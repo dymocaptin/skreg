@@ -3,6 +3,7 @@
 use std::fmt;
 
 use semver::Version;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 use crate::types::{Namespace, PackageName, ValidationError};
@@ -22,7 +23,7 @@ pub enum ParseError {
 }
 
 /// A fully-qualified package reference.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PackageRef {
     /// Publisher namespace.
     pub namespace: Namespace,
