@@ -7,6 +7,10 @@ edition = "2021"
 name = "skreg-worker"
 path = "src/main.rs"
 
+[lib]
+name = "skreg_worker"
+path = "src/lib.rs"
+
 [dependencies]
 skillpkg-core   = { path = "../skillpkg-core" }
 skillpkg-crypto = { path = "../skillpkg-crypto" }
@@ -21,3 +25,7 @@ log             = { workspace = true }
 env_logger      = { workspace = true }
 uuid            = { workspace = true }
 chrono          = { workspace = true }
+walkdir         = "2"
+
+[dev-dependencies]
+tempfile = "3"
