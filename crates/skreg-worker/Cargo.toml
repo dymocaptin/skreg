@@ -1,0 +1,23 @@
+[package]
+name    = "skreg-worker"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "skreg-worker"
+path = "src/main.rs"
+
+[dependencies]
+skillpkg-core   = { path = "../skillpkg-core" }
+skillpkg-crypto = { path = "../skillpkg-crypto" }
+skillpkg-pack   = { path = "../skillpkg-pack" }
+anyhow          = { workspace = true }
+tokio           = { workspace = true }
+sqlx            = { workspace = true }
+serde           = { workspace = true }
+serde_json      = { workspace = true }
+thiserror       = { workspace = true }
+log             = { workspace = true }
+env_logger      = { workspace = true }
+uuid            = { workspace = true }
+chrono          = { workspace = true }

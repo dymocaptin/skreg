@@ -1,0 +1,12 @@
+[package]
+name    = "skillpkg-crypto"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+skillpkg-core = { path = "../skillpkg-core" }
+thiserror     = { workspace = true }
+log           = { workspace = true }
+x509-cert     = { workspace = true }
+der           = { workspace = true }
+sha2          = { workspace = true }

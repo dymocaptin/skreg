@@ -1,0 +1,20 @@
+[package]
+name    = "skillpkg-cli"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "skillpkg"
+path = "src/main.rs"
+
+[dependencies]
+skillpkg-core   = { path = "../skillpkg-core" }
+skillpkg-crypto = { path = "../skillpkg-crypto" }
+skillpkg-pack   = { path = "../skillpkg-pack" }
+skillpkg-client = { path = "../skillpkg-client" }
+anyhow          = { workspace = true }
+tokio           = { workspace = true }
+log             = { workspace = true }
+env_logger      = { workspace = true }
+clap            = { version = "4", features = ["derive"] }
+toml            = "0.8"
