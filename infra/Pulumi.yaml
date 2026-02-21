@@ -1,0 +1,6 @@
+name: skreg-infra
+description: skreg infrastructure — skills registry
+runtime:
+  name: python
+  options:
+    virtualenv: .venv
