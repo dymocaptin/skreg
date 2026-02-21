@@ -28,3 +28,7 @@ uuid            = { workspace = true }
 chrono          = { workspace = true }
 tower-http      = { version = "0.5", features = ["trace", "cors"] }
 jsonwebtoken    = "9"
+
+[dev-dependencies]
+axum-test = "14"
+tokio     = { workspace = true }
