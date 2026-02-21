@@ -1,0 +1,14 @@
+pulumi<4,>=3
+pulumi-aws<7,>=6
+pulumi-gcp<8,>=7
+pulumi-azure-native<3,>=2
+pydantic-settings<3,>=2
+structlog<25,>=24
+
+[dev]
+pytest>=8
+pytest-cov>=5
+mypy>=1.9
+ruff>=0.4
+black>=24
+pulumi[testing]<4,>=3

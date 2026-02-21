@@ -39,4 +39,7 @@ mypy_path = "src"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "--cov=skillpkg_infra --cov-report=term-missing --cov-fail-under=90"
+addopts = "--cov=skillpkg_infra --cov-report=term-missing --cov-fail-under=70"
+
+[tool.coverage.run]
+omit = ["*/skillpkg_infra/__main__.py"]

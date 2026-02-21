@@ -1,0 +1,17 @@
+Metadata-Version: 2.4
+Name: skillpkg-infra
+Version: 0.1.0
+Requires-Python: >=3.12
+Requires-Dist: pulumi<4,>=3
+Requires-Dist: pulumi-aws<7,>=6
+Requires-Dist: pulumi-gcp<8,>=7
+Requires-Dist: pulumi-azure-native<3,>=2
+Requires-Dist: pydantic-settings<3,>=2
+Requires-Dist: structlog<25,>=24
+Provides-Extra: dev
+Requires-Dist: pytest>=8; extra == "dev"
+Requires-Dist: pytest-cov>=5; extra == "dev"
+Requires-Dist: mypy>=1.9; extra == "dev"
+Requires-Dist: ruff>=0.4; extra == "dev"
+Requires-Dist: black>=24; extra == "dev"
+Requires-Dist: pulumi[testing]<4,>=3; extra == "dev"
