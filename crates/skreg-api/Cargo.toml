@@ -7,6 +7,10 @@ edition = "2021"
 name = "skreg-api"
 path = "src/main.rs"
 
+[lib]
+name = "skreg_api"
+path = "src/lib.rs"
+
 [dependencies]
 skillpkg-core   = { path = "../skillpkg-core" }
 skillpkg-crypto = { path = "../skillpkg-crypto" }
