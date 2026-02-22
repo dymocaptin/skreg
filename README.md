@@ -76,4 +76,4 @@ uv run mypy src/
 
 ## License
 
-TBD
+Apache 2.0 — see [LICENSE](LICENSE).
