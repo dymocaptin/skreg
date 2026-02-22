@@ -29,9 +29,7 @@ class PkiOutputs:
             hsm_backend: Either ``"hsm"`` or ``"software"``.
         """
         self.hsm_key_id: pulumi.Output[str] = hsm_key_id
-        self.intermediate_ca_cert_secret_name: pulumi.Output[str] = (
-            intermediate_ca_cert_secret_name
-        )
+        self.intermediate_ca_cert_secret_name: pulumi.Output[str] = intermediate_ca_cert_secret_name
         self.crl_bucket_path: pulumi.Output[str] = crl_bucket_path
         self.hsm_backend: str = hsm_backend
 

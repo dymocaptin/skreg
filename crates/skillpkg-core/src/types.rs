@@ -46,15 +46,22 @@ impl Namespace {
             return Err(ValidationError::Empty);
         }
         if slug.len() > 64 {
-            return Err(ValidationError::TooLong { max: 64, got: slug.len() });
+            return Err(ValidationError::TooLong {
+                max: 64,
+                got: slug.len(),
+            });
         }
-        if !slug.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-') {
+        if !slug
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+        {
             return Err(ValidationError::InvalidCharacters);
         }
         Ok(Self(slug.to_owned()))
     }
 
     /// Return the inner slug string.
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -81,15 +88,22 @@ impl PackageName {
             return Err(ValidationError::Empty);
         }
         if name.len() > 64 {
-            return Err(ValidationError::TooLong { max: 64, got: name.len() });
+            return Err(ValidationError::TooLong {
+                max: 64,
+                got: name.len(),
+            });
         }
-        if !name.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-') {
+        if !name
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+        {
             return Err(ValidationError::InvalidCharacters);
         }
         Ok(Self(name.to_owned()))
     }
 
     /// Return the inner name string.
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
     }
@@ -122,6 +136,7 @@ impl Sha256Digest {
     }
 
     /// Return the hex string representation.
+    #[must_use]
     pub fn as_hex(&self) -> &str {
         &self.0
     }

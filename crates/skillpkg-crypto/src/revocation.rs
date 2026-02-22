@@ -22,8 +22,11 @@ pub struct InMemoryRevocationStore {
 
 impl InMemoryRevocationStore {
     /// Create an empty revocation store.
+    #[must_use]
     pub fn new() -> Self {
-        Self { revoked: HashSet::new() }
+        Self {
+            revoked: HashSet::new(),
+        }
     }
 
     /// Mark a certificate serial as revoked.

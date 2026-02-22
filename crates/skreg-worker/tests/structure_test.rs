@@ -4,7 +4,11 @@ use skreg_worker::stages::structure::check_structure;
 use tempfile::TempDir;
 
 fn make_valid_dir(dir: &TempDir) {
-    fs::write(dir.path().join("SKILL.md"), "---\nname: test\ndescription: hello\n---\n").unwrap();
+    fs::write(
+        dir.path().join("SKILL.md"),
+        "---\nname: test\ndescription: hello\n---\n",
+    )
+    .unwrap();
     fs::write(dir.path().join("manifest.json"), r#"{"name":"test"}"#).unwrap();
 }
 

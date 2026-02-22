@@ -56,7 +56,10 @@ impl Installer {
     /// * `install_root` — Base directory for installed packages
     ///   (e.g. `~/.skillpkg/packages`).
     pub fn new(client: Arc<dyn RegistryClient>, install_root: PathBuf) -> Self {
-        Self { client, install_root }
+        Self {
+            client,
+            install_root,
+        }
     }
 
     /// Download, verify, and extract a package.

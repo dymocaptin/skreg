@@ -2078,10 +2078,13 @@ dependencies = [
  "clap",
  "env_logger",
  "log",
+ "sha2",
  "skillpkg-client",
  "skillpkg-core",
  "skillpkg-crypto",
  "skillpkg-pack",
+ "tempfile",
+ "thiserror 1.0.69",
  "tokio",
  "toml",
 ]

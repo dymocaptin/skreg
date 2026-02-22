@@ -44,20 +44,32 @@ pub fn check_structure(path: &Path) -> Result<(), StructureError> {
 
     let mut total_size: u64 = 0;
 
-    for entry in walkdir::WalkDir::new(path).into_iter() {
-        let entry = entry.map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))?;
+    for entry in walkdir::WalkDir::new(path) {
+        let entry = entry.map_err(|e| std::io::Error::other(e.to_string()))?;
         if entry.file_type().is_dir() {
             continue;
         }
 
-        let ext = entry.path().extension().and_then(|e| e.to_str()).unwrap_or("");
+        let ext = entry
+            .path()
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("");
         if !ALLOWED_EXTENSIONS.contains(&ext) {
-            return Err(StructureError::DisallowedFileType(entry.path().display().to_string()));
+            return Err(StructureError::DisallowedFileType(
+                entry.path().display().to_string(),
+            ));
         }
 
-        total_size += entry.metadata().map_err(|e| StructureError::Io(e.into()))?.len();
+        total_size += entry
+            .metadata()
+            .map_err(|e| StructureError::Io(e.into()))?
+            .len();
         if total_size > MAX_TOTAL_BYTES {
-            return Err(StructureError::TooLarge { size: total_size, max: MAX_TOTAL_BYTES });
+            return Err(StructureError::TooLarge {
+                size: total_size,
+                max: MAX_TOTAL_BYTES,
+            });
         }
     }
 

@@ -63,7 +63,7 @@ impl RegistryClient for HttpRegistryClient {
             let version_segment = pkg_ref
                 .version
                 .as_ref()
-                .map_or_else(|| "latest".to_owned(), |v| v.to_string());
+                .map_or_else(|| "latest".to_owned(), ToString::to_string);
 
             let meta_url = format!(
                 "{}/v1/packages/{}/{}/{}",
@@ -90,9 +90,20 @@ impl RegistryClient for HttpRegistryClient {
 
             let tarball = self.http.get(&dl_url).send().await?.bytes().await?.to_vec();
             let sig_url = format!("{dl_url}/sig");
-            let signature = self.http.get(&sig_url).send().await?.bytes().await?.to_vec();
+            let signature = self
+                .http
+                .get(&sig_url)
+                .send()
+                .await?
+                .bytes()
+                .await?
+                .to_vec();
 
-            Ok(ResolvedVersion { manifest, tarball, signature })
+            Ok(ResolvedVersion {
+                manifest,
+                tarball,
+                signature,
+            })
         })
     }
 }

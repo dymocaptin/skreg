@@ -6,7 +6,7 @@ use thiserror::Error;
 /// Errors that can occur during database initialisation.
 #[derive(Debug, Error)]
 pub enum DbError {
-    /// SQLx returned an error connecting or migrating.
+    /// `SQLx` returned an error connecting or migrating.
     #[error("database error: {0}")]
     Sqlx(#[from] sqlx::Error),
     /// Migration error.
