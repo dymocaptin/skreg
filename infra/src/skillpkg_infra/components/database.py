@@ -16,28 +16,18 @@ class DatabaseOutputs:
     def __init__(
         self,
         connection_secret_name: pulumi.Output[str],
+        connection_secret_arn: pulumi.Output[str],
         host: pulumi.Output[str],
         port: pulumi.Output[int],
         database_name: pulumi.Output[str],
     ) -> None:
-        """Initialise database outputs.
-
-        Args:
-            connection_secret_name: Provider secret store key for DB credentials.
-            host: Database hostname or IP address.
-            port: Database TCP port.
-            database_name: Name of the application database.
-        """
         self.connection_secret_name: pulumi.Output[str] = connection_secret_name
+        self.connection_secret_arn: pulumi.Output[str] = connection_secret_arn
         self.host: pulumi.Output[str] = host
         self.port: pulumi.Output[int] = port
         self.database_name: pulumi.Output[str] = database_name
 
 
 class SkillpkgDatabase(Protocol):
-    """Provider-agnostic interface for the registry PostgreSQL component."""
-
     @property
-    def outputs(self) -> DatabaseOutputs:
-        """Return the resolved database connection outputs."""
-        ...
+    def outputs(self) -> DatabaseOutputs: ...

@@ -95,6 +95,7 @@ class AwsDatabase(pulumi.ComponentResource):
 
         self._outputs: DatabaseOutputs = DatabaseOutputs(
             connection_secret_name=password_secret.name,
+            connection_secret_arn=password_secret.arn,
             host=instance.address,
             port=pulumi.Output.from_input(5432),
             database_name=pulumi.Output.from_input("skillpkg"),
@@ -103,6 +104,7 @@ class AwsDatabase(pulumi.ComponentResource):
         self.register_outputs(
             {
                 "connection_secret_name": self._outputs.connection_secret_name,
+                "connection_secret_arn": self._outputs.connection_secret_arn,
                 "host": self._outputs.host,
                 "port": self._outputs.port,
                 "database_name": self._outputs.database_name,

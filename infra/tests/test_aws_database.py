@@ -4,53 +4,56 @@ from __future__ import annotations
 import pulumi
 from pulumi.runtime import Mocks
 
+from skillpkg_infra.providers.aws.database import AwsDatabase, AwsDatabaseArgs
+
 
 class SkillpkgMocks(Mocks):
-    """Deterministic mock returning stable IDs for all resources."""
-
     def new_resource(
-        self,
-        args: pulumi.runtime.MockResourceArgs,
+        self, args: pulumi.runtime.MockResourceArgs
     ) -> tuple[str, dict[str, object]]:
-        """Return a stable mock ID and echo inputs as outputs."""
-        return (f"{args.name}-id", args.inputs)
+        outputs: dict[str, object] = dict(args.inputs)
+        outputs["arn"] = f"arn:aws:secretsmanager:us-east-1:123456789012:secret:{args.name}-id"
+        outputs["address"] = "localhost"
+        outputs["name"] = args.name
+        return (f"{args.name}-id", outputs)
 
     def call(
-        self,
-        args: pulumi.runtime.MockCallArgs,
+        self, args: pulumi.runtime.MockCallArgs
     ) -> tuple[dict[str, object], list[tuple[str, str]]]:
-        """Return empty outputs for all provider function calls."""
         return ({}, [])
 
 
-pulumi.runtime.set_mocks(SkillpkgMocks())
-
-from skillpkg_infra.providers.aws.database import AwsDatabase, AwsDatabaseArgs  # noqa: E402
+pulumi.runtime.set_mocks(SkillpkgMocks(), preview=False)
 
 
 @pulumi.runtime.test
 def test_database_port_is_5432() -> None:
-    """AwsDatabase outputs must expose PostgreSQL port 5432."""
-    db = AwsDatabase(
-        "test-db",
-        AwsDatabaseArgs(vpc_id="vpc-abc", subnet_ids=["subnet-1"]),
-    )
+    pulumi.runtime.set_mocks(SkillpkgMocks(), preview=False)
+    db = AwsDatabase("test-db", AwsDatabaseArgs(vpc_id="vpc-abc", subnet_ids=["subnet-1"]))
 
     def assert_port(port: int) -> None:
-        assert port == 5432, f"Expected 5432, got {port}"
+        assert port == 5432
 
     return db.outputs.port.apply(assert_port)
 
 
 @pulumi.runtime.test
 def test_database_name_is_skillpkg() -> None:
-    """AwsDatabase outputs must use 'skillpkg' as the database name."""
-    db = AwsDatabase(
-        "test-db2",
-        AwsDatabaseArgs(vpc_id="vpc-abc", subnet_ids=["subnet-1"]),
-    )
+    pulumi.runtime.set_mocks(SkillpkgMocks(), preview=False)
+    db = AwsDatabase("test-db2", AwsDatabaseArgs(vpc_id="vpc-abc", subnet_ids=["subnet-1"]))
 
     def assert_name(name: str) -> None:
-        assert name == "skillpkg", f"Expected 'skillpkg', got {name}"
+        assert name == "skillpkg"
 
     return db.outputs.database_name.apply(assert_name)
+
+
+@pulumi.runtime.test
+def test_database_connection_secret_arn_is_set() -> None:
+    pulumi.runtime.set_mocks(SkillpkgMocks(), preview=False)
+    db = AwsDatabase("test-db3", AwsDatabaseArgs(vpc_id="vpc-abc", subnet_ids=["subnet-1"]))
+
+    def assert_arn(arn: str) -> None:
+        assert arn, f"Expected non-empty connection_secret_arn, got {arn!r}"
+
+    return db.outputs.connection_secret_arn.apply(assert_arn)

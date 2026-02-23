@@ -16,22 +16,14 @@ class NetworkOutputs:
     def __init__(
         self,
         vpc_id: pulumi.Output[str],
+        public_subnet_ids: list[pulumi.Output[str]],
         private_subnet_ids: list[pulumi.Output[str]],
     ) -> None:
-        """Initialise network outputs.
-
-        Args:
-            vpc_id: ID of the provisioned VPC or equivalent.
-            private_subnet_ids: IDs of private subnets for backend services.
-        """
         self.vpc_id: pulumi.Output[str] = vpc_id
+        self.public_subnet_ids: list[pulumi.Output[str]] = public_subnet_ids
         self.private_subnet_ids: list[pulumi.Output[str]] = private_subnet_ids
 
 
 class SkillpkgNetwork(Protocol):
-    """Provider-agnostic interface for the network component."""
-
     @property
-    def outputs(self) -> NetworkOutputs:
-        """Return the resolved network outputs."""
-        ...
+    def outputs(self) -> NetworkOutputs: ...
