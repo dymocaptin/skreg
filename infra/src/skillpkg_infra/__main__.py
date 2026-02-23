@@ -4,9 +4,16 @@ from __future__ import annotations
 
 import logging
 
+import pulumi
 import structlog
 
-from skillpkg_infra.config import StackConfig
+from skillpkg_infra.config import CloudProvider, StackConfig
+from skillpkg_infra.providers.aws.compute import AwsCompute, AwsComputeArgs
+from skillpkg_infra.providers.aws.database import AwsDatabase, AwsDatabaseArgs
+from skillpkg_infra.providers.aws.network import AwsNetwork
+from skillpkg_infra.providers.aws.oidc import AwsOidc
+from skillpkg_infra.providers.aws.pki import AwsPki, AwsPkiArgs
+from skillpkg_infra.providers.aws.storage import AwsStorage
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -24,7 +31,46 @@ class SkillpkgStack:
             "stack_run_started",
             extra={"cloud_provider": self._config.cloud_provider.value},
         )
-        raise NotImplementedError("Provider implementations not yet built.")
+        if self._config.cloud_provider == CloudProvider.AWS:
+            self._run_aws()
+        else:
+            raise NotImplementedError(
+                f"Provider '{self._config.cloud_provider}' not yet implemented."
+            )
+
+    def _run_aws(self) -> None:
+        config = self._config
+
+        network = AwsNetwork("skreg-network")
+        storage = AwsStorage("skreg-storage")
+        pki = AwsPki("skreg-pki", AwsPkiArgs(bucket_name=storage.outputs.bucket_name))
+        database = AwsDatabase(
+            "skreg-db",
+            AwsDatabaseArgs(
+                vpc_id=network.outputs.vpc_id,
+                subnet_ids=list(network.outputs.private_subnet_ids),
+                multi_az=config.multi_az,
+            ),
+        )
+        compute = AwsCompute(
+            "skreg-compute",
+            AwsComputeArgs(
+                vpc_id=network.outputs.vpc_id,
+                public_subnet_ids=list(network.outputs.public_subnet_ids),
+                private_subnet_ids=list(network.outputs.private_subnet_ids),
+                db_secret_arn=database.outputs.connection_secret_arn,
+                api_image_uri=config.api_image_uri,
+                worker_image_uri=config.worker_image_uri,
+            ),
+        )
+        oidc = AwsOidc("skreg-oidc", github_repo="dymocaptin/skreg")
+
+        pulumi.export("api_url", compute.outputs.service_url)
+        pulumi.export("cdn_base_url", storage.outputs.cdn_base_url)
+        pulumi.export("root_ca_cert", pki.root_ca_cert_pem)
+        pulumi.export("ecr_api_repo", compute.ecr_api_repo)
+        pulumi.export("ecr_worker_repo", compute.ecr_worker_repo)
+        pulumi.export("oidc_role_arn", oidc.outputs.role_arn)
 
 
 if __name__ == "__main__":
