@@ -55,3 +55,50 @@ jobs:
 
       - name: pytest
         run: uv run pytest --cov-fail-under=90
+
+  build-push:
+    name: Build and push Docker images to ECR
+    needs: [rust, python-infra]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
+          aws-region: us-west-2
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push skreg-api
+        env:
+          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          SHA: ${{ github.sha }}
+        run: |
+          docker build \
+            -f crates/skreg-api/Dockerfile \
+            -t "$REGISTRY/skreg-api:$SHA" \
+            -t "$REGISTRY/skreg-api:latest" \
+            .
+          docker push "$REGISTRY/skreg-api:$SHA"
+          docker push "$REGISTRY/skreg-api:latest"
+
+      - name: Build and push skreg-worker
+        env:
+          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          SHA: ${{ github.sha }}
+        run: |
+          docker build \
+            -f crates/skreg-worker/Dockerfile \
+            -t "$REGISTRY/skreg-worker:$SHA" \
+            -t "$REGISTRY/skreg-worker:latest" \
+            .
+          docker push "$REGISTRY/skreg-worker:$SHA"
+          docker push "$REGISTRY/skreg-worker:latest"
