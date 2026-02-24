@@ -44,3 +44,14 @@ def test_oidc_role_arn_different_repo() -> None:
         assert arn
 
     return oidc.outputs.role_arn.apply(check)
+
+
+@pulumi.runtime.test
+def test_oidc_deploy_role_arn_is_set() -> None:
+    pulumi.runtime.set_mocks(SkillpkgMocks())
+    oidc = AwsOidc("test-oidc3", github_repo="dymocaptin/skreg")
+
+    def check(arn: str) -> None:
+        assert arn
+
+    return oidc.outputs.deploy_role_arn.apply(check)

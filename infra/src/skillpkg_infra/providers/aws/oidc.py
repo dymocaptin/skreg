@@ -19,8 +19,13 @@ _GITHUB_THUMBPRINTS: list[str] = [
 class AwsOidcOutputs:
     """Resolved outputs from the OIDC component."""
 
-    def __init__(self, role_arn: pulumi.Output[str]) -> None:
+    def __init__(
+        self,
+        role_arn: pulumi.Output[str],
+        deploy_role_arn: pulumi.Output[str],
+    ) -> None:
         self.role_arn: pulumi.Output[str] = role_arn
+        self.deploy_role_arn: pulumi.Output[str] = deploy_role_arn
 
 
 class AwsOidc(pulumi.ComponentResource):
@@ -109,8 +114,29 @@ class AwsOidc(pulumi.ComponentResource):
             opts=pulumi.ResourceOptions(parent=self),
         )
 
-        self._outputs: AwsOidcOutputs = AwsOidcOutputs(role_arn=role.arn)
-        self.register_outputs({"role_arn": self._outputs.role_arn})
+        deploy_role = aws.iam.Role(
+            f"{name}-deploy-role",
+            aws.iam.RoleArgs(assume_role_policy=trust_policy),
+            opts=pulumi.ResourceOptions(parent=self),
+        )
+
+        aws.iam.RolePolicyAttachment(
+            f"{name}-deploy-policy",
+            aws.iam.RolePolicyAttachmentArgs(
+                role=deploy_role.name,
+                policy_arn="arn:aws:iam::aws:policy/AdministratorAccess",
+            ),
+            opts=pulumi.ResourceOptions(parent=self),
+        )
+
+        self._outputs: AwsOidcOutputs = AwsOidcOutputs(
+            role_arn=role.arn,
+            deploy_role_arn=deploy_role.arn,
+        )
+        self.register_outputs({
+            "role_arn": self._outputs.role_arn,
+            "deploy_role_arn": self._outputs.deploy_role_arn,
+        })
 
     @property
     def outputs(self) -> AwsOidcOutputs:

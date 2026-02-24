@@ -71,6 +71,7 @@ class SkillpkgStack:
         pulumi.export("ecr_api_repo", compute.ecr_api_repo)
         pulumi.export("ecr_worker_repo", compute.ecr_worker_repo)
         pulumi.export("oidc_role_arn", oidc.outputs.role_arn)
+        pulumi.export("deploy_role_arn", oidc.outputs.deploy_role_arn)
 
 
 if __name__ == "__main__":

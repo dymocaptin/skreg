@@ -64,6 +64,8 @@ jobs:
     permissions:
       id-token: write
       contents: read
+    outputs:
+      registry: ${{ steps.ecr-login.outputs.registry }}
     steps:
       - uses: actions/checkout@v4
 
@@ -102,3 +104,42 @@ jobs:
             .
           docker push "$REGISTRY/skreg-worker:$SHA"
           docker push "$REGISTRY/skreg-worker:latest"
+
+  deploy:
+    name: Deploy infrastructure with Pulumi
+    needs: [build-push]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      id-token: write
+      contents: read
+    defaults:
+      run:
+        working-directory: infra
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: us-west-2
+
+      - name: Install Pulumi CLI
+        uses: pulumi/actions@v5
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Pulumi up
+        env:
+          PULUMI_BACKEND_URL: ${{ vars.PULUMI_BACKEND_URL }}
+          SKILLPKG_CLOUD_PROVIDER: aws
+          SKILLPKG_API_IMAGE_URI: ${{ needs.build-push.outputs.registry }}/skreg-api:${{ github.sha }}
+          SKILLPKG_WORKER_IMAGE_URI: ${{ needs.build-push.outputs.registry }}/skreg-worker:${{ github.sha }}
+        run: |
+          pulumi stack select main
+          pulumi up --yes
