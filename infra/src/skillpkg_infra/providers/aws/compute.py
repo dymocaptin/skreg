@@ -187,7 +187,7 @@ class AwsCompute(pulumi.ComponentResource):
             opts=pulumi.ResourceOptions(parent=self),
         )
 
-        aws.lb.Listener(
+        listener = aws.lb.Listener(
             f"{name}-listener",
             aws.lb.ListenerArgs(
                 load_balancer_arn=alb.arn,
@@ -291,7 +291,7 @@ class AwsCompute(pulumi.ComponentResource):
                     )
                 ],
             ),
-            opts=pulumi.ResourceOptions(parent=self),
+            opts=pulumi.ResourceOptions(parent=self, depends_on=[listener]),
         )
 
         worker_svc = aws.ecs.Service(

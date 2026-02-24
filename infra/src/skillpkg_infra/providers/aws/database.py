@@ -29,7 +29,7 @@ class AwsDatabaseArgs:
         self,
         vpc_id: pulumi.Input[str],
         subnet_ids: list[pulumi.Input[str]],
-        instance_class: pulumi.Input[str] = "db.t4g.medium",
+        instance_class: pulumi.Input[str] = "db.t3.micro",
         multi_az: pulumi.Input[bool] = False,
     ) -> None:
         """Initialise RDS database arguments."""
