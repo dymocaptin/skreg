@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-import logging
-
 import json
+import logging
 
 import pulumi
 import pulumi_aws as aws
