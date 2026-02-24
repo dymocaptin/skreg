@@ -14,8 +14,10 @@ dependencies = [
     "pulumi-aws>=6,<7",
     "pulumi-gcp>=7,<8",
     "pulumi-azure-native>=2,<3",
+    "pulumi-random>=4,<5",
     "pydantic-settings>=2,<3",
     "structlog>=24,<25",
+    "cryptography>=42,<43",
 ]
 
 [project.optional-dependencies]
