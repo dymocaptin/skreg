@@ -133,10 +133,12 @@ class AwsOidc(pulumi.ComponentResource):
             role_arn=role.arn,
             deploy_role_arn=deploy_role.arn,
         )
-        self.register_outputs({
-            "role_arn": self._outputs.role_arn,
-            "deploy_role_arn": self._outputs.deploy_role_arn,
-        })
+        self.register_outputs(
+            {
+                "role_arn": self._outputs.role_arn,
+                "deploy_role_arn": self._outputs.deploy_role_arn,
+            }
+        )
 
     @property
     def outputs(self) -> AwsOidcOutputs:
