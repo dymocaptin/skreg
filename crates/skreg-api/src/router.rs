@@ -4,11 +4,12 @@ use std::sync::Arc;
 
 use aws_sdk_s3::Client as S3Client;
 use aws_sdk_sesv2::Client as SesClient;
-use axum::{routing::get, Json, Router};
+use axum::{routing::{get, post}, Json, Router};
 use serde::Serialize;
 use sqlx::PgPool;
 
 use crate::handlers::search::search_handler;
+use crate::handlers::namespaces::create_namespace_handler;
 
 /// Shared application state injected into every handler.
 #[derive(Clone)]
@@ -38,8 +39,9 @@ struct HealthResponse {
 pub fn build_router(state: AppState) -> Router {
     let shared = Arc::new(state);
     Router::new()
-        .route("/healthz",   get(health_handler))
-        .route("/v1/search", get(search_handler))
+        .route("/healthz",        get(health_handler))
+        .route("/v1/search",      get(search_handler))
+        .route("/v1/namespaces",  post(create_namespace_handler))
         .with_state(shared)
 }
 
