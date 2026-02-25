@@ -11,6 +11,7 @@ use sqlx::PgPool;
 use crate::handlers::search::search_handler;
 use crate::handlers::auth::{login_handler, token_handler};
 use crate::handlers::namespaces::create_namespace_handler;
+use crate::handlers::jobs::job_status_handler;
 use crate::handlers::publish::publish_handler;
 
 /// Shared application state injected into every handler.
@@ -47,6 +48,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/v1/auth/login",    post(login_handler))
         .route("/v1/auth/token",    post(token_handler))
         .route("/v1/publish",       post(publish_handler))
+        .route("/v1/jobs/:id",      get(job_status_handler))
         .with_state(shared)
 }
 
