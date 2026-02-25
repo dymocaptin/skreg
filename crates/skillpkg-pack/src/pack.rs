@@ -38,7 +38,7 @@ pub fn pack_directory(source_dir: &Path, output_path: &Path) -> Result<(), PackE
         let name = entry.file_name();
         let name_str = name.to_string_lossy();
 
-        if name_str.starts_with('.') || name_str == ".git" {
+        if name_str.starts_with('.') || name_str == ".git" || name_str.ends_with(".skill") {
             continue;
         }
 
