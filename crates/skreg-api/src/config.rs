@@ -18,11 +18,11 @@ pub struct ApiConfig {
     /// PostgreSQL connection URL.
     pub database_url: String,
     /// TCP address to bind (e.g. `0.0.0.0:8080`).
-    pub bind_addr:    String,
+    pub bind_addr: String,
     /// S3 bucket name used for package artifact storage.
-    pub s3_bucket:    String,
+    pub s3_bucket: String,
     /// Sender address used for SES transactional email.
-    pub from_email:   String,
+    pub from_email: String,
 }
 
 impl ApiConfig {
@@ -35,8 +35,7 @@ impl ApiConfig {
         Ok(Self {
             database_url: env::var("DATABASE_URL")
                 .map_err(|_| ConfigError::Missing("DATABASE_URL".to_owned()))?,
-            bind_addr: env::var("BIND_ADDR")
-                .unwrap_or_else(|_| "0.0.0.0:8080".to_owned()),
+            bind_addr: env::var("BIND_ADDR").unwrap_or_else(|_| "0.0.0.0:8080".to_owned()),
             s3_bucket: env::var("S3_BUCKET")
                 .map_err(|_| ConfigError::Missing("S3_BUCKET".to_owned()))?,
             from_email: env::var("FROM_EMAIL")

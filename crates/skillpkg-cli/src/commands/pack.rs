@@ -46,9 +46,9 @@ pub fn pack_directory_with_sha(source_dir: &Path, output_path: &Path) -> Result<
 pub fn run_pack(dir: &Path) -> Result<()> {
     let manifest_raw = std::fs::read_to_string(dir.join("manifest.json"))?;
     let manifest: serde_json::Value = serde_json::from_str(&manifest_raw)?;
-    let name    = manifest["name"].as_str().unwrap_or("skill");
+    let name = manifest["name"].as_str().unwrap_or("skill");
     let version = manifest["version"].as_str().unwrap_or("0.0.0");
-    let output  = dir.join(format!("{name}-{version}.skill"));
+    let output = dir.join(format!("{name}-{version}.skill"));
 
     pack_directory_with_sha(dir, &output)?;
     println!("packed: {}", output.display());
@@ -64,7 +64,11 @@ mod tests {
     #[test]
     fn pack_produces_skill_file() {
         let dir = tempdir().unwrap();
-        fs::write(dir.path().join("SKILL.md"), "---\nname: test\ndescription: a test skill that is long enough\n---\n# Test").unwrap();
+        fs::write(
+            dir.path().join("SKILL.md"),
+            "---\nname: test\ndescription: a test skill that is long enough\n---\n# Test",
+        )
+        .unwrap();
         fs::write(
             dir.path().join("manifest.json"),
             r#"{"name":"test","namespace":"acme","version":"1.0.0","description":"a test skill that is long enough"}"#,

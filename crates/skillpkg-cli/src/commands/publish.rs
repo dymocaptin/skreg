@@ -18,7 +18,7 @@ struct PublishResponse {
 
 #[derive(Deserialize)]
 struct JobStatus {
-    status:  String,
+    status: String,
     message: Option<String>,
 }
 
@@ -31,22 +31,22 @@ struct JobStatus {
 /// or vetting rejects the package.
 pub async fn run_publish() -> Result<()> {
     let cfg_path = default_config_path();
-    let cfg = load_config(&cfg_path)
-        .context("not logged in — run `skillpkg login <namespace>` first")?;
+    let cfg =
+        load_config(&cfg_path).context("not logged in — run `skillpkg login <namespace>` first")?;
 
     let cwd = std::env::current_dir()?;
 
     let manifest_raw = std::fs::read_to_string(cwd.join("manifest.json"))
         .context("manifest.json not found in current directory")?;
     let manifest: serde_json::Value = serde_json::from_str(&manifest_raw)?;
-    let name    = manifest["name"].as_str().unwrap_or("skill");
+    let name = manifest["name"].as_str().unwrap_or("skill");
     let version = manifest["version"].as_str().unwrap_or("0.0.0");
 
     let skill_file = cwd.join(format!("{name}-{version}.skill"));
     pack_directory_with_sha(&cwd, &skill_file)?;
     println!("packed {}", skill_file.display());
 
-    let bytes  = std::fs::read(&skill_file)?;
+    let bytes = std::fs::read(&skill_file)?;
     let client = reqwest::Client::new();
 
     println!("uploading to {}...", cfg.registry);

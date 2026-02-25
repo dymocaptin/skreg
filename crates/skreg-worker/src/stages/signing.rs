@@ -42,21 +42,21 @@ pub async fn run_signing(
         .await
         .context("fetching CA private key from Secrets Manager")?;
 
-    let secret_str = secret.secret_string()
+    let secret_str = secret
+        .secret_string()
         .context("CA secret has no string value")?;
-    let secret_json: serde_json::Value = serde_json::from_str(secret_str)
-        .context("parsing CA secret JSON")?;
-    let pem = secret_json["private_key"].as_str()
+    let secret_json: serde_json::Value =
+        serde_json::from_str(secret_str).context("parsing CA secret JSON")?;
+    let pem = secret_json["private_key"]
+        .as_str()
         .context("CA secret missing 'private_key' field")?;
 
     // 2. Parse RSA private key
-    let private_key = RsaPrivateKey::from_pkcs8_pem(pem)
-        .context("parsing RSA private key PEM")?;
+    let private_key = RsaPrivateKey::from_pkcs8_pem(pem).context("parsing RSA private key PEM")?;
     let signing_key = SigningKey::<Sha256>::new(private_key);
 
     // 3. Sign the sha256 digest bytes (rng dropped before any await)
-    let digest_bytes = hex::decode(tarball_sha256)
-        .context("decoding sha256 hex")?;
+    let digest_bytes = hex::decode(tarball_sha256).context("decoding sha256 hex")?;
     let signature = {
         let mut rng = rand::thread_rng();
         sign_bytes(&signing_key, &digest_bytes, &mut rng)
@@ -78,8 +78,11 @@ pub async fn run_signing(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rsa::{RsaPrivateKey, pkcs1v15::{SigningKey, VerifyingKey}};
     use rsa::signature::Verifier;
+    use rsa::{
+        pkcs1v15::{SigningKey, VerifyingKey},
+        RsaPrivateKey,
+    };
 
     #[test]
     fn sign_and_verify_roundtrip() {
@@ -90,6 +93,11 @@ mod tests {
 
         let data = b"test digest";
         let sig = sign_bytes(&signing_key, data, &mut rng);
-        assert!(verifying_key.verify(data, &rsa::pkcs1v15::Signature::try_from(sig.as_slice()).unwrap()).is_ok());
+        assert!(verifying_key
+            .verify(
+                data,
+                &rsa::pkcs1v15::Signature::try_from(sig.as_slice()).unwrap()
+            )
+            .is_ok());
     }
 }

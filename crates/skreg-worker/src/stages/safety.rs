@@ -19,8 +19,12 @@ pub fn levenshtein(a: &str, b: &str) -> usize {
     let b: Vec<char> = b.chars().collect();
     let (m, n) = (a.len(), b.len());
     let mut dp = vec![vec![0usize; n + 1]; m + 1];
-    for i in 0..=m { dp[i][0] = i; }
-    for j in 0..=n { dp[0][j] = j; }
+    for i in 0..=m {
+        dp[i][0] = i;
+    }
+    for j in 0..=n {
+        dp[0][j] = j;
+    }
     for i in 1..=m {
         for j in 1..=n {
             dp[i][j] = if a[i - 1] == b[j - 1] {
@@ -60,12 +64,17 @@ pub fn check_safety(
     }) {
         let dist = levenshtein(name, existing);
         return Err(SafetyError::NameSquatting(
-            name.to_owned(), existing.clone(), dist,
+            name.to_owned(),
+            existing.clone(),
+            dist,
         ));
     }
 
     // Yanked re-upload check
-    if yanked_versions.iter().any(|(n, v)| n == name && v == version) {
+    if yanked_versions
+        .iter()
+        .any(|(n, v)| n == name && v == version)
+    {
         return Err(SafetyError::YankedVersion(format!("{name}@{version}")));
     }
 
@@ -98,6 +107,9 @@ mod tests {
 
     #[test]
     fn no_squatting_when_clear() {
-        assert!(!is_squatting("my-unique-skill-name-xyz", &["react".to_owned()]));
+        assert!(!is_squatting(
+            "my-unique-skill-name-xyz",
+            &["react".to_owned()]
+        ));
     }
 }

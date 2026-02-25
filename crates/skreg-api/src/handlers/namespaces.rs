@@ -13,7 +13,7 @@ use crate::router::SharedState;
 #[derive(Debug, Deserialize)]
 pub struct CreateNamespaceRequest {
     /// Desired namespace slug.
-    pub slug:  String,
+    pub slug: String,
     /// Contact email address for this namespace.
     pub email: String,
 }
@@ -22,7 +22,7 @@ pub struct CreateNamespaceRequest {
 #[derive(Debug, Serialize)]
 pub struct CreateNamespaceResponse {
     /// Plaintext API key — shown once, never stored.
-    pub api_key:   String,
+    pub api_key: String,
     /// The registered namespace slug.
     pub namespace: String,
 }
@@ -32,7 +32,9 @@ pub fn is_valid_slug(slug: &str) -> bool {
     let len = slug.len();
     len >= 3
         && len <= 32
-        && slug.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+        && slug
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
 }
 
 /// Handle `POST /v1/namespaces` — register a new namespace and return a plaintext API key.
@@ -55,21 +57,25 @@ pub async fn create_namespace_handler(
     .bind(&body.slug)
     .fetch_optional(pool)
     .await
-    .map_err(|e| { error!("db error creating namespace: {e}"); StatusCode::INTERNAL_SERVER_ERROR })?
+    .map_err(|e| {
+        error!("db error creating namespace: {e}");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?
     .ok_or(StatusCode::CONFLICT)?;
 
-    let api_key  = generate_api_key();
+    let api_key = generate_api_key();
     let key_hash = hash_secret(&api_key);
 
-    sqlx::query(
-        "INSERT INTO api_keys (namespace_id, key_hash, email) VALUES ($1, $2, $3)",
-    )
-    .bind(ns_id)
-    .bind(&key_hash)
-    .bind(&body.email)
-    .execute(pool)
-    .await
-    .map_err(|e| { error!("db error creating api key: {e}"); StatusCode::INTERNAL_SERVER_ERROR })?;
+    sqlx::query("INSERT INTO api_keys (namespace_id, key_hash, email) VALUES ($1, $2, $3)")
+        .bind(ns_id)
+        .bind(&key_hash)
+        .bind(&body.email)
+        .execute(pool)
+        .await
+        .map_err(|e| {
+            error!("db error creating api key: {e}");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     Ok(Json(CreateNamespaceResponse {
         api_key,
@@ -84,18 +90,17 @@ mod tests {
     #[test]
     fn create_namespace_request_deserialises() {
         let body = json!({ "slug": "acme", "email": "dev@acme.com" });
-        let req: super::CreateNamespaceRequest =
-            serde_json::from_value(body).unwrap();
+        let req: super::CreateNamespaceRequest = serde_json::from_value(body).unwrap();
         assert_eq!(req.slug, "acme");
         assert_eq!(req.email, "dev@acme.com");
     }
 
     #[test]
     fn invalid_slug_rejected() {
-        assert!(!super::is_valid_slug("AB"));        // uppercase
-        assert!(!super::is_valid_slug("ab"));        // too short
+        assert!(!super::is_valid_slug("AB")); // uppercase
+        assert!(!super::is_valid_slug("ab")); // too short
         assert!(!super::is_valid_slug(&"a".repeat(33))); // too long
-        assert!(super::is_valid_slug("acme-corp"));  // valid
-        assert!(super::is_valid_slug("abc"));        // min length
+        assert!(super::is_valid_slug("acme-corp")); // valid
+        assert!(super::is_valid_slug("abc")); // min length
     }
 }

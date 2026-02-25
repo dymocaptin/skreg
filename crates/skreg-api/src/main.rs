@@ -3,7 +3,7 @@
 use skreg_api::{
     config::ApiConfig,
     db::connect_and_migrate,
-    router::{AppState, build_router},
+    router::{build_router, AppState},
 };
 
 #[tokio::main]
@@ -14,9 +14,9 @@ async fn main() -> anyhow::Result<()> {
     let aws_cfg = aws_config::load_from_env().await;
     let state = AppState {
         pool,
-        s3:         aws_sdk_s3::Client::new(&aws_cfg),
-        ses:        aws_sdk_sesv2::Client::new(&aws_cfg),
-        s3_bucket:  config.s3_bucket.clone(),
+        s3: aws_sdk_s3::Client::new(&aws_cfg),
+        ses: aws_sdk_sesv2::Client::new(&aws_cfg),
+        s3_bucket: config.s3_bucket.clone(),
         from_email: config.from_email.clone(),
     };
     let app = build_router(state);

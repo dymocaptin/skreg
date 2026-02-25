@@ -77,6 +77,9 @@ pub async fn run_login(namespace: &str) -> Result<()> {
         api_key,
     };
     save_config(&cfg, &default_config_path())?;
-    println!("Logged in as {namespace}. Config saved to {}", default_config_path().display());
+    println!(
+        "Logged in as {namespace}. Config saved to {}",
+        default_config_path().display()
+    );
     Ok(())
 }

@@ -9,11 +9,11 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CliConfig {
     /// Base URL of the skill registry.
-    pub registry:  String,
+    pub registry: String,
     /// Authenticated namespace slug.
     pub namespace: String,
     /// Plaintext API key for this namespace.
-    pub api_key:   String,
+    pub api_key: String,
 }
 
 /// Return the default path for the CLI config file (`~/.skillpkg/config.toml`).
@@ -56,9 +56,9 @@ mod tests {
         let dir = tempdir().unwrap();
         let path = dir.path().join("config.toml");
         let cfg = CliConfig {
-            registry:  "https://example.com".to_owned(),
+            registry: "https://example.com".to_owned(),
             namespace: "acme".to_owned(),
-            api_key:   "skreg_abc".to_owned(),
+            api_key: "skreg_abc".to_owned(),
         };
         save_config(&cfg, &path).unwrap();
         let loaded = load_config(&path).unwrap();

@@ -12,9 +12,9 @@ use crate::router::SharedState;
 #[derive(Debug, Serialize)]
 pub struct JobStatusResponse {
     /// Job UUID.
-    pub id:      String,
+    pub id: String,
     /// Current status: `pending`, `pass`, `fail`, or `quarantined`.
-    pub status:  String,
+    pub status: String,
     /// Optional human-readable detail from the vetting results.
     pub message: Option<String>,
 }
@@ -30,15 +30,19 @@ pub async fn job_status_handler(
     .bind(id)
     .fetch_optional(&state.pool)
     .await
-    .map_err(|e| { error!("db: {e}"); StatusCode::INTERNAL_SERVER_ERROR })?
+    .map_err(|e| {
+        error!("db: {e}");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?
     .ok_or(StatusCode::NOT_FOUND)?;
 
-    let message = row.1
+    let message = row
+        .1
         .and_then(|v| v.get("message").cloned())
         .and_then(|v| v.as_str().map(str::to_owned));
 
     Ok(Json(JobStatusResponse {
-        id:     id.to_string(),
+        id: id.to_string(),
         status: row.0,
         message,
     }))
@@ -51,8 +55,8 @@ mod tests {
     #[test]
     fn job_response_serialises() {
         let r = JobStatusResponse {
-            id:      "abc".to_owned(),
-            status:  "pending".to_owned(),
+            id: "abc".to_owned(),
+            status: "pending".to_owned(),
             message: None,
         };
         let json = serde_json::to_string(&r).unwrap();

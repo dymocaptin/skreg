@@ -9,7 +9,11 @@ use crate::auth::hash_secret;
 /// Extract the raw token from an `Authorization: Bearer <token>` header value.
 pub fn extract_bearer(header: &str) -> Option<String> {
     let token = header.strip_prefix("Bearer ")?;
-    if token.is_empty() { None } else { Some(token.to_owned()) }
+    if token.is_empty() {
+        None
+    } else {
+        Some(token.to_owned())
+    }
 }
 
 /// Resolve a namespace slug from a raw API key.
@@ -34,7 +38,10 @@ pub async fn resolve_namespace(
     .bind(&key_hash)
     .fetch_optional(pool)
     .await
-    .map_err(|e| { error!("db: {e}"); StatusCode::INTERNAL_SERVER_ERROR })?
+    .map_err(|e| {
+        error!("db: {e}");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?
     .ok_or(StatusCode::UNAUTHORIZED)?;
 
     Ok(row)

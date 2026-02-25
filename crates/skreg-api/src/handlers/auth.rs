@@ -16,7 +16,7 @@ pub struct LoginRequest {
     /// Namespace slug to authenticate for.
     pub namespace: String,
     /// Email address registered with this namespace.
-    pub email:     String,
+    pub email: String,
 }
 
 /// Request body for `POST /v1/auth/token`.
@@ -25,14 +25,14 @@ pub struct TokenRequest {
     /// Namespace slug to exchange the OTP for.
     pub namespace: String,
     /// 6-digit one-time password received by email.
-    pub otp:       String,
+    pub otp: String,
 }
 
 /// Response body for `POST /v1/auth/token`.
 #[derive(Debug, Serialize)]
 pub struct TokenResponse {
     /// New plaintext API key — shown once, never stored.
-    pub api_key:   String,
+    pub api_key: String,
     /// The authenticated namespace slug.
     pub namespace: String,
 }
@@ -51,7 +51,10 @@ pub async fn login_handler(
     .bind(&body.namespace)
     .fetch_optional(pool)
     .await
-    .map_err(|e| { error!("db error: {e}"); StatusCode::INTERNAL_SERVER_ERROR })?
+    .map_err(|e| {
+        error!("db error: {e}");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?
     .ok_or(StatusCode::NOT_FOUND)?;
 
     // Verify email matches a key on this namespace
@@ -62,25 +65,29 @@ pub async fn login_handler(
     .bind(&body.email)
     .fetch_one(pool)
     .await
-    .map_err(|e| { error!("db error: {e}"); StatusCode::INTERNAL_SERVER_ERROR })?;
+    .map_err(|e| {
+        error!("db error: {e}");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     if !exists {
         return Err(StatusCode::FORBIDDEN);
     }
 
-    let otp       = generate_otp();
-    let otp_hash  = hash_secret(&otp);
+    let otp = generate_otp();
+    let otp_hash = hash_secret(&otp);
     let expires_at = Utc::now() + Duration::minutes(10);
 
-    sqlx::query(
-        "INSERT INTO otps (namespace_id, code_hash, expires_at) VALUES ($1, $2, $3)",
-    )
-    .bind(ns_id)
-    .bind(&otp_hash)
-    .bind(expires_at)
-    .execute(pool)
-    .await
-    .map_err(|e| { error!("db error: {e}"); StatusCode::INTERNAL_SERVER_ERROR })?;
+    sqlx::query("INSERT INTO otps (namespace_id, code_hash, expires_at) VALUES ($1, $2, $3)")
+        .bind(ns_id)
+        .bind(&otp_hash)
+        .bind(expires_at)
+        .execute(pool)
+        .await
+        .map_err(|e| {
+            error!("db error: {e}");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     // Send via SES
     state.ses
@@ -135,7 +142,10 @@ pub async fn token_handler(
     .bind(&body.namespace)
     .fetch_optional(pool)
     .await
-    .map_err(|e| { error!("db: {e}"); StatusCode::INTERNAL_SERVER_ERROR })?
+    .map_err(|e| {
+        error!("db: {e}");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?
     .ok_or(StatusCode::NOT_FOUND)?;
 
     let otp_hash = hash_secret(&body.otp);
@@ -153,7 +163,10 @@ pub async fn token_handler(
     .bind(&otp_hash)
     .execute(pool)
     .await
-    .map_err(|e| { error!("db: {e}"); StatusCode::INTERNAL_SERVER_ERROR })?;
+    .map_err(|e| {
+        error!("db: {e}");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     if rows.rows_affected() == 0 {
         return Err(StatusCode::UNAUTHORIZED);
@@ -166,26 +179,33 @@ pub async fn token_handler(
     .bind(ns_id)
     .fetch_one(pool)
     .await
-    .map_err(|e| { error!("db: {e}"); StatusCode::INTERNAL_SERVER_ERROR })?;
+    .map_err(|e| {
+        error!("db: {e}");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
 
     sqlx::query("DELETE FROM api_keys WHERE namespace_id = $1")
         .bind(ns_id)
         .execute(pool)
         .await
-        .map_err(|e| { error!("db: {e}"); StatusCode::INTERNAL_SERVER_ERROR })?;
+        .map_err(|e| {
+            error!("db: {e}");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
-    let api_key  = generate_api_key();
+    let api_key = generate_api_key();
     let key_hash = hash_secret(&api_key);
 
-    sqlx::query(
-        "INSERT INTO api_keys (namespace_id, key_hash, email) VALUES ($1, $2, $3)",
-    )
-    .bind(ns_id)
-    .bind(&key_hash)
-    .bind(&email)
-    .execute(pool)
-    .await
-    .map_err(|e| { error!("db: {e}"); StatusCode::INTERNAL_SERVER_ERROR })?;
+    sqlx::query("INSERT INTO api_keys (namespace_id, key_hash, email) VALUES ($1, $2, $3)")
+        .bind(ns_id)
+        .bind(&key_hash)
+        .bind(&email)
+        .execute(pool)
+        .await
+        .map_err(|e| {
+            error!("db: {e}");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
 
     Ok(Json(TokenResponse {
         api_key,
