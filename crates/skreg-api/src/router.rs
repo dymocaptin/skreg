@@ -9,6 +9,7 @@ use serde::Serialize;
 use sqlx::PgPool;
 
 use crate::handlers::search::search_handler;
+use crate::handlers::auth::{login_handler, token_handler};
 use crate::handlers::namespaces::create_namespace_handler;
 
 /// Shared application state injected into every handler.
@@ -39,9 +40,11 @@ struct HealthResponse {
 pub fn build_router(state: AppState) -> Router {
     let shared = Arc::new(state);
     Router::new()
-        .route("/healthz",        get(health_handler))
-        .route("/v1/search",      get(search_handler))
-        .route("/v1/namespaces",  post(create_namespace_handler))
+        .route("/healthz",          get(health_handler))
+        .route("/v1/search",        get(search_handler))
+        .route("/v1/namespaces",    post(create_namespace_handler))
+        .route("/v1/auth/login",    post(login_handler))
+        .route("/v1/auth/token",    post(token_handler))
         .with_state(shared)
 }
 
