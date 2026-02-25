@@ -28,16 +28,21 @@ pub struct CreateNamespaceResponse {
 }
 
 /// Validate namespace slug: lowercase alphanumeric + hyphens, 3–32 chars.
+#[must_use]
 pub fn is_valid_slug(slug: &str) -> bool {
     let len = slug.len();
-    len >= 3
-        && len <= 32
+    (3..=32).contains(&len)
         && slug
             .chars()
             .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
 }
 
 /// Handle `POST /v1/namespaces` — register a new namespace and return a plaintext API key.
+///
+/// # Errors
+///
+/// Returns `422` if the slug is invalid, `409` if the slug is already taken,
+/// or `500` on a database error.
 pub async fn create_namespace_handler(
     State(state): State<SharedState>,
     Json(body): Json<CreateNamespaceRequest>,

@@ -14,16 +14,17 @@ pub enum SafetyError {
 }
 
 /// Compute the Levenshtein edit distance between two strings.
+#[must_use]
 pub fn levenshtein(a: &str, b: &str) -> usize {
     let a: Vec<char> = a.chars().collect();
     let b: Vec<char> = b.chars().collect();
     let (m, n) = (a.len(), b.len());
     let mut dp = vec![vec![0usize; n + 1]; m + 1];
-    for i in 0..=m {
-        dp[i][0] = i;
+    for (i, row) in dp.iter_mut().enumerate() {
+        row[0] = i;
     }
-    for j in 0..=n {
-        dp[0][j] = j;
+    for (j, val) in dp[0].iter_mut().enumerate() {
+        *val = j;
     }
     for i in 1..=m {
         for j in 1..=n {
@@ -38,6 +39,7 @@ pub fn levenshtein(a: &str, b: &str) -> usize {
 }
 
 /// Return `true` if `name` is within Levenshtein distance 2 of any existing name.
+#[must_use]
 pub fn is_squatting(name: &str, existing: &[String]) -> bool {
     existing.iter().any(|e| {
         let dist = levenshtein(name, e);

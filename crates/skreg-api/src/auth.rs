@@ -4,17 +4,20 @@ use rand::Rng;
 use sha2::{Digest, Sha256};
 
 /// Generate a random API key with a `skreg_` prefix.
+#[must_use]
 pub fn generate_api_key() -> String {
     let bytes: Vec<u8> = (0..32).map(|_| rand::thread_rng().gen::<u8>()).collect();
     format!("skreg_{}", hex::encode(bytes))
 }
 
 /// Generate a 6-digit numeric OTP.
+#[must_use]
 pub fn generate_otp() -> String {
     format!("{:06}", rand::thread_rng().gen_range(0..1_000_000))
 }
 
 /// SHA-256 hex digest of `input`. Used for both API keys and OTPs.
+#[must_use]
 pub fn hash_secret(input: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(input.as_bytes());

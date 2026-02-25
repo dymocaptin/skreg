@@ -7,6 +7,7 @@ use sqlx::PgPool;
 use crate::auth::hash_secret;
 
 /// Extract the raw token from an `Authorization: Bearer <token>` header value.
+#[must_use]
 pub fn extract_bearer(header: &str) -> Option<String> {
     let token = header.strip_prefix("Bearer ")?;
     if token.is_empty() {

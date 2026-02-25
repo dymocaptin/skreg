@@ -38,6 +38,11 @@ pub struct TokenResponse {
 }
 
 /// Handle `POST /v1/auth/login` — send an OTP to the registered email.
+///
+/// # Errors
+///
+/// Returns `404` if the namespace is not found, `403` if the email is not registered,
+/// `503` if the SES send fails, or `500` on a database error.
 pub async fn login_handler(
     State(state): State<SharedState>,
     Json(body): Json<LoginRequest>,
@@ -130,6 +135,11 @@ pub async fn login_handler(
 }
 
 /// Handle `POST /v1/auth/token` — exchange an OTP for a new API key.
+///
+/// # Errors
+///
+/// Returns `404` if the namespace is not found, `401` if the OTP is invalid or expired,
+/// or `500` on a database error.
 pub async fn token_handler(
     State(state): State<SharedState>,
     Json(body): Json<TokenRequest>,

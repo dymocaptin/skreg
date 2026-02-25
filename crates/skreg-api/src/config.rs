@@ -15,7 +15,7 @@ pub enum ConfigError {
 /// API server runtime configuration.
 #[derive(Debug, Clone)]
 pub struct ApiConfig {
-    /// PostgreSQL connection URL.
+    /// `PostgreSQL` connection URL.
     pub database_url: String,
     /// TCP address to bind (e.g. `0.0.0.0:8080`).
     pub bind_addr: String,

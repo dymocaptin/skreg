@@ -20,7 +20,7 @@ use crate::handlers::search::search_handler;
 /// Shared application state injected into every handler.
 #[derive(Clone)]
 pub struct AppState {
-    /// PostgreSQL connection pool.
+    /// `PostgreSQL` connection pool.
     pub pool: PgPool,
     /// AWS S3 client.
     pub s3: S3Client,

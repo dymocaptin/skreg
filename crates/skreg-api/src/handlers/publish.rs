@@ -11,7 +11,7 @@ use skillpkg_core::manifest::Manifest;
 use skillpkg_pack::unpack::unpack_to_tempdir;
 
 use crate::middleware::resolve_namespace;
-use crate::router::SharedState;
+use crate::router::{AppState, SharedState};
 
 /// Response body for `POST /v1/publish`.
 #[derive(Debug, Serialize)]
@@ -23,29 +23,16 @@ pub struct PublishResponse {
 }
 
 /// Build the S3 object key for a tarball.
+#[must_use]
 pub fn make_storage_path(ns: &str, name: &str, version: &str, sha256: &str) -> String {
     format!("{ns}/{name}/{version}/{sha256}.skill")
 }
 
-/// Handle `POST /v1/publish` — validate a `.skill` tarball, upload to S3, and enqueue vetting.
-pub async fn publish_handler(
-    State(state): State<SharedState>,
-    headers: HeaderMap,
-    body: Bytes,
-) -> Result<(StatusCode, Json<PublishResponse>), StatusCode> {
-    // 1. Auth
-    let auth = headers
-        .get("Authorization")
-        .and_then(|v| v.to_str().ok())
-        .ok_or(StatusCode::UNAUTHORIZED)?;
-    let raw_key = crate::middleware::extract_bearer(auth).ok_or(StatusCode::UNAUTHORIZED)?;
-    let (ns_id, ns_slug) = resolve_namespace(&state.pool, &raw_key).await?;
+/// Compute sha256, unpack, parse and validate manifest ownership and integrity.
+fn validate_manifest(body: &Bytes, ns_slug: &str) -> Result<(Manifest, String), StatusCode> {
+    let sha256 = hex::encode(Sha256::digest(body));
 
-    // 2. Compute sha256 of tarball
-    let sha256 = hex::encode(Sha256::digest(&body));
-
-    // 3. Unpack and read manifest
-    let tmp = unpack_to_tempdir(&body).map_err(|e| {
+    let tmp = unpack_to_tempdir(body).map_err(|e| {
         error!("unpack: {e}");
         StatusCode::UNPROCESSABLE_ENTITY
     })?;
@@ -56,17 +43,26 @@ pub async fn publish_handler(
         StatusCode::UNPROCESSABLE_ENTITY
     })?;
 
-    // 4. Validate namespace ownership
     if manifest.namespace.as_str() != ns_slug {
         return Err(StatusCode::FORBIDDEN);
     }
-
-    // 5. Validate sha256 matches manifest
     if manifest.sha256.as_hex() != sha256 {
         return Err(StatusCode::UNPROCESSABLE_ENTITY);
     }
 
-    // 6. Check version doesn't already exist
+    Ok((manifest, sha256))
+}
+
+/// Check version uniqueness, upload tarball to S3, persist package + version rows,
+/// insert a vetting job, and notify the worker via `pg_notify`.
+async fn persist_and_notify(
+    state: &AppState,
+    ns_id: uuid::Uuid,
+    ns_slug: &str,
+    manifest: &Manifest,
+    sha256: &str,
+    body: Bytes,
+) -> Result<uuid::Uuid, StatusCode> {
     let existing = sqlx::query_scalar::<_, bool>(
         "SELECT EXISTS(
             SELECT 1 FROM packages p
@@ -88,12 +84,11 @@ pub async fn publish_handler(
         return Err(StatusCode::CONFLICT);
     }
 
-    // 7. Upload to S3
     let storage_path = make_storage_path(
-        &ns_slug,
+        ns_slug,
         manifest.name.as_str(),
         &manifest.version.to_string(),
-        &sha256,
+        sha256,
     );
     state
         .s3
@@ -108,7 +103,6 @@ pub async fn publish_handler(
             StatusCode::SERVICE_UNAVAILABLE
         })?;
 
-    // 8. Upsert package row
     let pkg_id = sqlx::query_scalar::<_, uuid::Uuid>(
         "INSERT INTO packages (namespace_id, name, description)
          VALUES ($1, $2, $3)
@@ -125,7 +119,6 @@ pub async fn publish_handler(
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    // 9. Insert version row
     let version_id = sqlx::query_scalar::<_, uuid::Uuid>(
         "INSERT INTO versions (package_id, version, sha256, storage_path, sig_path, signer)
          VALUES ($1, $2, $3, $4, '', 'registry')
@@ -133,7 +126,7 @@ pub async fn publish_handler(
     )
     .bind(pkg_id)
     .bind(manifest.version.to_string())
-    .bind(&sha256)
+    .bind(sha256)
     .bind(&storage_path)
     .fetch_one(&state.pool)
     .await
@@ -142,7 +135,6 @@ pub async fn publish_handler(
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    // 10. Insert vetting job and notify worker
     let job_id = sqlx::query_scalar::<_, uuid::Uuid>(
         "INSERT INTO vetting_jobs (version_id) VALUES ($1) RETURNING id",
     )
@@ -162,6 +154,32 @@ pub async fn publish_handler(
             error!("notify: {e}");
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
+
+    Ok(job_id)
+}
+
+/// Handle `POST /v1/publish` — validate a `.skill` tarball, upload to S3, and enqueue vetting.
+///
+/// # Errors
+///
+/// Returns `401` if the API key is missing or invalid, `403` if the namespace does not match,
+/// `409` if the version already exists, `422` if the tarball is malformed,
+/// `503` if S3 is unavailable, or `500` on a database error.
+pub async fn publish_handler(
+    State(state): State<SharedState>,
+    headers: HeaderMap,
+    body: Bytes,
+) -> Result<(StatusCode, Json<PublishResponse>), StatusCode> {
+    let auth = headers
+        .get("Authorization")
+        .and_then(|v| v.to_str().ok())
+        .ok_or(StatusCode::UNAUTHORIZED)?;
+    let raw_key = crate::middleware::extract_bearer(auth).ok_or(StatusCode::UNAUTHORIZED)?;
+    let (ns_id, ns_slug) = resolve_namespace(&state.pool, &raw_key).await?;
+
+    let (manifest, sha256) = validate_manifest(&body, &ns_slug)?;
+
+    let job_id = persist_and_notify(&state, ns_id, &ns_slug, &manifest, &sha256, body).await?;
 
     Ok((
         StatusCode::ACCEPTED,

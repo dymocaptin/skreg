@@ -20,6 +20,10 @@ pub struct JobStatusResponse {
 }
 
 /// Handle `GET /v1/jobs/{id}` — return the current status of a vetting job.
+///
+/// # Errors
+///
+/// Returns `404` if the job does not exist, or `500` on a database error.
 pub async fn job_status_handler(
     State(state): State<SharedState>,
     Path(id): Path<uuid::Uuid>,

@@ -10,7 +10,7 @@ use uuid::Uuid;
 
 use crate::stages::run_pipeline;
 
-/// Start the pg_notify listener loop. Blocks indefinitely.
+/// Start the `pg_notify` listener loop. Blocks indefinitely.
 ///
 /// # Errors
 ///
