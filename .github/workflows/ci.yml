@@ -136,7 +136,7 @@ jobs:
 
       - name: Pulumi up
         env:
-          PULUMI_BACKEND_URL: ${{ vars.PULUMI_BACKEND_URL }}
+          PULUMI_BACKEND_URL: ${{ secrets.PULUMI_BACKEND_URL }}
           SKILLPKG_CLOUD_PROVIDER: aws
           SKILLPKG_API_IMAGE_URI: ${{ needs.build-push.outputs.registry }}/skreg-api:${{ github.sha }}
           SKILLPKG_WORKER_IMAGE_URI: ${{ needs.build-push.outputs.registry }}/skreg-worker:${{ github.sha }}
