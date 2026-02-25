@@ -1,0 +1,7 @@
+{
+  "cert_chain_pem": [],
+  "description": "Analyzes the dominant colors in any image file, producing a ranked color palette with hex codes, RGB/HSL values, human-readable color names, and percentage breakdowns.",
+  "name": "color-analysis",
+  "namespace": "dymocaptin",
+  "version": "1.0.0"
+}

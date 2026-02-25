@@ -6,7 +6,7 @@ use axum::Json;
 use log::error;
 
 use crate::models::{PackageSummary, SearchQuery, SearchResponse};
-use crate::router::AppState;
+use crate::router::SharedState;
 
 const PAGE_SIZE: i64 = 20;
 
@@ -14,16 +14,12 @@ const PAGE_SIZE: i64 = 20;
 ///
 /// # Errors
 ///
-/// Returns [`StatusCode::SERVICE_UNAVAILABLE`] if no database pool is configured,
-/// or [`StatusCode::INTERNAL_SERVER_ERROR`] if the query fails.
+/// Returns [`StatusCode::INTERNAL_SERVER_ERROR`] if the query fails.
 pub async fn search_handler(
-    State(state): State<AppState>,
+    State(state): State<SharedState>,
     Query(params): Query<SearchQuery>,
 ) -> Result<Json<SearchResponse>, StatusCode> {
-    let pool = state
-        .as_ref()
-        .as_ref()
-        .ok_or(StatusCode::SERVICE_UNAVAILABLE)?;
+    let pool = &state.pool;
 
     let page = params.page.unwrap_or(1).max(1);
     let offset = (page - 1) * PAGE_SIZE;
