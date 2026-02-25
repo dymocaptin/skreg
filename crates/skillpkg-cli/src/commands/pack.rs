@@ -11,10 +11,6 @@ use sha2::{Digest, Sha256};
 /// then the tarball is re-packed with the updated manifest. The manifest is restored
 /// to its original state afterwards so the source directory is not permanently modified.
 ///
-/// # Panics
-///
-/// Panics if `manifest.json` is not a JSON object (should never happen after successful parse).
-///
 /// # Errors
 ///
 /// Returns an error if any file I/O or packing step fails.
@@ -36,7 +32,10 @@ pub fn pack_directory_with_sha(source_dir: &Path, output_path: &Path) -> Result<
     skillpkg_pack::pack::pack_directory(source_dir, output_path)?;
 
     // Restore original manifest (without sha256 stamped in source)
-    manifest.as_object_mut().unwrap().remove("sha256");
+    manifest
+        .as_object_mut()
+        .ok_or_else(|| anyhow::anyhow!("manifest.json is not a JSON object"))?
+        .remove("sha256");
     std::fs::write(&manifest_path, serde_json::to_string_pretty(&manifest)?)?;
 
     Ok(())
