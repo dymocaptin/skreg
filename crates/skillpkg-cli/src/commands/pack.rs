@@ -11,6 +11,10 @@ use sha2::{Digest, Sha256};
 /// then the tarball is re-packed with the updated manifest. The manifest is restored
 /// to its original state afterwards so the source directory is not permanently modified.
 ///
+/// # Panics
+///
+/// Panics if `manifest.json` is not a JSON object (should never happen after successful parse).
+///
 /// # Errors
 ///
 /// Returns an error if any file I/O or packing step fails.

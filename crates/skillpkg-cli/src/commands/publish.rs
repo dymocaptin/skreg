@@ -97,8 +97,5 @@ pub async fn run_publish() -> Result<()> {
 mod tests {
     use super::*;
 
-    #[test]
-    fn poll_interval_is_reasonable() {
-        assert!(POLL_INTERVAL_SECS > 0 && POLL_INTERVAL_SECS <= 10);
-    }
+    const _: () = assert!(POLL_INTERVAL_SECS > 0 && POLL_INTERVAL_SECS <= 10);
 }
