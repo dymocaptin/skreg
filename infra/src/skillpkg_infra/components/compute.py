@@ -17,15 +17,13 @@ class ComputeOutputs:
         self,
         service_url: pulumi.Output[str],
         worker_service_name: pulumi.Output[str],
+        alb_dns_name: pulumi.Output[str] | None = None,
+        cert_validation_cname: pulumi.Output[dict[str, str] | None] | None = None,
     ) -> None:
-        """Initialise compute outputs.
-
-        Args:
-            service_url: Public HTTPS URL of the registry API service.
-            worker_service_name: Internal name of the vetting worker service.
-        """
         self.service_url: pulumi.Output[str] = service_url
         self.worker_service_name: pulumi.Output[str] = worker_service_name
+        self.alb_dns_name: pulumi.Output[str] | None = alb_dns_name
+        self.cert_validation_cname: pulumi.Output[dict[str, str] | None] | None = cert_validation_cname
 
 
 class SkillpkgCompute(Protocol):
