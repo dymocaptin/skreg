@@ -198,6 +198,13 @@ class AwsCompute(pulumi.ComponentResource):
                 ),
                 opts=pulumi.ResourceOptions(parent=self),
             )
+            cert_validation = aws.acm.CertificateValidation(
+                f"{name}-cert-validation",
+                aws.acm.CertificateValidationArgs(
+                    certificate_arn=cert.arn,
+                ),
+                opts=pulumi.ResourceOptions(parent=self),
+            )
             listener = aws.lb.Listener(
                 f"{name}-listener",
                 aws.lb.ListenerArgs(
@@ -224,7 +231,7 @@ class AwsCompute(pulumi.ComponentResource):
                     port=443,
                     protocol="HTTPS",
                     ssl_policy="ELBSecurityPolicy-TLS13-1-2-2021-06",
-                    certificate_arn=cert.arn,
+                    certificate_arn=cert_validation.certificate_arn,
                     default_actions=[
                         aws.lb.ListenerDefaultActionArgs(type="forward", target_group_arn=tg.arn)
                     ],
