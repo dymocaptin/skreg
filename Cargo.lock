@@ -3018,83 +3018,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "skillpkg-cli"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "clap",
- "env_logger",
- "hex",
- "log",
- "reqwest",
- "serde",
- "serde_json",
- "sha2",
- "skillpkg-client",
- "skillpkg-core",
- "skillpkg-crypto",
- "skillpkg-pack",
- "tempfile",
- "thiserror 1.0.69",
- "tokio",
- "toml",
-]
-
-[[package]]
-name = "skillpkg-client"
-version = "0.1.0"
-dependencies = [
- "log",
- "reqwest",
- "serde",
- "serde_json",
- "skillpkg-core",
- "skillpkg-crypto",
- "thiserror 1.0.69",
- "tokio",
-]
-
-[[package]]
-name = "skillpkg-core"
-version = "0.1.0"
-dependencies = [
- "chrono",
- "semver",
- "serde",
- "serde_json",
- "sha2",
- "thiserror 1.0.69",
- "uuid",
-]
-
-[[package]]
-name = "skillpkg-crypto"
-version = "0.1.0"
-dependencies = [
- "der 0.7.10",
- "log",
- "sha2",
- "skillpkg-core",
- "thiserror 1.0.69",
- "x509-cert",
-]
-
-[[package]]
-name = "skillpkg-pack"
-version = "0.1.0"
-dependencies = [
- "flate2",
- "log",
- "serde",
- "serde_json",
- "sha2",
- "skillpkg-core",
- "tar",
- "tempfile",
- "thiserror 1.0.69",
-]
-
-[[package]]
 name = "skreg-api"
 version = "0.1.0"
 dependencies = [
@@ -3113,14 +3036,91 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
- "skillpkg-core",
- "skillpkg-crypto",
- "skillpkg-pack",
+ "skreg-core",
+ "skreg-crypto",
+ "skreg-pack",
  "sqlx",
  "thiserror 1.0.69",
  "tokio",
  "tower-http",
  "uuid",
+]
+
+[[package]]
+name = "skreg-cli"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "env_logger",
+ "hex",
+ "log",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sha2",
+ "skreg-client",
+ "skreg-core",
+ "skreg-crypto",
+ "skreg-pack",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
+ "toml",
+]
+
+[[package]]
+name = "skreg-client"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "skreg-core",
+ "skreg-crypto",
+ "thiserror 1.0.69",
+ "tokio",
+]
+
+[[package]]
+name = "skreg-core"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "semver",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror 1.0.69",
+ "uuid",
+]
+
+[[package]]
+name = "skreg-crypto"
+version = "0.1.0"
+dependencies = [
+ "der 0.7.10",
+ "log",
+ "sha2",
+ "skreg-core",
+ "thiserror 1.0.69",
+ "x509-cert",
+]
+
+[[package]]
+name = "skreg-pack"
+version = "0.1.0"
+dependencies = [
+ "flate2",
+ "log",
+ "serde",
+ "serde_json",
+ "sha2",
+ "skreg-core",
+ "tar",
+ "tempfile",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
@@ -3140,9 +3140,9 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
- "skillpkg-core",
- "skillpkg-crypto",
- "skillpkg-pack",
+ "skreg-core",
+ "skreg-crypto",
+ "skreg-pack",
  "sqlx",
  "tempfile",
  "thiserror 1.0.69",

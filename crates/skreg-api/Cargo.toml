@@ -12,9 +12,9 @@ name = "skreg_api"
 path = "src/lib.rs"
 
 [dependencies]
-skillpkg-core   = { path = "../skillpkg-core" }
-skillpkg-crypto = { path = "../skillpkg-crypto" }
-skillpkg-pack   = { path = "../skillpkg-pack" }
+skreg-core   = { path = "../skreg-core" }
+skreg-crypto = { path = "../skreg-crypto" }
+skreg-pack   = { path = "../skreg-pack" }
 anyhow          = { workspace = true }
 tokio           = { workspace = true }
 axum            = { workspace = true, features = ["multipart"] }

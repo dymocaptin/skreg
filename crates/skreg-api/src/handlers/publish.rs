@@ -7,8 +7,8 @@ use axum::Json;
 use log::error;
 use serde::Serialize;
 use sha2::{Digest, Sha256};
-use skillpkg_core::manifest::Manifest;
-use skillpkg_pack::unpack::unpack_to_tempdir;
+use skreg_core::manifest::Manifest;
+use skreg_pack::unpack::unpack_to_tempdir;
 
 use crate::middleware::resolve_namespace;
 use crate::router::{AppState, SharedState};

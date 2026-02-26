@@ -48,7 +48,7 @@ pub async fn run_pipeline(
         .send()
         .await?;
     let bytes = obj.body.collect().await?.into_bytes();
-    let tmp = skillpkg_pack::unpack::unpack_to_tempdir(&bytes)?;
+    let tmp = skreg_pack::unpack::unpack_to_tempdir(&bytes)?;
 
     // Stage 1
     check_structure(tmp.path()).map_err(|e| anyhow::anyhow!("Stage 1 failed: {e}"))?;

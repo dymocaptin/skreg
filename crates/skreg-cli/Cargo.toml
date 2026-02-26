@@ -1,0 +1,31 @@
+[package]
+name    = "skreg-cli"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "skreg"
+path = "src/main.rs"
+
+[dependencies]
+skreg-core   = { path = "../skreg-core" }
+skreg-crypto = { path = "../skreg-crypto" }
+skreg-pack   = { path = "../skreg-pack" }
+skreg-client = { path = "../skreg-client" }
+anyhow          = { workspace = true }
+tokio           = { workspace = true }
+log             = { workspace = true }
+env_logger      = { workspace = true }
+clap            = { version = "4", features = ["derive"] }
+toml            = "0.8"
+sha2            = { workspace = true }
+serde_json      = { workspace = true }
+serde           = { workspace = true }
+reqwest         = { workspace = true }
+hex             = "0.4"
+tempfile        = "3"
+thiserror       = { workspace = true }
+
+[lib]
+name = "skreg_cli"
+path = "src/lib.rs"
