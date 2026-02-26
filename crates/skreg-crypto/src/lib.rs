@@ -1,4 +1,4 @@
-//! Cryptographic primitives for skillpkg: signature verification and revocation.
+//! Cryptographic primitives for skreg: signature verification and revocation.
 #![deny(warnings, clippy::all, clippy::pedantic)]
 #![warn(missing_docs)]
 

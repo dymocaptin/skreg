@@ -1,4 +1,4 @@
-//! `skillpkg pack` — create a .skill tarball from the current directory.
+//! `skreg pack` — create a .skill tarball from the current directory.
 
 use std::path::Path;
 

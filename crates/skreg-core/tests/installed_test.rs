@@ -28,7 +28,7 @@ fn installed_package_roundtrips_json() {
         )
         .unwrap(),
         signer: SignerKind::Registry,
-        install_path: PathBuf::from("/home/user/.skillpkg/packages/acme/deploy-helper/1.0.0"),
+        install_path: PathBuf::from("/home/user/.skreg/packages/acme/deploy-helper/1.0.0"),
     };
     let json = serde_json::to_string(&pkg).unwrap();
     let back: InstalledPackage = serde_json::from_str(&json).unwrap();

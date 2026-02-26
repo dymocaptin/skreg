@@ -1,4 +1,4 @@
-//! `skillpkg login <namespace>` — register or re-authenticate.
+//! `skreg login <namespace>` — register or re-authenticate.
 
 use anyhow::{bail, Result};
 use serde::Deserialize;
@@ -10,7 +10,7 @@ struct ApiKeyResponse {
     api_key: String,
 }
 
-/// Run `skillpkg login <namespace>` — register a new namespace or re-authenticate via OTP.
+/// Run `skreg login <namespace>` — register a new namespace or re-authenticate via OTP.
 ///
 /// # Errors
 ///

@@ -1,4 +1,4 @@
-//! Core domain types for the skillpkg ecosystem.
+//! Core domain types for the skreg ecosystem.
 #![deny(warnings, clippy::all, clippy::pedantic)]
 #![warn(missing_docs)]
 

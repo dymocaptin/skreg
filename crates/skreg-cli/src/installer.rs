@@ -54,7 +54,7 @@ impl Installer {
     ///
     /// * `client` — Registry HTTP client.
     /// * `install_root` — Base directory for installed packages
-    ///   (e.g. `~/.skillpkg/packages`).
+    ///   (e.g. `~/.skreg/packages`).
     pub fn new(client: Arc<dyn RegistryClient>, install_root: PathBuf) -> Self {
         Self {
             client,

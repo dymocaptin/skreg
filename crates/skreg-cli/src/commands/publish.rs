@@ -1,4 +1,4 @@
-//! `skillpkg publish` — pack, upload, and poll vetting result.
+//! `skreg publish` — pack, upload, and poll vetting result.
 
 use std::time::Duration;
 
@@ -22,7 +22,7 @@ struct JobStatus {
     message: Option<String>,
 }
 
-/// Run `skillpkg publish` — pack the current directory, upload to the registry,
+/// Run `skreg publish` — pack the current directory, upload to the registry,
 /// then poll until vetting passes or fails.
 ///
 /// # Errors
@@ -32,7 +32,7 @@ struct JobStatus {
 pub async fn run_publish() -> Result<()> {
     let cfg_path = default_config_path();
     let cfg =
-        load_config(&cfg_path).context("not logged in — run `skillpkg login <namespace>` first")?;
+        load_config(&cfg_path).context("not logged in — run `skreg login <namespace>` first")?;
 
     let cwd = std::env::current_dir()?;
 
