@@ -32,7 +32,7 @@ class SkillpkgMocks(Mocks):
 
 pulumi.runtime.set_mocks(SkillpkgMocks())
 
-from skillpkg_infra.providers.aws.compute import AwsCompute, AwsComputeArgs  # noqa: E402
+from skreg_infra.providers.aws.compute import AwsCompute, AwsComputeArgs  # noqa: E402
 
 
 def _args() -> AwsComputeArgs:

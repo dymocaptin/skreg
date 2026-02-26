@@ -7,18 +7,18 @@ import logging
 import pulumi
 import structlog
 
-from skillpkg_infra.config import CloudProvider, StackConfig
-from skillpkg_infra.providers.aws.compute import AwsCompute, AwsComputeArgs
-from skillpkg_infra.providers.aws.database import AwsDatabase, AwsDatabaseArgs
-from skillpkg_infra.providers.aws.network import AwsNetwork
-from skillpkg_infra.providers.aws.oidc import AwsOidc
-from skillpkg_infra.providers.aws.pki import AwsPki, AwsPkiArgs
-from skillpkg_infra.providers.aws.storage import AwsStorage
+from skreg_infra.config import CloudProvider, StackConfig
+from skreg_infra.providers.aws.compute import AwsCompute, AwsComputeArgs
+from skreg_infra.providers.aws.database import AwsDatabase, AwsDatabaseArgs
+from skreg_infra.providers.aws.network import AwsNetwork
+from skreg_infra.providers.aws.oidc import AwsOidc
+from skreg_infra.providers.aws.pki import AwsPki, AwsPkiArgs
+from skreg_infra.providers.aws.storage import AwsStorage
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 
-class SkillpkgStack:
+class SkregStack:
     """Orchestrates all provider-agnostic infrastructure components."""
 
     def __init__(self, config: StackConfig) -> None:
@@ -86,4 +86,4 @@ class SkillpkgStack:
 
 if __name__ == "__main__":
     structlog.configure(wrapper_class=structlog.make_filtering_bound_logger(logging.INFO))
-    SkillpkgStack(config=StackConfig.load()).run()
+    SkregStack(config=StackConfig.load()).run()

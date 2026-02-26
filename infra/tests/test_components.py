@@ -3,11 +3,11 @@ from __future__ import annotations
 
 import pulumi
 
-from skillpkg_infra.components.compute import ComputeOutputs, SkillpkgCompute
-from skillpkg_infra.components.database import DatabaseOutputs, SkillpkgDatabase
-from skillpkg_infra.components.network import NetworkOutputs, SkillpkgNetwork
-from skillpkg_infra.components.pki import PkiOutputs, SkillpkgPki
-from skillpkg_infra.components.storage import SkillpkgStorage, StorageOutputs
+from skreg_infra.components.compute import ComputeOutputs, SkillpkgCompute
+from skreg_infra.components.database import DatabaseOutputs, SkillpkgDatabase
+from skreg_infra.components.network import NetworkOutputs, SkillpkgNetwork
+from skreg_infra.components.pki import PkiOutputs, SkillpkgPki
+from skreg_infra.components.storage import SkillpkgStorage, StorageOutputs
 
 
 def test_database_protocol_is_importable() -> None:

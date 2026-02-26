@@ -8,7 +8,7 @@ import logging
 import pulumi
 import pulumi_aws as aws
 
-from skillpkg_infra.components.compute import ComputeOutputs
+from skreg_infra.components.compute import ComputeOutputs
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -50,7 +50,7 @@ class AwsCompute(pulumi.ComponentResource):
         args: AwsComputeArgs,
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
-        super().__init__("skillpkg:aws:Compute", name, {}, opts)
+        super().__init__("skreg:aws:Compute", name, {}, opts)
 
         logger.debug("provisioning_aws_compute", extra={"name": name})
 

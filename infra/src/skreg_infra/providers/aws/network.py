@@ -7,7 +7,7 @@ import logging
 import pulumi
 import pulumi_aws as aws
 
-from skillpkg_infra.components.network import NetworkOutputs
+from skreg_infra.components.network import NetworkOutputs
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ class AwsNetwork(pulumi.ComponentResource):
         name: str,
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
-        super().__init__("skillpkg:aws:Network", name, {}, opts)
+        super().__init__("skreg:aws:Network", name, {}, opts)
 
         logger.debug("provisioning_aws_network", extra={"name": name})
 

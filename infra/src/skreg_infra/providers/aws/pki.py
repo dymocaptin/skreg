@@ -12,7 +12,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
 
-from skillpkg_infra.components.pki import PkiOutputs
+from skreg_infra.components.pki import PkiOutputs
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -72,7 +72,7 @@ class AwsPki(pulumi.ComponentResource):
         args: AwsPkiArgs,
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
-        super().__init__("skillpkg:aws:Pki", name, {}, opts)
+        super().__init__("skreg:aws:Pki", name, {}, opts)
 
         logger.debug("provisioning_aws_pki", extra={"name": name})
 

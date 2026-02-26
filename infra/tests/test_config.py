@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from skillpkg_infra.config import CloudProvider, HsmBackend, StackConfig
+from skreg_infra.config import CloudProvider, HsmBackend, StackConfig
 
 
 def test_cloud_provider_values() -> None:

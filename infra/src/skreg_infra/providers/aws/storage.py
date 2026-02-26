@@ -7,7 +7,7 @@ import logging
 import pulumi
 import pulumi_aws as aws
 
-from skillpkg_infra.components.storage import StorageOutputs
+from skreg_infra.components.storage import StorageOutputs
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ class AwsStorage(pulumi.ComponentResource):
             name: Logical Pulumi resource name.
             opts: Optional Pulumi resource options.
         """
-        super().__init__("skillpkg:aws:Storage", name, {}, opts)
+        super().__init__("skreg:aws:Storage", name, {}, opts)
 
         logger.debug("provisioning_aws_storage", extra={"name": name})
 

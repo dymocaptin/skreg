@@ -21,7 +21,7 @@ class SkillpkgMocks(Mocks):
 
 pulumi.runtime.set_mocks(SkillpkgMocks())
 
-from skillpkg_infra.providers.aws.pki import AwsPki, AwsPkiArgs, _generate_root_ca  # noqa: E402
+from skreg_infra.providers.aws.pki import AwsPki, AwsPkiArgs, _generate_root_ca  # noqa: E402
 
 
 def test_generate_root_ca_returns_pem_strings() -> None:
@@ -44,7 +44,7 @@ def test_generate_root_ca_key_is_4096_bits() -> None:
 def test_pki_root_ca_cert_pem_is_exposed() -> None:
     """AwsPki must expose root_ca_cert_pem as a non-empty Output."""
     with patch(
-        "skillpkg_infra.providers.aws.pki._generate_root_ca",
+        "skreg_infra.providers.aws.pki._generate_root_ca",
         return_value=("---KEY---", "---CERT---"),
     ):
         pki = AwsPki("test-pki", AwsPkiArgs(bucket_name="test-bucket"))
@@ -59,7 +59,7 @@ def test_pki_root_ca_cert_pem_is_exposed() -> None:
 def test_pki_hsm_key_id_is_set() -> None:
     """AwsPki outputs.hsm_key_id must be non-empty."""
     with patch(
-        "skillpkg_infra.providers.aws.pki._generate_root_ca",
+        "skreg_infra.providers.aws.pki._generate_root_ca",
         return_value=("---KEY---", "---CERT---"),
     ):
         pki = AwsPki("test-pki2", AwsPkiArgs(bucket_name="test-bucket"))

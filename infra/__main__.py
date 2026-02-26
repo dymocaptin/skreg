@@ -3,8 +3,8 @@ import logging
 
 import structlog
 
-from skillpkg_infra.__main__ import SkillpkgStack
-from skillpkg_infra.config import StackConfig
+from skreg_infra.__main__ import SkregStack
+from skreg_infra.config import StackConfig
 
 structlog.configure(wrapper_class=structlog.make_filtering_bound_logger(logging.INFO))
-SkillpkgStack(config=StackConfig.load()).run()
+SkregStack(config=StackConfig.load()).run()

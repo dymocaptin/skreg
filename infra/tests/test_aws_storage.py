@@ -25,7 +25,7 @@ class SkillpkgMocks(Mocks):
 
 pulumi.runtime.set_mocks(SkillpkgMocks())
 
-from skillpkg_infra.providers.aws.storage import AwsStorage  # noqa: E402
+from skreg_infra.providers.aws.storage import AwsStorage  # noqa: E402
 
 
 @pulumi.runtime.test

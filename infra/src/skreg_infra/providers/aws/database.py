@@ -9,7 +9,7 @@ import pulumi
 import pulumi_aws as aws
 import pulumi_random as random
 
-from skillpkg_infra.components.database import DatabaseOutputs
+from skreg_infra.components.database import DatabaseOutputs
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -58,7 +58,7 @@ class AwsDatabase(pulumi.ComponentResource):
             args: Validated AWS-specific database arguments.
             opts: Optional Pulumi resource options.
         """
-        super().__init__("skillpkg:aws:Database", name, {}, opts)
+        super().__init__("skreg:aws:Database", name, {}, opts)
 
         logger.debug("provisioning_aws_database", extra={"name": name})
 
@@ -90,7 +90,7 @@ class AwsDatabase(pulumi.ComponentResource):
             aws.secretsmanager.SecretVersionArgs(
                 secret_id=credentials_secret.id,
                 secret_string=db_password.result.apply(
-                    lambda pw: json.dumps({"username": "skillpkg", "password": pw})
+                    lambda pw: json.dumps({"username": "skreg", "password": pw})
                 ),
             ),
             opts=pulumi.ResourceOptions(parent=self),
@@ -104,8 +104,8 @@ class AwsDatabase(pulumi.ComponentResource):
                 instance_class=args.instance_class,
                 allocated_storage=20,
                 storage_encrypted=True,
-                db_name="skillpkg",
-                username="skillpkg",
+                db_name="skreg",
+                username="skreg",
                 password=db_password.result,
                 multi_az=args.multi_az,
                 db_subnet_group_name=subnet_group.name,
@@ -120,7 +120,7 @@ class AwsDatabase(pulumi.ComponentResource):
             connection_secret_arn=credentials_secret.arn,
             host=instance.address,
             port=pulumi.Output.from_input(5432),
-            database_name=pulumi.Output.from_input("skillpkg"),
+            database_name=pulumi.Output.from_input("skreg"),
         )
 
         self.register_outputs(

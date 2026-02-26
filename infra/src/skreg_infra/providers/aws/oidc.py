@@ -40,7 +40,7 @@ class AwsOidc(pulumi.ComponentResource):
         github_repo: str,
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
-        super().__init__("skillpkg:aws:Oidc", name, {}, opts)
+        super().__init__("skreg:aws:Oidc", name, {}, opts)
 
         logger.debug("provisioning_aws_oidc", extra={"name": name, "repo": github_repo})
 
