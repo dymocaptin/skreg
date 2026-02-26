@@ -50,13 +50,13 @@ def test_stack_config_image_uris(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_stack_config_domain_name_defaults_to_empty(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("SKILLPKG_CLOUD_PROVIDER", "aws")
+    monkeypatch.setenv("SKREG_CLOUD_PROVIDER", "aws")
     config = StackConfig.load()
     assert config.domain_name == ""
 
 
 def test_stack_config_domain_name_read_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("SKILLPKG_CLOUD_PROVIDER", "aws")
-    monkeypatch.setenv("SKILLPKG_DOMAIN_NAME", "api.skreg.ai")
+    monkeypatch.setenv("SKREG_CLOUD_PROVIDER", "aws")
+    monkeypatch.setenv("SKREG_DOMAIN_NAME", "api.skreg.ai")
     config = StackConfig.load()
     assert config.domain_name == "api.skreg.ai"
