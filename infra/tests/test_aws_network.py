@@ -19,7 +19,7 @@ class SkillpkgMocks(Mocks):
 
 pulumi.runtime.set_mocks(SkillpkgMocks())
 
-from skillpkg_infra.providers.aws.network import AwsNetwork  # noqa: E402
+from skreg_infra.providers.aws.network import AwsNetwork  # noqa: E402
 
 
 def test_network_public_subnet_count() -> None:

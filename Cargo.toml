@@ -1,10 +1,10 @@
 [workspace]
 members = [
-    "crates/skillpkg-core",
-    "crates/skillpkg-crypto",
-    "crates/skillpkg-pack",
-    "crates/skillpkg-client",
-    "crates/skillpkg-cli",
+    "crates/skreg-core",
+    "crates/skreg-crypto",
+    "crates/skreg-pack",
+    "crates/skreg-client",
+    "crates/skreg-cli",
     "crates/skreg-api",
     "crates/skreg-worker",
 ]

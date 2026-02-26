@@ -6,11 +6,11 @@ A public skills package registry for AI coding tools — analogous to npm or cra
 
 | Crate / module | Language | Purpose |
 |---|---|---|
-| `crates/skillpkg-core` | Rust | Domain types: `Manifest`, `PackageRef`, `Namespace`, `Sha256Digest` |
-| `crates/skillpkg-crypto` | Rust | Signature verification, revocation (CRL) |
-| `crates/skillpkg-pack` | Rust | Pack/unpack `.skill` tarballs |
-| `crates/skillpkg-client` | Rust | `RegistryClient` trait + HTTP adapter |
-| `crates/skillpkg-cli` | Rust | `skillpkg` binary — install command |
+| `crates/skreg-core` | Rust | Domain types: `Manifest`, `PackageRef`, `Namespace`, `Sha256Digest` |
+| `crates/skreg-crypto` | Rust | Signature verification, revocation (CRL) |
+| `crates/skreg-pack` | Rust | Pack/unpack `.skill` tarballs |
+| `crates/skreg-client` | Rust | `RegistryClient` trait + HTTP adapter |
+| `crates/skreg-cli` | Rust | `skreg` binary — install command |
 | `crates/skreg-api` | Rust | Registry HTTP API (Axum + SQLx + Tokio) |
 | `crates/skreg-worker` | Rust | Async vetting worker (structure checks, ClamAV) |
 | `infra/` | Python | Pulumi IaC — provider-agnostic components, AWS implementation |
@@ -38,13 +38,13 @@ Root CA  (offline, HSM-backed)
             Orgs sign locally; registry verifies on ingest
 ```
 
-The Root CA cert is embedded in the `skillpkg` CLI binary at build time. On install the CLI verifies the sha256 digest, the cert chain, the detached signature, and checks the CRL (cached 24 h).
+The Root CA cert is embedded in the `skreg` CLI binary at build time. On install the CLI verifies the sha256 digest, the cert chain, the detached signature, and checks the CRL (cached 24 h).
 
 ## Install a skill
 
 ```sh
-skillpkg install acme/my-skill
-skillpkg install acme/my-skill@1.2.0
+skreg install acme/my-skill
+skreg install acme/my-skill@1.2.0
 ```
 
 ## Self-hosting
