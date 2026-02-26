@@ -34,6 +34,7 @@ class StackConfig(BaseSettings):
     cloud_provider: CloudProvider
     api_image_uri: str = ""
     worker_image_uri: str = ""
+    domain_name: str = ""
     hsm_backend: HsmBackend = HsmBackend.HSM
     multi_az: bool = False
     environment: Literal["prod", "staging", "dev"] = "prod"
