@@ -47,3 +47,16 @@ def test_stack_config_image_uris(monkeypatch: pytest.MonkeyPatch) -> None:
     config = StackConfig.load()
     assert config.api_image_uri == "123.dkr.ecr.us-west-2.amazonaws.com/skreg-api:latest"
     assert config.worker_image_uri == "123.dkr.ecr.us-west-2.amazonaws.com/skreg-worker:latest"
+
+
+def test_stack_config_domain_name_defaults_to_empty(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SKILLPKG_CLOUD_PROVIDER", "aws")
+    config = StackConfig.load()
+    assert config.domain_name == ""
+
+
+def test_stack_config_domain_name_read_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SKILLPKG_CLOUD_PROVIDER", "aws")
+    monkeypatch.setenv("SKILLPKG_DOMAIN_NAME", "api.skreg.ai")
+    config = StackConfig.load()
+    assert config.domain_name == "api.skreg.ai"

@@ -63,6 +63,34 @@ def test_compute_outputs_constructible() -> None:
     assert outputs is not None
 
 
+def test_compute_outputs_includes_alb_dns_name() -> None:
+    outputs = ComputeOutputs(
+        service_url=pulumi.Output.from_input("https://api.example.com"),
+        worker_service_name=pulumi.Output.from_input("skreg-worker"),
+        alb_dns_name=pulumi.Output.from_input("skreg-alb-123.us-west-2.elb.amazonaws.com"),
+    )
+    assert outputs.alb_dns_name is not None
+
+
+def test_compute_outputs_cert_validation_cname_defaults_to_none() -> None:
+    outputs = ComputeOutputs(
+        service_url=pulumi.Output.from_input("https://api.example.com"),
+        worker_service_name=pulumi.Output.from_input("skreg-worker"),
+    )
+    assert outputs.cert_validation_cname is None
+
+
+def test_compute_outputs_cert_validation_cname_set_when_provided() -> None:
+    outputs = ComputeOutputs(
+        service_url=pulumi.Output.from_input("https://api.example.com"),
+        worker_service_name=pulumi.Output.from_input("skreg-worker"),
+        cert_validation_cname=pulumi.Output.from_input(
+            {"name": "_abc.api.skreg.ai", "value": "_xyz.acm.amazonaws.com", "type": "CNAME"}
+        ),
+    )
+    assert outputs.cert_validation_cname is not None
+
+
 def test_network_outputs_constructible() -> None:
     outputs = NetworkOutputs(
         vpc_id=pulumi.Output.from_input("vpc-123"),

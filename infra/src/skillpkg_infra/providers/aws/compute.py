@@ -26,6 +26,7 @@ class AwsComputeArgs:
         db_secret_arn: pulumi.Input[str],
         api_image_uri: str = "",
         worker_image_uri: str = "",
+        domain_name: str = "",
     ) -> None:
         self.vpc_id: pulumi.Input[str] = vpc_id
         self.public_subnet_ids: list[pulumi.Input[str]] = public_subnet_ids
@@ -33,6 +34,7 @@ class AwsComputeArgs:
         self.db_secret_arn: pulumi.Input[str] = db_secret_arn
         self.api_image_uri: str = api_image_uri or _FALLBACK_IMAGE
         self.worker_image_uri: str = worker_image_uri or _FALLBACK_IMAGE
+        self.domain_name: str = domain_name
 
 
 class AwsCompute(pulumi.ComponentResource):
@@ -187,18 +189,79 @@ class AwsCompute(pulumi.ComponentResource):
             opts=pulumi.ResourceOptions(parent=self),
         )
 
-        listener = aws.lb.Listener(
-            f"{name}-listener",
-            aws.lb.ListenerArgs(
-                load_balancer_arn=alb.arn,
-                port=80,
-                protocol="HTTP",
-                default_actions=[
-                    aws.lb.ListenerDefaultActionArgs(type="forward", target_group_arn=tg.arn)
-                ],
-            ),
-            opts=pulumi.ResourceOptions(parent=self),
-        )
+        if args.domain_name:
+            cert = aws.acm.Certificate(
+                f"{name}-cert",
+                aws.acm.CertificateArgs(
+                    domain_name=args.domain_name,
+                    validation_method="DNS",
+                ),
+                opts=pulumi.ResourceOptions(parent=self),
+            )
+            listener = aws.lb.Listener(
+                f"{name}-listener",
+                aws.lb.ListenerArgs(
+                    load_balancer_arn=alb.arn,
+                    port=80,
+                    protocol="HTTP",
+                    default_actions=[
+                        aws.lb.ListenerDefaultActionArgs(
+                            type="redirect",
+                            redirect=aws.lb.ListenerDefaultActionRedirectArgs(
+                                port="443",
+                                protocol="HTTPS",
+                                status_code="HTTP_301",
+                            ),
+                        )
+                    ],
+                ),
+                opts=pulumi.ResourceOptions(parent=self),
+            )
+            aws.lb.Listener(
+                f"{name}-https-listener",
+                aws.lb.ListenerArgs(
+                    load_balancer_arn=alb.arn,
+                    port=443,
+                    protocol="HTTPS",
+                    ssl_policy="ELBSecurityPolicy-TLS13-1-2-2021-06",
+                    certificate_arn=cert.arn,
+                    default_actions=[
+                        aws.lb.ListenerDefaultActionArgs(type="forward", target_group_arn=tg.arn)
+                    ],
+                ),
+                opts=pulumi.ResourceOptions(parent=self),
+            )
+            cert_validation_cname: pulumi.Output[dict[str, str] | None] | None = (
+                cert.domain_validation_options.apply(
+                    lambda opts: (
+                        {
+                            "name": opts[0]["resource_record_name"],
+                            "value": opts[0]["resource_record_value"],
+                            "type": opts[0]["resource_record_type"],
+                        }
+                        if opts
+                        else None
+                    )
+                )
+            )
+            service_url: pulumi.Output[str] = pulumi.Output.from_input(
+                f"https://{args.domain_name}"
+            )
+        else:
+            listener = aws.lb.Listener(
+                f"{name}-listener",
+                aws.lb.ListenerArgs(
+                    load_balancer_arn=alb.arn,
+                    port=80,
+                    protocol="HTTP",
+                    default_actions=[
+                        aws.lb.ListenerDefaultActionArgs(type="forward", target_group_arn=tg.arn)
+                    ],
+                ),
+                opts=pulumi.ResourceOptions(parent=self),
+            )
+            cert_validation_cname = None
+            service_url = alb.dns_name.apply(lambda d: f"http://{d}")
 
         api_image = args.api_image_uri
         api_container_defs = pulumi.Output.from_input(args.db_secret_arn).apply(
@@ -310,8 +373,10 @@ class AwsCompute(pulumi.ComponentResource):
         )
 
         self._outputs: ComputeOutputs = ComputeOutputs(
-            service_url=alb.dns_name.apply(lambda d: f"http://{d}"),
+            service_url=service_url,
             worker_service_name=worker_svc.name,
+            alb_dns_name=alb.dns_name,
+            cert_validation_cname=cert_validation_cname,
         )
         self.ecr_api_repo: pulumi.Output[str] = api_repo.repository_url
         self.ecr_worker_repo: pulumi.Output[str] = worker_repo.repository_url
@@ -322,6 +387,8 @@ class AwsCompute(pulumi.ComponentResource):
                 "worker_service_name": self._outputs.worker_service_name,
                 "ecr_api_repo": self.ecr_api_repo,
                 "ecr_worker_repo": self.ecr_worker_repo,
+                "alb_dns_name": self._outputs.alb_dns_name,
+                "cert_validation_cname": self._outputs.cert_validation_cname,
             }
         )
 

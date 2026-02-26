@@ -61,11 +61,21 @@ class SkillpkgStack:
                 db_secret_arn=database.outputs.connection_secret_arn,
                 api_image_uri=config.api_image_uri,
                 worker_image_uri=config.worker_image_uri,
+                domain_name=config.domain_name,
             ),
         )
         oidc = AwsOidc("skreg-oidc", github_repo="dymocaptin/skreg")
 
-        pulumi.export("api_url", compute.outputs.service_url)
+        pulumi.export(
+            "api_url",
+            (
+                pulumi.Output.from_input(f"https://{config.domain_name}")
+                if config.domain_name
+                else compute.outputs.service_url
+            ),
+        )
+        pulumi.export("alb_dns_name", compute.outputs.alb_dns_name)
+        pulumi.export("cert_validation_cname", compute.outputs.cert_validation_cname)
         pulumi.export("cdn_base_url", storage.outputs.cdn_base_url)
         pulumi.export("root_ca_cert", pki.root_ca_cert_pem)
         pulumi.export("ecr_api_repo", compute.ecr_api_repo)
