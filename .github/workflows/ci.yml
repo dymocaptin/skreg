@@ -139,6 +139,7 @@ jobs:
           PULUMI_BACKEND_URL: ${{ secrets.PULUMI_BACKEND_URL }}
           PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
           SKILLPKG_CLOUD_PROVIDER: aws
+          SKILLPKG_DOMAIN_NAME: ${{ vars.SKILLPKG_DOMAIN_NAME }}
           SKILLPKG_API_IMAGE_URI: ${{ needs.build-push.outputs.registry }}/skreg-api:${{ github.sha }}
           SKILLPKG_WORKER_IMAGE_URI: ${{ needs.build-push.outputs.registry }}/skreg-worker:${{ github.sha }}
         run: |
