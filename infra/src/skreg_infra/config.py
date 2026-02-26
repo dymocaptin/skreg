@@ -26,7 +26,7 @@ class StackConfig(BaseSettings):
     """Fully validated infrastructure stack configuration."""
 
     model_config = SettingsConfigDict(
-        env_prefix="SKILLPKG_",
+        env_prefix="SKREG_",
         env_file=".env",
         env_file_encoding="utf-8",
     )

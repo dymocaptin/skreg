@@ -18,7 +18,7 @@ def test_hsm_backend_values() -> None:
 
 
 def test_stack_config_load(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("SKILLPKG_CLOUD_PROVIDER", "aws")
+    monkeypatch.setenv("SKREG_CLOUD_PROVIDER", "aws")
     config = StackConfig.load()
     assert config.cloud_provider == CloudProvider.AWS
     assert config.hsm_backend == HsmBackend.HSM
@@ -29,10 +29,10 @@ def test_stack_config_load(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_stack_config_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("SKILLPKG_CLOUD_PROVIDER", "gcp")
-    monkeypatch.setenv("SKILLPKG_HSM_BACKEND", "software")
-    monkeypatch.setenv("SKILLPKG_MULTI_AZ", "true")
-    monkeypatch.setenv("SKILLPKG_ENVIRONMENT", "staging")
+    monkeypatch.setenv("SKREG_CLOUD_PROVIDER", "gcp")
+    monkeypatch.setenv("SKREG_HSM_BACKEND", "software")
+    monkeypatch.setenv("SKREG_MULTI_AZ", "true")
+    monkeypatch.setenv("SKREG_ENVIRONMENT", "staging")
     config = StackConfig.load()
     assert config.cloud_provider == CloudProvider.GCP
     assert config.hsm_backend == HsmBackend.SOFTWARE
@@ -41,9 +41,9 @@ def test_stack_config_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_stack_config_image_uris(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("SKILLPKG_CLOUD_PROVIDER", "aws")
-    monkeypatch.setenv("SKILLPKG_API_IMAGE_URI", "123.dkr.ecr.us-west-2.amazonaws.com/skreg-api:latest")
-    monkeypatch.setenv("SKILLPKG_WORKER_IMAGE_URI", "123.dkr.ecr.us-west-2.amazonaws.com/skreg-worker:latest")
+    monkeypatch.setenv("SKREG_CLOUD_PROVIDER", "aws")
+    monkeypatch.setenv("SKREG_API_IMAGE_URI", "123.dkr.ecr.us-west-2.amazonaws.com/skreg-api:latest")
+    monkeypatch.setenv("SKREG_WORKER_IMAGE_URI", "123.dkr.ecr.us-west-2.amazonaws.com/skreg-worker:latest")
     config = StackConfig.load()
     assert config.api_image_uri == "123.dkr.ecr.us-west-2.amazonaws.com/skreg-api:latest"
     assert config.worker_image_uri == "123.dkr.ecr.us-west-2.amazonaws.com/skreg-worker:latest"
