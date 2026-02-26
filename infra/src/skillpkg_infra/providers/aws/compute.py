@@ -230,7 +230,7 @@ class AwsCompute(pulumi.ComponentResource):
                     load_balancer_arn=alb.arn,
                     port=443,
                     protocol="HTTPS",
-                    ssl_policy="ELBSecurityPolicy-TLS13-1-2-2021-06",
+                    ssl_policy="ELBSecurityPolicy-TLS13-1-2-Res-PQ-2025-09",
                     certificate_arn=cert_validation.certificate_arn,
                     default_actions=[
                         aws.lb.ListenerDefaultActionArgs(type="forward", target_group_arn=tg.arn)
