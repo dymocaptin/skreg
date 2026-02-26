@@ -68,9 +68,11 @@ class SkillpkgStack:
 
         pulumi.export(
             "api_url",
-            pulumi.Output.from_input(f"https://{config.domain_name}")
-            if config.domain_name
-            else compute.outputs.service_url,
+            (
+                pulumi.Output.from_input(f"https://{config.domain_name}")
+                if config.domain_name
+                else compute.outputs.service_url
+            ),
         )
         pulumi.export("alb_dns_name", compute.outputs.alb_dns_name)
         pulumi.export("cert_validation_cname", compute.outputs.cert_validation_cname)

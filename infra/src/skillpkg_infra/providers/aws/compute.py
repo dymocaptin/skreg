@@ -233,13 +233,15 @@ class AwsCompute(pulumi.ComponentResource):
             )
             cert_validation_cname: pulumi.Output[dict[str, str] | None] | None = (
                 cert.domain_validation_options.apply(
-                    lambda opts: {
-                        "name": opts[0]["resource_record_name"],
-                        "value": opts[0]["resource_record_value"],
-                        "type": opts[0]["resource_record_type"],
-                    }
-                    if opts
-                    else None
+                    lambda opts: (
+                        {
+                            "name": opts[0]["resource_record_name"],
+                            "value": opts[0]["resource_record_value"],
+                            "type": opts[0]["resource_record_type"],
+                        }
+                        if opts
+                        else None
+                    )
                 )
             )
             service_url: pulumi.Output[str] = pulumi.Output.from_input(

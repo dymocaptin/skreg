@@ -34,9 +34,9 @@ class ComputeOutputs:
         self.service_url: pulumi.Output[str] = service_url
         self.worker_service_name: pulumi.Output[str] = worker_service_name
         self.alb_dns_name: pulumi.Output[str] | None = alb_dns_name
-        self.cert_validation_cname: (
-            pulumi.Output[dict[str, str] | None] | None
-        ) = cert_validation_cname
+        self.cert_validation_cname: pulumi.Output[dict[str, str] | None] | None = (
+            cert_validation_cname
+        )
 
 
 class SkillpkgCompute(Protocol):
