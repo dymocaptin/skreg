@@ -50,7 +50,15 @@ class AwsCompute(pulumi.ComponentResource):
         args: AwsComputeArgs,
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
-        super().__init__("skreg:aws:Compute", name, {}, opts)
+        super().__init__(
+            "skreg:aws:Compute",
+            name,
+            {},
+            pulumi.ResourceOptions.merge(
+                opts,
+                pulumi.ResourceOptions(aliases=[pulumi.Alias(type_="skillpkg:aws:Compute")]),
+            ),
+        )
 
         logger.debug("provisioning_aws_compute", extra={"name": name})
 

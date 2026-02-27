@@ -58,7 +58,15 @@ class AwsDatabase(pulumi.ComponentResource):
             args: Validated AWS-specific database arguments.
             opts: Optional Pulumi resource options.
         """
-        super().__init__("skreg:aws:Database", name, {}, opts)
+        super().__init__(
+            "skreg:aws:Database",
+            name,
+            {},
+            pulumi.ResourceOptions.merge(
+                opts,
+                pulumi.ResourceOptions(aliases=[pulumi.Alias(type_="skillpkg:aws:Database")]),
+            ),
+        )
 
         logger.debug("provisioning_aws_database", extra={"name": name})
 
