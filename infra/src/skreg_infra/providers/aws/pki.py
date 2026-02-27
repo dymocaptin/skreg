@@ -72,15 +72,7 @@ class AwsPki(pulumi.ComponentResource):
         args: AwsPkiArgs,
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
-        super().__init__(
-            "skreg:aws:Pki",
-            name,
-            {},
-            pulumi.ResourceOptions.merge(
-                opts,
-                pulumi.ResourceOptions(aliases=[pulumi.Alias(type_="skillpkg:aws:Pki")]),
-            ),
-        )
+        super().__init__("skreg:aws:Pki", name, {}, opts)
 
         logger.debug("provisioning_aws_pki", extra={"name": name})
 

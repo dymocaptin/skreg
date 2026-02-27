@@ -30,15 +30,7 @@ class AwsStorage(pulumi.ComponentResource):
             name: Logical Pulumi resource name.
             opts: Optional Pulumi resource options.
         """
-        super().__init__(
-            "skreg:aws:Storage",
-            name,
-            {},
-            pulumi.ResourceOptions.merge(
-                opts,
-                pulumi.ResourceOptions(aliases=[pulumi.Alias(type_="skillpkg:aws:Storage")]),
-            ),
-        )
+        super().__init__("skreg:aws:Storage", name, {}, opts)
 
         logger.debug("provisioning_aws_storage", extra={"name": name})
 

@@ -25,15 +25,7 @@ class AwsNetwork(pulumi.ComponentResource):
         name: str,
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
-        super().__init__(
-            "skreg:aws:Network",
-            name,
-            {},
-            pulumi.ResourceOptions.merge(
-                opts,
-                pulumi.ResourceOptions(aliases=[pulumi.Alias(type_="skillpkg:aws:Network")]),
-            ),
-        )
+        super().__init__("skreg:aws:Network", name, {}, opts)
 
         logger.debug("provisioning_aws_network", extra={"name": name})
 
