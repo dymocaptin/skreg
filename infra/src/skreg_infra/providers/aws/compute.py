@@ -27,6 +27,7 @@ class AwsComputeArgs:
         api_image_uri: str = "",
         worker_image_uri: str = "",
         domain_name: str = "",
+        existing_cert_arn: str = "",
     ) -> None:
         self.vpc_id: pulumi.Input[str] = vpc_id
         self.public_subnet_ids: list[pulumi.Input[str]] = public_subnet_ids
@@ -35,6 +36,7 @@ class AwsComputeArgs:
         self.api_image_uri: str = api_image_uri or _FALLBACK_IMAGE
         self.worker_image_uri: str = worker_image_uri or _FALLBACK_IMAGE
         self.domain_name: str = domain_name
+        self.existing_cert_arn: str = existing_cert_arn
 
 
 class AwsCompute(pulumi.ComponentResource):
@@ -196,7 +198,10 @@ class AwsCompute(pulumi.ComponentResource):
                     domain_name=args.domain_name,
                     validation_method="DNS",
                 ),
-                opts=pulumi.ResourceOptions(parent=self),
+                opts=pulumi.ResourceOptions(
+                    parent=self,
+                    import_=args.existing_cert_arn or None,
+                ),
             )
             cert_validation = aws.acm.CertificateValidation(
                 f"{name}-cert-validation",

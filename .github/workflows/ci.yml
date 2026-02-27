@@ -140,6 +140,7 @@ jobs:
           PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
           SKREG_CLOUD_PROVIDER: aws
           SKREG_DOMAIN_NAME: ${{ vars.SKREG_DOMAIN_NAME }}
+          SKREG_EXISTING_CERT_ARN: ${{ secrets.SKREG_EXISTING_CERT_ARN }}
           SKREG_API_IMAGE_URI: ${{ needs.build-push.outputs.registry }}/skreg-api:${{ github.sha }}
           SKREG_WORKER_IMAGE_URI: ${{ needs.build-push.outputs.registry }}/skreg-worker:${{ github.sha }}
         run: |
