@@ -1,78 +1,140 @@
 # skreg
 
-A public skills package registry for AI coding tools — analogous to npm or crates.io for Claude Code skills (and any tool that adopts the format). Packages are vetted and cryptographically signed, so you know exactly what you're installing and where it came from.
+A package registry for AI coding assistant skills.
 
-## What's in this repo
+## What is skreg?
 
-| Crate / module | Language | Purpose |
-|---|---|---|
-| `crates/skreg-core` | Rust | Domain types: `Manifest`, `PackageRef`, `Namespace`, `Sha256Digest` |
-| `crates/skreg-crypto` | Rust | Signature verification, revocation (CRL) |
-| `crates/skreg-pack` | Rust | Pack/unpack `.skill` tarballs |
-| `crates/skreg-client` | Rust | `RegistryClient` trait + HTTP adapter |
-| `crates/skreg-cli` | Rust | `skreg` binary — install command |
-| `crates/skreg-api` | Rust | Registry HTTP API (Axum + SQLx + Tokio) |
-| `crates/skreg-worker` | Rust | Async vetting worker (structure checks, ClamAV) |
-| `infra/` | Python | Pulumi IaC — provider-agnostic components, AWS implementation |
+skreg is a registry for skills — reusable instruction sets that extend what
+your AI coding assistant can do. Think of it like npm or crates.io, but for
+prompts you share across projects and teams.
 
-## Package format
+Browse and install community skills from [skreg.ai](https://skreg.ai). Package
+your own with a single command and publish them for others to use — or run a
+private registry your team controls.
 
-A `.skill` file is a gzip'd tarball containing:
+## Install
 
-```
-SKILL.md          # skill content with YAML frontmatter
-manifest.json     # name, version, description, author, sha256, signature, cert chain
-references/       # optional reference markdown files
+```bash
+cargo install skreg-cli
 ```
 
-Packages are content-addressed in storage: `/{namespace}/{name}/{version}/{sha256}.skill`
+Requires Rust ([rustup.rs](https://rustup.rs)). After installing, verify with:
 
-## Trust model
-
-```
-Root CA  (offline, HSM-backed)
-    ├── Registry Intermediate CA
-    │       Signs packages for individual publishers after vetting
-    └── Publisher Intermediate CA
-            Issues leaf certs to verified org accounts
-            Orgs sign locally; registry verifies on ingest
+```bash
+skreg --version
 ```
 
-The Root CA cert is embedded in the `skreg` CLI binary at build time. On install the CLI verifies the sha256 digest, the cert chain, the detached signature, and checks the CRL (cached 24 h).
+## Using skills
 
-## Install a skill
+### Finding a skill
 
-```sh
-skreg install acme/my-skill
-skreg install acme/my-skill@1.2.0
+Browse and search for skills at [skreg.ai](https://skreg.ai).
+
+> **Coming soon:** `skreg search <query>` — find skills directly from the CLI.
+
+### Installing a skill
+
+```bash
+skreg install <namespace>/<name>
 ```
+
+For example:
+
+```bash
+skreg install dymocaptin/color-analysis
+```
+
+Skills are installed to `~/.skreg/packages/` and are available to your AI
+coding assistant automatically.
+
+### Using an installed skill
+
+> **Coming soon:** Native Claude Code integration — skills installed via skreg
+> will be available directly through the Claude Code plugin marketplace.
+
+## Building skills
+
+### Anatomy of a skill
+
+A skill is a directory with two files:
+
+```
+my-skill/
+├── SKILL.md        # The skill prompt and instructions
+└── manifest.json   # Metadata
+```
+
+`SKILL.md` starts with a YAML frontmatter block followed by the instructions
+your AI assistant will follow when the skill is active:
+
+```markdown
+---
+name: color-analysis
+description: Analyzes the dominant colors in any image file, producing a ranked
+             color palette with hex codes, RGB/HSL values, human-readable color
+             names, and percentage breakdowns.
+---
+
+# Color Analysis
+
+You are an expert color analyst. When the user provides an image, analyze it
+and produce a detailed color palette report.
+...
+```
+
+`manifest.json` declares the package identity:
+
+```json
+{
+  "namespace": "dymocaptin",
+  "name": "color-analysis",
+  "version": "1.0.0",
+  "description": "Analyzes the dominant colors in any image file, producing a ranked color palette with hex codes, RGB/HSL values, human-readable color names, and percentage breakdowns."
+}
+```
+
+### Packaging
+
+From inside your skill directory, run:
+
+```bash
+skreg pack
+```
+
+This produces a `<name>-<version>.skill` archive ready to publish.
+
+### Publishing
+
+First, log in to your registry:
+
+```bash
+skreg login <your-namespace>
+```
+
+Then publish:
+
+```bash
+skreg publish
+```
+
+skreg will pack, upload, and vet your skill. Once it passes review it appears
+on [skreg.ai](https://skreg.ai).
 
 ## Self-hosting
 
-The registry API is a stateless Rust binary configured entirely via environment variables. The `infra/` Pulumi project provides provider-agnostic component interfaces with an AWS implementation (RDS + S3 + CloudFront). GCP and Azure implementations follow the same interface.
+You can run your own skreg registry. Deploy the infrastructure with Pulumi,
+then point the CLI at your domain:
 
-```sh
-cd infra
-uv sync --extra dev
-pulumi up
+```bash
+skreg login <your-namespace> --registry https://registry.example.com
 ```
 
-## Development
+See [infra/README.md](infra/README.md) for the full deployment guide.
 
-**Prerequisites:** Rust stable, Python 3.12, [uv](https://github.com/astral-sh/uv), PostgreSQL 16
+## Contributing
 
-```sh
-# Rust
-cargo build --workspace
-cargo test --workspace
-cargo clippy --all-targets -- -D warnings
-
-# Python infra
-cd infra
-uv sync --extra dev
-uv run pytest
-uv run mypy src/
-```
+skreg is open source. See [CONTRIBUTING.md](CONTRIBUTING.md) for how to build
+from source, run tests, and submit changes.
 
 ## License
 
