@@ -35,6 +35,7 @@ class StackConfig(BaseSettings):
     api_image_uri: str = ""
     worker_image_uri: str = ""
     domain_name: str = ""
+    existing_cert_arn: str = ""
     hsm_backend: HsmBackend = HsmBackend.HSM
     multi_az: bool = False
     environment: Literal["prod", "staging", "dev"] = "prod"

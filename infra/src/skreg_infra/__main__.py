@@ -62,6 +62,7 @@ class SkregStack:
                 api_image_uri=config.api_image_uri,
                 worker_image_uri=config.worker_image_uri,
                 domain_name=config.domain_name,
+                existing_cert_arn=config.existing_cert_arn,
             ),
         )
         oidc = AwsOidc("skreg-oidc", github_repo="dymocaptin/skreg")
