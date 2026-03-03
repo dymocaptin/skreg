@@ -9,7 +9,9 @@ BUCKET="skreg-pulumi-state-${ACCOUNT_ID}"
 
 echo "Creating Pulumi state bucket: s3://${BUCKET} in ${REGION}"
 
-if [[ "${REGION}" == "us-east-1" ]]; then
+if aws s3api head-bucket --bucket "${BUCKET}" 2>/dev/null; then
+    echo "  Bucket already exists, skipping creation"
+elif [[ "${REGION}" == "us-east-1" ]]; then
     aws s3api create-bucket --bucket "${BUCKET}" --region "${REGION}"
 else
     aws s3api create-bucket \
