@@ -3,3 +3,4 @@
 pub mod login;
 pub mod pack;
 pub mod publish;
+pub mod search;

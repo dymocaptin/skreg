@@ -15,6 +15,11 @@ enum Commands {
     Login { namespace: String },
     /// Publish a skill to the registry
     Publish,
+    /// Search the registry for skills
+    Search {
+        /// Search query string
+        query: String,
+    },
 }
 
 #[tokio::main]
@@ -29,6 +34,9 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::Publish => {
             skreg_cli::commands::publish::run_publish().await?;
+        }
+        Commands::Search { query } => {
+            skreg_cli::commands::search::run_search(&query).await?;
         }
     }
     Ok(())
