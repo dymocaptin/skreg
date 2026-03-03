@@ -20,6 +20,12 @@ enum Commands {
         /// Search query string
         query: String,
     },
+    /// Download and install a skill
+    Install {
+        /// Package reference (namespace/name or namespace/name@version)
+        #[arg(value_name = "PACKAGE")]
+        package_ref: String,
+    },
 }
 
 #[tokio::main]
@@ -37,6 +43,9 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::Search { query } => {
             skreg_cli::commands::search::run_search(&query).await?;
+        }
+        Commands::Install { package_ref } => {
+            skreg_cli::commands::install::run_install(&package_ref).await?;
         }
     }
     Ok(())
