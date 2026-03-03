@@ -10,7 +10,7 @@ use log::error;
 use serde::Serialize;
 use skreg_core::types::{Namespace, PackageName};
 
-use crate::router::SharedState;
+use crate::router::{AppState, SharedState};
 
 /// A row from the `versions` + `packages` join used to resolve a version.
 #[derive(sqlx::FromRow)]
@@ -58,7 +58,7 @@ fn validate_version(v: &str) -> bool {
 /// Resolve a version row from the DB given validated namespace, name, and version.
 /// If version is "latest", returns the most recently published version.
 async fn resolve_version_row(
-    state: &crate::router::AppState,
+    state: &AppState,
     ns: &str,
     name: &str,
     version: &str,
@@ -73,7 +73,7 @@ async fn resolve_version_row(
              WHERE n.slug = $1
                AND p.name = $2
                AND v.yanked_at IS NULL
-             ORDER BY v.published_at DESC
+             ORDER BY v.published_at DESC, v.id DESC
              LIMIT 1",
         )
         .bind(ns)
@@ -164,6 +164,45 @@ pub async fn package_download_handler(
     })?;
 
     Ok(data.into_bytes())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::validate_version;
+
+    #[test]
+    fn validate_version_accepts_latest() {
+        assert!(validate_version("latest"));
+    }
+
+    #[test]
+    fn validate_version_accepts_semver() {
+        assert!(validate_version("1.2.3"));
+        assert!(validate_version("1.0.0-alpha.1"));
+        assert!(validate_version("2.0.0+build.1"));
+    }
+
+    #[test]
+    fn validate_version_rejects_empty() {
+        assert!(!validate_version(""));
+    }
+
+    #[test]
+    fn validate_version_rejects_too_long() {
+        assert!(!validate_version(&"1".repeat(33)));
+    }
+
+    #[test]
+    fn validate_version_rejects_path_traversal() {
+        assert!(!validate_version("../etc/passwd"));
+        assert!(!validate_version("1.0/bad"));
+    }
+
+    #[test]
+    fn validate_version_rejects_special_chars() {
+        assert!(!validate_version("1.0.0 beta"));
+        assert!(!validate_version("1.0.0@tag"));
+    }
 }
 
 /// Handle `GET /v1/download/:ns/:name/:version/sig` — return signature bytes.
