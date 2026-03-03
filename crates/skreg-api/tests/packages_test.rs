@@ -51,3 +51,19 @@ async fn packages_rejects_invalid_namespace() {
     let response = server.get("/v1/packages/ACME/my-skill/1.0.0").await;
     assert_eq!(response.status_code(), StatusCode::BAD_REQUEST);
 }
+
+#[tokio::test]
+async fn packages_download_rejects_invalid_namespace() {
+    let app = build_router(make_state().await);
+    let server = TestServer::new(app).unwrap();
+    let response = server.get("/v1/download/ACME/my-skill/1.0.0").await;
+    assert_eq!(response.status_code(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn packages_sig_rejects_invalid_namespace() {
+    let app = build_router(make_state().await);
+    let server = TestServer::new(app).unwrap();
+    let response = server.get("/v1/download/ACME/my-skill/1.0.0/sig").await;
+    assert_eq!(response.status_code(), StatusCode::BAD_REQUEST);
+}
