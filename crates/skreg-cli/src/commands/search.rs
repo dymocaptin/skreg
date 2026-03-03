@@ -1,6 +1,6 @@
 //! `skreg search` — search the registry for skills.
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 
 use skreg_client::client::{HttpRegistryClient, RegistryClient};
 
@@ -13,12 +13,13 @@ use crate::config::{default_config_path, load_config};
 /// Returns an error if the registry request fails.
 pub async fn run_search(query: &str) -> Result<()> {
     let cfg_path = default_config_path();
-    let cfg = load_config(&cfg_path)?;
+    let cfg = load_config(&cfg_path)
+        .context("not logged in — run `skreg login <namespace>` first")?;
     let client = HttpRegistryClient::new(&cfg.registry);
     let results = client.search(query).await?;
 
     if results.is_empty() {
-        println!("No results for {:?}", query);
+        println!("No results for '{query}'");
         return Ok(());
     }
 
