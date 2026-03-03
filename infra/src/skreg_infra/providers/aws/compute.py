@@ -56,17 +56,9 @@ class AwsCompute(pulumi.ComponentResource):
 
         logger.debug("provisioning_aws_compute", extra={"name": name})
 
-        api_repo = aws.ecr.Repository(
-            f"{name}-ecr-api",
-            aws.ecr.RepositoryArgs(name="skreg-api", image_tag_mutability="MUTABLE"),
-            opts=pulumi.ResourceOptions(parent=self),
-        )
-
-        worker_repo = aws.ecr.Repository(
-            f"{name}-ecr-worker",
-            aws.ecr.RepositoryArgs(name="skreg-worker", image_tag_mutability="MUTABLE"),
-            opts=pulumi.ResourceOptions(parent=self),
-        )
+        identity = aws.get_caller_identity()
+        region = aws.get_region()
+        ecr_base = f"{identity.account_id}.dkr.ecr.{region.name}.amazonaws.com"
 
         cluster = aws.ecs.Cluster(
             f"{name}-cluster",
@@ -390,8 +382,8 @@ class AwsCompute(pulumi.ComponentResource):
             alb_dns_name=alb.dns_name,
             cert_validation_cname=cert_validation_cname,
         )
-        self.ecr_api_repo: pulumi.Output[str] = api_repo.repository_url
-        self.ecr_worker_repo: pulumi.Output[str] = worker_repo.repository_url
+        self.ecr_api_repo: pulumi.Output[str] = pulumi.Output.from_input(f"{ecr_base}/skreg-api")
+        self.ecr_worker_repo: pulumi.Output[str] = pulumi.Output.from_input(f"{ecr_base}/skreg-worker")
 
         self.register_outputs(
             {

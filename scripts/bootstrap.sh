@@ -36,6 +36,16 @@ aws s3api put-bucket-versioning \
     --bucket "${BUCKET}" \
     --versioning-configuration Status=Enabled
 
+echo "Creating ECR repositories..."
+aws ecr create-repository \
+    --repository-name skreg-api \
+    --image-tag-mutability MUTABLE \
+    --region "${REGION}" 2>/dev/null && echo "  Created skreg-api" || echo "  skreg-api already exists"
+aws ecr create-repository \
+    --repository-name skreg-worker \
+    --image-tag-mutability MUTABLE \
+    --region "${REGION}" 2>/dev/null && echo "  Created skreg-worker" || echo "  skreg-worker already exists"
+
 echo ""
 echo "Done. Run the following to configure Pulumi:"
 echo "  pulumi login s3://${BUCKET}"

@@ -27,6 +27,10 @@ class SkillpkgMocks(Mocks):
     def call(
         self, args: pulumi.runtime.MockCallArgs
     ) -> tuple[dict[str, object], list[tuple[str, str]]]:
+        if args.token == "aws:index/getCallerIdentity:getCallerIdentity":
+            return ({"accountId": "123456789012", "arn": "arn:aws:iam::123456789012:root", "userId": "123456789012"}, [])
+        if args.token == "aws:index/getRegion:getRegion":
+            return ({"name": "us-west-2", "description": "US West (Oregon)", "endpoint": "ec2.us-west-2.amazonaws.com", "id": "us-west-2"}, [])
         return ({}, [])
 
 

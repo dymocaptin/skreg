@@ -79,6 +79,11 @@ jobs:
         id: ecr-login
         uses: aws-actions/amazon-ecr-login@v2
 
+      - name: Ensure ECR repositories exist
+        run: |
+          aws ecr create-repository --repository-name skreg-api --image-tag-mutability MUTABLE 2>/dev/null || true
+          aws ecr create-repository --repository-name skreg-worker --image-tag-mutability MUTABLE 2>/dev/null || true
+
       - name: Build and push skreg-api
         env:
           REGISTRY: ${{ steps.ecr-login.outputs.registry }}
