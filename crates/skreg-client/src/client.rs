@@ -135,8 +135,8 @@ impl RegistryClient for HttpRegistryClient {
         query: &'a str,
     ) -> BoxFuture<'a, Result<Vec<SearchResult>, ClientError>> {
         Box::pin(async move {
-            let url = format!("{}/v1/search?q={}", self.base_url, query);
-            debug!("searching registry: {url}");
+            let url = format!("{}/v1/search", self.base_url);
+            debug!("searching registry: {url}?q={query}");
 
             #[derive(serde::Deserialize)]
             struct SearchResponse {
@@ -146,6 +146,7 @@ impl RegistryClient for HttpRegistryClient {
             let resp: SearchResponse = self
                 .http
                 .get(&url)
+                .query(&[("q", query)])
                 .send()
                 .await?
                 .error_for_status()
