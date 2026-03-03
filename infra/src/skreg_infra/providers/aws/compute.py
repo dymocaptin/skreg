@@ -382,9 +382,7 @@ class AwsCompute(pulumi.ComponentResource):
             alb_dns_name=alb.dns_name,
             cert_validation_cname=cert_validation_cname,
         )
-        self.ecr_api_repo: pulumi.Output[str] = pulumi.Output.from_input(
-            f"{ecr_base}/skreg-api"
-        )
+        self.ecr_api_repo: pulumi.Output[str] = pulumi.Output.from_input(f"{ecr_base}/skreg-api")
         self.ecr_worker_repo: pulumi.Output[str] = pulumi.Output.from_input(
             f"{ecr_base}/skreg-worker"
         )
