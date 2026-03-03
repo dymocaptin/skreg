@@ -2,7 +2,7 @@
 
 use rsa::pkcs1v15::{Signature as RsaSignature, VerifyingKey};
 use rsa::pkcs8::DecodePublicKey;
-use rsa::signature::Verifier as RsaVerifier;
+use rsa::signature::hazmat::PrehashVerifier;
 use rsa::RsaPublicKey;
 use sha2::Sha256;
 use skreg_core::types::Sha256Digest;
@@ -60,7 +60,10 @@ impl RsaPkcs1Verifier {
         }
     }
 
-    /// Create a verifier with a custom root CA PEM (for tests).
+    /// Create a verifier with a custom root CA PEM.
+    ///
+    /// Intended for testing and self-hosted registries; production code
+    /// should use [`RsaPkcs1Verifier::new`] to use the bundled root CA.
     #[must_use]
     pub fn new_with_root_pem(pem: &[u8]) -> Self {
         Self {
@@ -103,14 +106,17 @@ impl SignatureVerifier for RsaPkcs1Verifier {
         let public_key = self.root_public_key()?;
         let verifying_key = VerifyingKey::<Sha256>::new(public_key);
 
+        // Sha256Digest::from_hex validates hex at construction; this cannot fail.
         let digest_bytes = hex::decode(digest.as_hex())
-            .map_err(|e| VerifyError::Der(e.to_string()))?;
+            .expect("Sha256Digest always contains valid lowercase hex");
 
         let sig = RsaSignature::try_from(signature)
             .map_err(|_| VerifyError::SignatureMismatch)?;
 
+        // verify_prehash treats digest_bytes as the pre-computed SHA-256 hash
+        // and applies PKCS#1 v1.5 without re-hashing.
         verifying_key
-            .verify(&digest_bytes, &sig)
+            .verify_prehash(&digest_bytes, &sig)
             .map_err(|_| VerifyError::SignatureMismatch)?;
 
         Ok(VerifiedSigner {

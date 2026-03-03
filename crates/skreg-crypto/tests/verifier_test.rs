@@ -18,7 +18,8 @@ fn in_memory_store_tracks_revoked_serials() {
 
 use rsa::pkcs1v15::SigningKey;
 use rsa::pkcs8::{DecodePrivateKey, EncodePrivateKey};
-use rsa::signature::{RandomizedSigner, SignatureEncoding};
+use rsa::signature::hazmat::PrehashSigner;
+use rsa::signature::SignatureEncoding;
 use sha2::Sha256;
 use skreg_core::types::Sha256Digest;
 use skreg_crypto::verifier::{RsaPkcs1Verifier, SignatureVerifier};
@@ -46,13 +47,16 @@ fn make_test_ca() -> (String, String) {
 }
 
 /// Sign `digest_hex`'s decoded bytes with an RSA private key from PKCS8 PEM.
+///
+/// Uses `sign_prehash` so the bytes are treated as a pre-computed hash without
+/// re-hashing, matching the behavior of `skreg_worker::stages::signing::sign_bytes`.
 fn sign_digest(private_key_pem: &str, digest_hex: &str) -> Vec<u8> {
     let private_key = rsa::RsaPrivateKey::from_pkcs8_pem(private_key_pem).unwrap();
     let signing_key = SigningKey::<Sha256>::new(private_key);
     let digest_bytes = hex::decode(digest_hex).unwrap();
-    let mut rng = rand::thread_rng();
     signing_key
-        .sign_with_rng(&mut rng, &digest_bytes)
+        .sign_prehash(&digest_bytes)
+        .expect("sign_prehash failed")
         .to_bytes()
         .to_vec()
 }
@@ -82,6 +86,18 @@ fn verifier_rejects_wrong_signature() {
     assert!(
         matches!(result, Err(skreg_crypto::error::VerifyError::SignatureMismatch)),
         "expected SignatureMismatch, got {result:?}"
+    );
+}
+
+#[test]
+fn verifier_rejects_nonempty_cert_chain() {
+    let (ca_pem, _) = make_test_ca();
+    let digest = Sha256Digest::from_hex(&"a".repeat(64)).unwrap();
+    let verifier = RsaPkcs1Verifier::new_with_root_pem(ca_pem.as_bytes());
+    let result = verifier.verify(&digest, &[], &["fake-cert".to_owned()]);
+    assert!(
+        matches!(result, Err(skreg_crypto::error::VerifyError::InvalidCertChain(_))),
+        "expected InvalidCertChain, got {result:?}"
     );
 }
 

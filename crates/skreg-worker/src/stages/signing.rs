@@ -3,20 +3,23 @@
 use anyhow::{Context, Result};
 use aws_sdk_s3::Client as S3Client;
 use aws_sdk_secretsmanager::Client as SmClient;
-use rand::CryptoRng;
 use rsa::pkcs1v15::SigningKey;
 use rsa::pkcs8::DecodePrivateKey;
-use rsa::signature::{RandomizedSigner, SignatureEncoding};
+use rsa::signature::hazmat::PrehashSigner;
+use rsa::signature::SignatureEncoding;
 use rsa::RsaPrivateKey;
 use sha2::Sha256;
 
-/// Sign `data` with `signing_key` using RSA PKCS#1v1.5 + SHA-256.
-pub fn sign_bytes<R: rand::RngCore + CryptoRng>(
-    signing_key: &SigningKey<Sha256>,
-    data: &[u8],
-    rng: &mut R,
-) -> Vec<u8> {
-    signing_key.sign_with_rng(rng, data).to_bytes().to_vec()
+/// Sign `data` (a pre-computed hash) with `signing_key` using RSA PKCS#1v1.5 + SHA-256.
+///
+/// `data` must be the raw hash bytes — the signing key applies PKCS#1v1.5 padding
+/// with the SHA-256 OID without re-hashing.
+pub fn sign_bytes(signing_key: &SigningKey<Sha256>, data: &[u8]) -> Vec<u8> {
+    signing_key
+        .sign_prehash(data)
+        .expect("sign_prehash failed: invalid key or hash length")
+        .to_bytes()
+        .to_vec()
 }
 
 /// Load the CA private key from Secrets Manager, sign the tarball sha256,
@@ -55,12 +58,9 @@ pub async fn run_signing(
     let private_key = RsaPrivateKey::from_pkcs8_pem(pem).context("parsing RSA private key PEM")?;
     let signing_key = SigningKey::<Sha256>::new(private_key);
 
-    // 3. Sign the sha256 digest bytes (rng dropped before any await)
+    // 3. Sign the sha256 digest bytes
     let digest_bytes = hex::decode(tarball_sha256).context("decoding sha256 hex")?;
-    let signature = {
-        let mut rng = rand::thread_rng();
-        sign_bytes(&signing_key, &digest_bytes, &mut rng)
-    };
+    let signature = sign_bytes(&signing_key, &digest_bytes);
 
     // 4. Write .sig to S3
     let sig_path = storage_path.replace(".skill", ".sig");
@@ -78,7 +78,7 @@ pub async fn run_signing(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rsa::signature::Verifier;
+    use rsa::signature::hazmat::PrehashVerifier;
     use rsa::{
         pkcs1v15::{SigningKey, VerifyingKey},
         RsaPrivateKey,
@@ -91,13 +91,10 @@ mod tests {
         let signing_key = SigningKey::<Sha256>::new(private_key.clone());
         let verifying_key = VerifyingKey::<Sha256>::new(private_key.to_public_key());
 
-        let data = b"test digest";
-        let sig = sign_bytes(&signing_key, data, &mut rng);
-        assert!(verifying_key
-            .verify(
-                data,
-                &rsa::pkcs1v15::Signature::try_from(sig.as_slice()).unwrap()
-            )
-            .is_ok());
+        // data is treated as a pre-computed hash (no internal re-hashing)
+        let data = b"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"; // 64 bytes
+        let sig = sign_bytes(&signing_key, data);
+        let sig_obj = rsa::pkcs1v15::Signature::try_from(sig.as_slice()).unwrap();
+        assert!(verifying_key.verify_prehash(data, &sig_obj).is_ok());
     }
 }
