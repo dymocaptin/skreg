@@ -73,6 +73,7 @@ async fn resolve_version_row(
              WHERE n.slug = $1
                AND p.name = $2
                AND v.yanked_at IS NULL
+               AND n.banned_at IS NULL
              ORDER BY v.published_at DESC, v.id DESC
              LIMIT 1",
         )
@@ -90,7 +91,8 @@ async fn resolve_version_row(
              WHERE n.slug = $1
                AND p.name = $2
                AND v.version = $3
-               AND v.yanked_at IS NULL",
+               AND v.yanked_at IS NULL
+               AND n.banned_at IS NULL",
         )
         .bind(ns)
         .bind(name)

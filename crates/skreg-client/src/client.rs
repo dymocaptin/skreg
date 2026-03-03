@@ -111,13 +111,23 @@ impl RegistryClient for HttpRegistryClient {
                 self.base_url, pkg_ref.namespace, pkg_ref.name, manifest.version,
             );
 
-            let tarball = self.http.get(&dl_url).send().await?.bytes().await?.to_vec();
+            let tarball = self.http
+                .get(&dl_url)
+                .send()
+                .await?
+                .error_for_status()
+                .map_err(ClientError::Http)?
+                .bytes()
+                .await?
+                .to_vec();
             let sig_url = format!("{dl_url}/sig");
             let signature = self
                 .http
                 .get(&sig_url)
                 .send()
                 .await?
+                .error_for_status()
+                .map_err(ClientError::Http)?
                 .bytes()
                 .await?
                 .to_vec();
