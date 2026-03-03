@@ -11,7 +11,6 @@ from skreg_infra.config import CloudProvider, StackConfig
 from skreg_infra.providers.aws.compute import AwsCompute, AwsComputeArgs
 from skreg_infra.providers.aws.database import AwsDatabase, AwsDatabaseArgs
 from skreg_infra.providers.aws.network import AwsNetwork
-from skreg_infra.providers.aws.oidc import AwsOidc
 from skreg_infra.providers.aws.pki import AwsPki, AwsPkiArgs
 from skreg_infra.providers.aws.storage import AwsStorage
 
@@ -65,8 +64,6 @@ class SkregStack:
                 existing_cert_arn=config.existing_cert_arn,
             ),
         )
-        oidc = AwsOidc("skreg-oidc", github_repo="dymocaptin/skreg")
-
         pulumi.export(
             "api_url",
             (
@@ -81,8 +78,6 @@ class SkregStack:
         pulumi.export("root_ca_cert", pki.root_ca_cert_pem)
         pulumi.export("ecr_api_repo", compute.ecr_api_repo)
         pulumi.export("ecr_worker_repo", compute.ecr_worker_repo)
-        pulumi.export("oidc_role_arn", oidc.outputs.role_arn)
-        pulumi.export("deploy_role_arn", oidc.outputs.deploy_role_arn)
 
 
 if __name__ == "__main__":
