@@ -3326,12 +3326,15 @@ dependencies = [
 name = "skreg-core"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
  "chrono",
  "semver",
  "serde",
  "serde_json",
  "sha2",
+ "tempfile",
  "thiserror 1.0.69",
+ "toml",
  "uuid",
 ]
 

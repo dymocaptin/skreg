@@ -12,12 +12,13 @@ pub mod views;
 pub mod widgets;
 
 use anyhow::Result;
+use skreg_core::config::CliConfig;
 
-/// Run the skreg terminal UI against the given registry.
+/// Run the skreg terminal UI with the given configuration.
 ///
 /// # Errors
 /// Returns an error if the terminal cannot be initialized or if an I/O error occurs.
 #[allow(clippy::unused_async)]
-pub async fn run(registry_url: String, namespace: String, api_key: String) -> Result<()> {
-    app::run(registry_url, namespace, api_key).await
+pub async fn run(config: CliConfig) -> Result<()> {
+    app::run(config).await
 }
