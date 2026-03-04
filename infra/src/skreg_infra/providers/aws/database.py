@@ -108,7 +108,7 @@ class AwsDatabase(pulumi.ComponentResource):
             aws.secretsmanager.SecretVersionArgs(
                 secret_id=credentials_secret.id,
                 secret_string=pulumi.Output.all(db_password.result, instance.address).apply(
-                    lambda vals: f"postgresql://skreg:{vals[0]}@{vals[1]}:5432/skreg"
+                    lambda vals: f"postgresql://skreg:{vals[0]}@{vals[1]}:5432/skreg?sslmode=require"
                 ),
             ),
             opts=pulumi.ResourceOptions(parent=self),
