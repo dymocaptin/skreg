@@ -120,6 +120,7 @@ class AwsDatabase(pulumi.ComponentResource):
             host=instance.address,
             port=pulumi.Output.from_input(5432),
             database_name=pulumi.Output.from_input("skreg"),
+            security_group_id=security_group.id,
         )
 
         self.register_outputs(
@@ -128,6 +129,7 @@ class AwsDatabase(pulumi.ComponentResource):
                 "connection_secret_arn": self._outputs.connection_secret_arn,
                 "host": self._outputs.host,
                 "port": self._outputs.port,
+                "security_group_id": self._outputs.security_group_id,
                 "database_name": self._outputs.database_name,
             }
         )

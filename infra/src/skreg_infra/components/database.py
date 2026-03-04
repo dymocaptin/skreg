@@ -20,12 +20,14 @@ class DatabaseOutputs:
         host: pulumi.Output[str],
         port: pulumi.Output[int],
         database_name: pulumi.Output[str],
+        security_group_id: pulumi.Output[str],
     ) -> None:
         self.connection_secret_name: pulumi.Output[str] = connection_secret_name
         self.connection_secret_arn: pulumi.Output[str] = connection_secret_arn
         self.host: pulumi.Output[str] = host
         self.port: pulumi.Output[int] = port
         self.database_name: pulumi.Output[str] = database_name
+        self.security_group_id: pulumi.Output[str] = security_group_id
 
 
 class SkillpkgDatabase(Protocol):

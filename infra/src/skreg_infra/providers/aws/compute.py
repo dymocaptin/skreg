@@ -32,6 +32,7 @@ class AwsComputeArgs:
         from_email: str = "",
         ses_region: str = "",
         ca_secret_arn: pulumi.Input[str] = "",
+        db_sg_id: pulumi.Input[str] = "",
     ) -> None:
         self.vpc_id: pulumi.Input[str] = vpc_id
         self.public_subnet_ids: list[pulumi.Input[str]] = public_subnet_ids
@@ -45,6 +46,7 @@ class AwsComputeArgs:
         self.from_email: str = from_email
         self.ses_region: str = ses_region
         self.ca_secret_arn: pulumi.Input[str] = ca_secret_arn
+        self.db_sg_id: pulumi.Input[str] = db_sg_id
 
 
 class AwsCompute(pulumi.ComponentResource):
@@ -285,6 +287,32 @@ class AwsCompute(pulumi.ComponentResource):
             ),
             opts=pulumi.ResourceOptions(parent=self),
         )
+
+        if args.db_sg_id:
+            aws.ec2.SecurityGroupRule(
+                f"{name}-db-from-api",
+                aws.ec2.SecurityGroupRuleArgs(
+                    type="ingress",
+                    from_port=5432,
+                    to_port=5432,
+                    protocol="tcp",
+                    source_security_group_id=api_sg.id,
+                    security_group_id=args.db_sg_id,
+                ),
+                opts=pulumi.ResourceOptions(parent=self),
+            )
+            aws.ec2.SecurityGroupRule(
+                f"{name}-db-from-worker",
+                aws.ec2.SecurityGroupRuleArgs(
+                    type="ingress",
+                    from_port=5432,
+                    to_port=5432,
+                    protocol="tcp",
+                    source_security_group_id=worker_sg.id,
+                    security_group_id=args.db_sg_id,
+                ),
+                opts=pulumi.ResourceOptions(parent=self),
+            )
 
         alb = aws.lb.LoadBalancer(
             f"{name}-alb",
