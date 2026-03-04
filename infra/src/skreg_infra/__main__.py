@@ -62,6 +62,10 @@ class SkregStack:
                 worker_image_uri=config.worker_image_uri,
                 domain_name=config.domain_name,
                 existing_cert_arn=config.existing_cert_arn,
+                s3_bucket=storage.outputs.bucket_name,
+                from_email=config.from_email,
+                ses_region=config.ses_region,
+                ca_secret_arn=pki.outputs.hsm_key_id,
             ),
         )
         pulumi.export(

@@ -28,6 +28,10 @@ class AwsComputeArgs:
         worker_image_uri: str = "",
         domain_name: str = "",
         existing_cert_arn: str = "",
+        s3_bucket: pulumi.Input[str] = "",
+        from_email: str = "",
+        ses_region: str = "",
+        ca_secret_arn: pulumi.Input[str] = "",
     ) -> None:
         self.vpc_id: pulumi.Input[str] = vpc_id
         self.public_subnet_ids: list[pulumi.Input[str]] = public_subnet_ids
@@ -37,6 +41,10 @@ class AwsComputeArgs:
         self.worker_image_uri: str = worker_image_uri or _FALLBACK_IMAGE
         self.domain_name: str = domain_name
         self.existing_cert_arn: str = existing_cert_arn
+        self.s3_bucket: pulumi.Input[str] = s3_bucket
+        self.from_email: str = from_email
+        self.ses_region: str = ses_region
+        self.ca_secret_arn: pulumi.Input[str] = ca_secret_arn
 
 
 class AwsCompute(pulumi.ComponentResource):
@@ -107,6 +115,102 @@ class AwsCompute(pulumi.ComponentResource):
                                     "Action": "secretsmanager:GetSecretValue",
                                     "Resource": arn,
                                 }
+                            ],
+                        }
+                    )
+                ),
+            ),
+            opts=pulumi.ResourceOptions(parent=self),
+        )
+
+        _task_assume = json.dumps(
+            {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Principal": {"Service": "ecs-tasks.amazonaws.com"},
+                        "Action": "sts:AssumeRole",
+                    }
+                ],
+            }
+        )
+
+        api_task_role = aws.iam.Role(
+            f"{name}-api-task-role",
+            aws.iam.RoleArgs(assume_role_policy=_task_assume),
+            opts=pulumi.ResourceOptions(parent=self),
+        )
+        aws.iam.RolePolicy(
+            f"{name}-api-task-policy",
+            aws.iam.RolePolicyArgs(
+                role=api_task_role.name,
+                policy=pulumi.Output.from_input(args.s3_bucket).apply(
+                    lambda bucket: json.dumps(
+                        {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "s3:GetObject",
+                                        "s3:PutObject",
+                                        "s3:DeleteObject",
+                                        "s3:ListBucket",
+                                    ],
+                                    "Resource": [
+                                        f"arn:aws:s3:::{bucket}",
+                                        f"arn:aws:s3:::{bucket}/*",
+                                    ],
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": "ses:SendEmail",
+                                    "Resource": "*",
+                                },
+                            ],
+                        }
+                    )
+                ),
+            ),
+            opts=pulumi.ResourceOptions(parent=self),
+        )
+
+        worker_task_role = aws.iam.Role(
+            f"{name}-worker-task-role",
+            aws.iam.RoleArgs(assume_role_policy=_task_assume),
+            opts=pulumi.ResourceOptions(parent=self),
+        )
+        aws.iam.RolePolicy(
+            f"{name}-worker-task-policy",
+            aws.iam.RolePolicyArgs(
+                role=worker_task_role.name,
+                policy=pulumi.Output.all(
+                    pulumi.Output.from_input(args.s3_bucket),
+                    pulumi.Output.from_input(args.ca_secret_arn),
+                ).apply(
+                    lambda vals: json.dumps(
+                        {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": [
+                                        "s3:GetObject",
+                                        "s3:PutObject",
+                                        "s3:DeleteObject",
+                                        "s3:ListBucket",
+                                    ],
+                                    "Resource": [
+                                        f"arn:aws:s3:::{vals[0]}",
+                                        f"arn:aws:s3:::{vals[0]}/*",
+                                    ],
+                                },
+                                {
+                                    "Effect": "Allow",
+                                    "Action": "secretsmanager:GetSecretValue",
+                                    "Resource": vals[1],
+                                },
                             ],
                         }
                     )
@@ -290,15 +394,25 @@ class AwsCompute(pulumi.ComponentResource):
             service_url = alb.dns_name.apply(lambda d: f"http://{d}")
 
         api_image = args.api_image_uri
-        api_container_defs = pulumi.Output.from_input(args.db_secret_arn).apply(
-            lambda arn: json.dumps(
+        from_email = args.from_email
+        ses_region = args.ses_region
+        api_container_defs = pulumi.Output.all(
+            pulumi.Output.from_input(args.db_secret_arn),
+            pulumi.Output.from_input(args.s3_bucket),
+        ).apply(
+            lambda vals: json.dumps(
                 [
                     {
                         "name": "skreg-api",
                         "image": api_image,
                         "portMappings": [{"containerPort": 8080, "protocol": "tcp"}],
-                        "environment": [{"name": "BIND_ADDR", "value": "0.0.0.0:8080"}],
-                        "secrets": [{"name": "DATABASE_URL", "valueFrom": arn}],
+                        "environment": [
+                            {"name": "BIND_ADDR", "value": "0.0.0.0:8080"},
+                            {"name": "S3_BUCKET", "value": vals[1]},
+                            {"name": "FROM_EMAIL", "value": from_email},
+                            {"name": "SES_REGION", "value": ses_region},
+                        ],
+                        "secrets": [{"name": "DATABASE_URL", "valueFrom": vals[0]}],
                         "logConfiguration": {
                             "logDriver": "awslogs",
                             "options": {
@@ -321,19 +435,28 @@ class AwsCompute(pulumi.ComponentResource):
                 network_mode="awsvpc",
                 requires_compatibilities=["FARGATE"],
                 execution_role_arn=exec_role.arn,
+                task_role_arn=api_task_role.arn,
                 container_definitions=api_container_defs,
             ),
             opts=pulumi.ResourceOptions(parent=self),
         )
 
         worker_image = args.worker_image_uri
-        worker_container_defs = pulumi.Output.from_input(args.db_secret_arn).apply(
-            lambda arn: json.dumps(
+        worker_container_defs = pulumi.Output.all(
+            pulumi.Output.from_input(args.db_secret_arn),
+            pulumi.Output.from_input(args.s3_bucket),
+            pulumi.Output.from_input(args.ca_secret_arn),
+        ).apply(
+            lambda vals: json.dumps(
                 [
                     {
                         "name": "skreg-worker",
                         "image": worker_image,
-                        "secrets": [{"name": "DATABASE_URL", "valueFrom": arn}],
+                        "environment": [
+                            {"name": "S3_BUCKET", "value": vals[1]},
+                            {"name": "CA_SECRET_ARN", "value": vals[2]},
+                        ],
+                        "secrets": [{"name": "DATABASE_URL", "valueFrom": vals[0]}],
                         "logConfiguration": {
                             "logDriver": "awslogs",
                             "options": {
@@ -356,6 +479,7 @@ class AwsCompute(pulumi.ComponentResource):
                 network_mode="awsvpc",
                 requires_compatibilities=["FARGATE"],
                 execution_role_arn=exec_role.arn,
+                task_role_arn=worker_task_role.arn,
                 container_definitions=worker_container_defs,
             ),
             opts=pulumi.ResourceOptions(parent=self),
