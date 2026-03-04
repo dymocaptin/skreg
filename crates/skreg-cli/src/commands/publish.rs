@@ -49,10 +49,10 @@ pub async fn run_publish() -> Result<()> {
     let bytes = std::fs::read(&skill_file)?;
     let client = reqwest::Client::new();
 
-    println!("uploading to {}...", cfg.registry);
+    println!("uploading to {}...", cfg.registry());
     let resp = client
-        .post(format!("{}/v1/publish", cfg.registry))
-        .header("Authorization", format!("Bearer {}", cfg.api_key))
+        .post(format!("{}/v1/publish", cfg.registry()))
+        .header("Authorization", format!("Bearer {}", cfg.api_key()))
         .header("Content-Type", "application/octet-stream")
         .body(bytes)
         .send()
@@ -70,7 +70,7 @@ pub async fn run_publish() -> Result<()> {
         tokio::time::sleep(Duration::from_secs(POLL_INTERVAL_SECS)).await;
 
         let job: JobStatus = client
-            .get(format!("{}/v1/jobs/{}", cfg.registry, publish.job_id))
+            .get(format!("{}/v1/jobs/{}", cfg.registry(), publish.job_id))
             .send()
             .await?
             .json()
@@ -78,7 +78,7 @@ pub async fn run_publish() -> Result<()> {
 
         match job.status.as_str() {
             "pass" => {
-                println!("Published {}/{name}@{version}", cfg.namespace);
+                println!("Published {}/{name}@{version}", cfg.namespace());
                 std::fs::remove_file(&skill_file).ok();
                 return Ok(());
             }

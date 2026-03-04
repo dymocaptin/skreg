@@ -3,7 +3,9 @@
 use anyhow::{bail, Result};
 use serde::Deserialize;
 
-use crate::config::{default_config_path, save_config, CliConfig};
+use std::collections::HashMap;
+
+use crate::config::{default_config_path, save_config, CliConfig, ContextConfig};
 
 #[derive(Deserialize)]
 struct ApiKeyResponse {
@@ -71,10 +73,18 @@ pub async fn run_login(namespace: &str) -> Result<()> {
         bail!("failed to register namespace: {}", create_resp.status());
     };
 
+    let mut contexts = HashMap::new();
+    contexts.insert(
+        "default".to_owned(),
+        ContextConfig {
+            registry,
+            namespace: namespace.to_owned(),
+            api_key,
+        },
+    );
     let cfg = CliConfig {
-        registry,
-        namespace: namespace.to_owned(),
-        api_key,
+        active_context: "default".to_owned(),
+        contexts,
     };
     save_config(&cfg, &default_config_path())?;
     println!(

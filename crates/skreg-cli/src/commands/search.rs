@@ -15,7 +15,7 @@ pub async fn run_search(query: &str) -> Result<()> {
     let cfg_path = default_config_path();
     let cfg =
         load_config(&cfg_path).context("not logged in — run `skreg login <namespace>` first")?;
-    let client = HttpRegistryClient::new(&cfg.registry);
+    let client = HttpRegistryClient::new(cfg.registry());
     let results = client.search(query).await?;
 
     if results.is_empty() {
