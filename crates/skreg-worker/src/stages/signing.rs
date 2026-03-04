@@ -3,8 +3,8 @@
 use anyhow::{Context, Result};
 use aws_sdk_s3::Client as S3Client;
 use aws_sdk_secretsmanager::Client as SmClient;
+use rsa::pkcs1::DecodeRsaPrivateKey;
 use rsa::pkcs1v15::SigningKey;
-use rsa::pkcs8::DecodePrivateKey;
 use rsa::signature::hazmat::PrehashSigner;
 use rsa::signature::SignatureEncoding;
 use rsa::RsaPrivateKey;
@@ -50,17 +50,12 @@ pub async fn run_signing(
         .await
         .context("fetching CA private key from Secrets Manager")?;
 
-    let secret_str = secret
+    let pem = secret
         .secret_string()
         .context("CA secret has no string value")?;
-    let secret_json: serde_json::Value =
-        serde_json::from_str(secret_str).context("parsing CA secret JSON")?;
-    let pem = secret_json["private_key"]
-        .as_str()
-        .context("CA secret missing 'private_key' field")?;
 
-    // 2. Parse RSA private key
-    let private_key = RsaPrivateKey::from_pkcs8_pem(pem).context("parsing RSA private key PEM")?;
+    // 2. Parse RSA private key (PKCS#1 PEM stored by PKI component)
+    let private_key = RsaPrivateKey::from_pkcs1_pem(pem).context("parsing RSA private key PEM")?;
     let signing_key = SigningKey::<Sha256>::new(private_key);
 
     // 3. Sign the sha256 digest bytes
