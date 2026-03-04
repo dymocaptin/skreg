@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 
 import pulumi
@@ -85,17 +84,6 @@ class AwsDatabase(pulumi.ComponentResource):
             opts=pulumi.ResourceOptions(parent=self),
         )
 
-        aws.secretsmanager.SecretVersion(
-            f"{name}-db-password-version",
-            aws.secretsmanager.SecretVersionArgs(
-                secret_id=credentials_secret.id,
-                secret_string=db_password.result.apply(
-                    lambda pw: json.dumps({"username": "skreg", "password": pw})
-                ),
-            ),
-            opts=pulumi.ResourceOptions(parent=self),
-        )
-
         instance = aws.rds.Instance(
             f"{name}-rds",
             aws.rds.InstanceArgs(
@@ -111,6 +99,17 @@ class AwsDatabase(pulumi.ComponentResource):
                 db_subnet_group_name=subnet_group.name,
                 vpc_security_group_ids=[security_group.id],
                 skip_final_snapshot=False,
+            ),
+            opts=pulumi.ResourceOptions(parent=self),
+        )
+
+        aws.secretsmanager.SecretVersion(
+            f"{name}-db-password-version",
+            aws.secretsmanager.SecretVersionArgs(
+                secret_id=credentials_secret.id,
+                secret_string=pulumi.Output.all(db_password.result, instance.address).apply(
+                    lambda vals: f"postgresql://skreg:{vals[0]}@{vals[1]}:5432/skreg"
+                ),
             ),
             opts=pulumi.ResourceOptions(parent=self),
         )
