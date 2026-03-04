@@ -6,7 +6,7 @@ use ratatui::crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     text::{Line, Span},
-    widgets::{Paragraph, Row, Table, TableState as RatatuiTableState},
+    widgets::{Block, Borders, Paragraph, Row, Table, TableState as RatatuiTableState},
     Frame,
 };
 use skreg_client::client::{HttpRegistryClient, RegistryClient, SearchResult};
@@ -190,37 +190,73 @@ impl View for PackageListView {
                 );
             }
             Load::Loaded => {
+                let block = Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(theme.border());
+                let table_area = block.inner(main_area);
+                frame.render_widget(block, main_area);
+
+                // Reserve space for the header + separator inside the block.
+                let [header_row, sep_row, data_area] = Layout::vertical([
+                    Constraint::Length(1),
+                    Constraint::Length(1),
+                    Constraint::Min(0),
+                ])
+                .areas(table_area);
+
+                // Column widths (shared between header and data table).
+                let widths = [
+                    Constraint::Min(18),
+                    Constraint::Length(14),
+                    Constraint::Length(9),
+                    Constraint::Length(30),
+                ];
+
+                // Render the header manually so we can draw a separator beneath it.
+                let header_cols = Layout::horizontal(widths).spacing(1).areas::<4>(header_row);
+                let labels = ["NAME", "NAMESPACE", "VERSION", "DESCRIPTION"];
+                for (area, label) in header_cols.iter().zip(labels.iter()) {
+                    frame.render_widget(
+                        Paragraph::new(*label).style(theme.header()),
+                        *area,
+                    );
+                }
+
+                // Separator line under the header.
+                let sep_line = "─".repeat(table_area.width as usize);
+                frame.render_widget(
+                    Paragraph::new(sep_line).style(theme.border()),
+                    sep_row,
+                );
+
+                // Truncate description to fit the fixed column width.
+                const DESC_MAX: usize = 28;
                 let rows: Vec<Row> = self
                     .state
                     .items
                     .iter()
                     .map(|p| {
+                        let desc = p.description.as_deref().unwrap_or("");
+                        let desc_truncated = if desc.len() > DESC_MAX {
+                            format!("{}…", &desc[..DESC_MAX.saturating_sub(1)])
+                        } else {
+                            desc.to_string()
+                        };
                         Row::new(vec![
                             p.name.clone(),
                             p.namespace.clone(),
                             p.latest_version.clone().unwrap_or_default(),
-                            p.description.clone().unwrap_or_default(),
+                            desc_truncated,
                         ])
                     })
                     .collect();
 
-                let table = Table::new(
-                    rows,
-                    [
-                        Constraint::Min(20),
-                        Constraint::Length(14),
-                        Constraint::Length(9),
-                        Constraint::Min(12),
-                    ],
-                )
-                .header(
-                    Row::new(["NAME", "NAMESPACE", "VERSION", "DESCRIPTION"])
-                        .style(theme.header()),
-                )
-                .row_highlight_style(theme.selected())
-                .highlight_symbol("▶ ");
+                let table = Table::new(rows, widths)
+                    .row_highlight_style(theme.selected())
+                    .highlight_symbol("▶ ")
+                    .column_spacing(1);
 
-                frame.render_stateful_widget(table, main_area, &mut self.state.table_state);
+                frame.render_stateful_widget(table, data_area, &mut self.state.table_state);
             }
         }
 

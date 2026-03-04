@@ -44,6 +44,7 @@ async fn run_loop(
     let mut stack: Vec<Box<dyn View>> = vec![Box::new(PackageListView::new(config.clone()))];
     let mut toast: Option<(Toast, std::time::Instant)> = None;
     let mut context_overlay: Option<crate::views::context::ContextOverlay> = None;
+    let mut show_help = false;
 
     loop {
         for view in &mut stack {
@@ -60,6 +61,9 @@ async fn run_loop(
             }
             if let Some((t, _)) = &toast {
                 crate::widgets::toast::render_toast(frame, area, t, &theme);
+            }
+            if show_help {
+                crate::widgets::help::render_help(frame, area, &theme);
             }
         })?;
 
@@ -78,6 +82,20 @@ async fn run_loop(
                 if k.code == KeyCode::Char('c') && k.modifiers.contains(KeyModifiers::CONTROL))
             {
                 break;
+            }
+
+            // ? toggles help from anywhere; help overlay consumes all other keys while open.
+            if matches!(&ev, Event::Key(k) if k.code == KeyCode::Char('?')) {
+                show_help = !show_help;
+                continue;
+            }
+            if show_help {
+                if matches!(&ev, Event::Key(k)
+                    if matches!(k.code, KeyCode::Esc | KeyCode::Enter | KeyCode::Char('q')))
+                {
+                    show_help = false;
+                }
+                continue;
             }
 
             toast = None;
