@@ -46,9 +46,6 @@ fn validate_manifest(body: &Bytes, ns_slug: &str) -> Result<(Manifest, String), 
     if manifest.namespace.as_str() != ns_slug {
         return Err(StatusCode::FORBIDDEN);
     }
-    if manifest.sha256.as_hex() != sha256 {
-        return Err(StatusCode::UNPROCESSABLE_ENTITY);
-    }
 
     Ok((manifest, sha256))
 }
