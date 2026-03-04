@@ -26,16 +26,25 @@ pub struct CliConfig {
     pub contexts: HashMap<String, ContextConfig>,
 }
 
+/// Old flat config format (pre-multi-context) used only during migration.
+#[derive(Deserialize)]
+struct OldConfig {
+    registry: String,
+    namespace: String,
+    api_key: String,
+}
+
 impl CliConfig {
     /// Return the [`ContextConfig`] for the currently active context.
     ///
     /// # Panics
     ///
     /// Panics if `active_context` does not name an entry in `contexts`.
+    #[must_use]
     pub fn active_context_config(&self) -> &ContextConfig {
         self.contexts.get(&self.active_context).unwrap_or_else(|| {
             panic!(
-                "active context {:?} not found in contexts; available: {:?}",
+                "active context {:?} not found; available: {:?}",
                 self.active_context,
                 self.contexts.keys().collect::<Vec<_>>()
             )
@@ -43,16 +52,19 @@ impl CliConfig {
     }
 
     /// Registry base URL from the active context.
+    #[must_use]
     pub fn registry(&self) -> &str {
         &self.active_context_config().registry
     }
 
     /// Namespace slug from the active context.
+    #[must_use]
     pub fn namespace(&self) -> &str {
         &self.active_context_config().namespace
     }
 
     /// API key from the active context.
+    #[must_use]
     pub fn api_key(&self) -> &str {
         &self.active_context_config().api_key
     }
@@ -74,13 +86,6 @@ impl CliConfig {
         }
 
         // Fall back to old flat format.
-        #[derive(Deserialize)]
-        struct OldConfig {
-            registry: String,
-            namespace: String,
-            api_key: String,
-        }
-
         let old: OldConfig = toml::from_str(s)?;
         let mut contexts = HashMap::new();
         contexts.insert(
@@ -128,9 +133,9 @@ pub fn save_config(cfg: &CliConfig, path: &Path) -> Result<()> {
 /// Returns an error if the file cannot be read or deserialized.
 pub fn load_config(path: &Path) -> Result<CliConfig> {
     let raw = std::fs::read_to_string(path)?;
-    let was_migrated = !raw.contains("active_context");
+    let was_old_format = toml::from_str::<CliConfig>(&raw).is_err();
     let cfg = CliConfig::from_str_with_migration(&raw)?;
-    if was_migrated {
+    if was_old_format {
         save_config(&cfg, path)?;
     }
     Ok(cfg)

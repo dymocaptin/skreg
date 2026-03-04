@@ -5,7 +5,7 @@ use serde::Deserialize;
 
 use std::collections::HashMap;
 
-use crate::config::{default_config_path, save_config, CliConfig, ContextConfig};
+use crate::config::{default_config_path, load_config, save_config, CliConfig, ContextConfig};
 
 #[derive(Deserialize)]
 struct ApiKeyResponse {
@@ -73,8 +73,11 @@ pub async fn run_login(namespace: &str) -> Result<()> {
         bail!("failed to register namespace: {}", create_resp.status());
     };
 
-    let mut contexts = HashMap::new();
-    contexts.insert(
+    let mut config = load_config(&default_config_path()).unwrap_or_else(|_| CliConfig {
+        active_context: "default".to_owned(),
+        contexts: HashMap::new(),
+    });
+    config.contexts.insert(
         "default".to_owned(),
         ContextConfig {
             registry,
@@ -82,11 +85,8 @@ pub async fn run_login(namespace: &str) -> Result<()> {
             api_key,
         },
     );
-    let cfg = CliConfig {
-        active_context: "default".to_owned(),
-        contexts,
-    };
-    save_config(&cfg, &default_config_path())?;
+    "default".clone_into(&mut config.active_context);
+    save_config(&config, &default_config_path())?;
     println!(
         "Logged in as {namespace}. Config saved to {}",
         default_config_path().display()
