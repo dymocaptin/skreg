@@ -19,7 +19,7 @@ pub struct PackageSummary {
     pub category: Option<String>,
     /// Creation timestamp.
     pub created_at: DateTime<Utc>,
-    /// Latest published version string (most recent by published_at), if any.
+    /// Latest published version string (most recent by `published_at`), if any.
     pub latest_version: Option<String>,
 }
 

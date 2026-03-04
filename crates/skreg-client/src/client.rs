@@ -33,7 +33,7 @@ pub struct SearchResult {
     pub name: String,
     /// Human-readable description, if any.
     pub description: Option<String>,
-    /// Latest published version string (most recent by published_at), if any.
+    /// Latest published version string (most recent by `published_at`), if any.
     pub latest_version: Option<String>,
 }
 
@@ -145,14 +145,14 @@ impl RegistryClient for HttpRegistryClient {
         &'a self,
         query: &'a str,
     ) -> BoxFuture<'a, Result<Vec<SearchResult>, ClientError>> {
+        #[derive(serde::Deserialize)]
+        struct SearchResponse {
+            packages: Vec<SearchResult>,
+        }
+
         Box::pin(async move {
             let url = format!("{}/v1/search", self.base_url);
             debug!("searching registry: {url}?q={query}");
-
-            #[derive(serde::Deserialize)]
-            struct SearchResponse {
-                packages: Vec<SearchResult>,
-            }
 
             let resp: SearchResponse = self
                 .http

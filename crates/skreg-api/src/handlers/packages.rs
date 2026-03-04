@@ -112,6 +112,11 @@ async fn resolve_version_row(
 }
 
 /// Handle `GET /v1/packages/:ns/:name/:version` — return package manifest JSON.
+///
+/// # Errors
+///
+/// Returns `400` for invalid namespace, name, or version. Returns `404` if the
+/// package or version does not exist. Returns `500` on database error.
 pub async fn package_meta_handler(
     State(state): State<SharedState>,
     Path((ns_raw, name_raw, version_raw)): Path<(String, String, String)>,
@@ -136,6 +141,11 @@ pub async fn package_meta_handler(
 }
 
 /// Handle `GET /v1/download/:ns/:name/:version` — return tarball bytes.
+///
+/// # Errors
+///
+/// Returns `400` for invalid namespace, name, or version. Returns `404` if the
+/// package or version does not exist. Returns `503` on S3 error.
 pub async fn package_download_handler(
     State(state): State<SharedState>,
     Path((ns_raw, name_raw, version_raw)): Path<(String, String, String)>,
@@ -162,6 +172,44 @@ pub async fn package_download_handler(
 
     let data = obj.body.collect().await.map_err(|e| {
         error!("s3 body collect error: {e}");
+        StatusCode::SERVICE_UNAVAILABLE
+    })?;
+
+    Ok(data.into_bytes())
+}
+
+/// Handle `GET /v1/download/:ns/:name/:version/sig` — return signature bytes.
+///
+/// # Errors
+///
+/// Returns `400` for invalid namespace, name, or version. Returns `404` if the
+/// package or version does not exist. Returns `503` on S3 error.
+pub async fn package_sig_handler(
+    State(state): State<SharedState>,
+    Path((ns_raw, name_raw, version_raw)): Path<(String, String, String)>,
+) -> Result<Bytes, StatusCode> {
+    let ns = Namespace::new(&ns_raw).map_err(|_| StatusCode::BAD_REQUEST)?;
+    let pkg_name = PackageName::new(&name_raw).map_err(|_| StatusCode::BAD_REQUEST)?;
+    if !validate_version(&version_raw) {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    let row = resolve_version_row(&state, ns.as_str(), pkg_name.as_str(), &version_raw).await?;
+
+    let obj = state
+        .s3
+        .get_object()
+        .bucket(&state.s3_bucket)
+        .key(&row.sig_path)
+        .send()
+        .await
+        .map_err(|e| {
+            error!("s3 get_object (sig) error: {e}");
+            StatusCode::SERVICE_UNAVAILABLE
+        })?;
+
+    let data = obj.body.collect().await.map_err(|e| {
+        error!("s3 body collect (sig) error: {e}");
         StatusCode::SERVICE_UNAVAILABLE
     })?;
 
@@ -205,37 +253,4 @@ mod tests {
         assert!(!validate_version("1.0.0 beta"));
         assert!(!validate_version("1.0.0@tag"));
     }
-}
-
-/// Handle `GET /v1/download/:ns/:name/:version/sig` — return signature bytes.
-pub async fn package_sig_handler(
-    State(state): State<SharedState>,
-    Path((ns_raw, name_raw, version_raw)): Path<(String, String, String)>,
-) -> Result<Bytes, StatusCode> {
-    let ns = Namespace::new(&ns_raw).map_err(|_| StatusCode::BAD_REQUEST)?;
-    let pkg_name = PackageName::new(&name_raw).map_err(|_| StatusCode::BAD_REQUEST)?;
-    if !validate_version(&version_raw) {
-        return Err(StatusCode::BAD_REQUEST);
-    }
-
-    let row = resolve_version_row(&state, ns.as_str(), pkg_name.as_str(), &version_raw).await?;
-
-    let obj = state
-        .s3
-        .get_object()
-        .bucket(&state.s3_bucket)
-        .key(&row.sig_path)
-        .send()
-        .await
-        .map_err(|e| {
-            error!("s3 get_object (sig) error: {e}");
-            StatusCode::SERVICE_UNAVAILABLE
-        })?;
-
-    let data = obj.body.collect().await.map_err(|e| {
-        error!("s3 body collect (sig) error: {e}");
-        StatusCode::SERVICE_UNAVAILABLE
-    })?;
-
-    Ok(data.into_bytes())
 }

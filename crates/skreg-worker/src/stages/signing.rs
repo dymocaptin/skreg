@@ -14,6 +14,11 @@ use sha2::Sha256;
 ///
 /// `data` must be the raw hash bytes — the signing key applies PKCS#1v1.5 padding
 /// with the SHA-256 OID without re-hashing.
+///
+/// # Panics
+///
+/// Panics if `data` is not exactly 32 bytes (a valid SHA-256 hash length).
+#[must_use]
 pub fn sign_bytes(signing_key: &SigningKey<Sha256>, data: &[u8]) -> Vec<u8> {
     signing_key
         .sign_prehash(data)

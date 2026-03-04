@@ -39,13 +39,9 @@ pub async fn run_install(package_ref: &str) -> Result<()> {
     let install_root = default_install_root()?;
 
     let installer = Installer::new(client, install_root).with_verifier(verifier);
-    let installed = installer.install(&pkg_ref).await?;
+    let result = installer.install(&pkg_ref).await?;
 
-    println!(
-        "Installed {} to {}",
-        pkg_ref,
-        installed.install_path.display()
-    );
+    println!("Installed {} to {}", pkg_ref, result.install_path.display());
 
     Ok(())
 }
