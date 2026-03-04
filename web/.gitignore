@@ -1,2 +1,14 @@
 node_modules/
 dist/
+
+# Environment files
+.env
+.env.*
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+
+# Test coverage
+coverage/
