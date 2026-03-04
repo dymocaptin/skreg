@@ -1,9 +1,12 @@
 //! Package list view — the root view of the TUI.
 
-use ratatui::crossterm::event::{Event, KeyCode, KeyEvent};
+use std::time::{Duration, Instant};
+
+use ratatui::crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
-    widgets::{Row, Table, TableState as RatatuiTableState},
+    text::{Line, Span},
+    widgets::{Paragraph, Row, Table, TableState as RatatuiTableState},
     Frame,
 };
 use skreg_client::client::{HttpRegistryClient, RegistryClient, SearchResult};
@@ -14,6 +17,9 @@ use crate::theme::Theme;
 use crate::widgets::{footer::Footer, header::Header};
 
 use super::{Action, ToastKind, View};
+
+/// Debounce delay before issuing a search fetch after the last keystroke.
+const SEARCH_DEBOUNCE: Duration = Duration::from_millis(300);
 
 /// Cursor and items for the package list table.
 pub struct ListState {
@@ -68,7 +74,14 @@ pub struct PackageListView {
     state: ListState,
     load: Load,
     rx: Option<oneshot::Receiver<Result<Vec<SearchResult>, String>>>,
+    /// The last query that was actually sent to the registry.
     query: String,
+    /// Whether the inline search bar is open.
+    searching: bool,
+    /// The text currently typed in the search bar (may not yet be sent).
+    search_input: String,
+    /// When the search input last changed (used for debouncing).
+    search_changed_at: Option<Instant>,
 }
 
 impl PackageListView {
@@ -80,6 +93,9 @@ impl PackageListView {
             load: Load::Loading,
             rx: None,
             query: String::new(),
+            searching: false,
+            search_input: String::new(),
+            search_changed_at: None,
         };
         v.fetch();
         v
@@ -97,10 +113,37 @@ impl PackageListView {
             let _ = tx.send(result);
         });
     }
+
+    fn commit_search(&mut self) {
+        self.query = self.search_input.clone();
+        self.search_changed_at = None;
+        self.state.selected = 0;
+        self.state.table_state.select(Some(0));
+        self.fetch();
+    }
+
+    fn clear_search(&mut self) {
+        self.searching = false;
+        self.search_input.clear();
+        self.search_changed_at = None;
+        if !self.query.is_empty() {
+            self.query.clear();
+            self.state.selected = 0;
+            self.state.table_state.select(Some(0));
+            self.fetch();
+        }
+    }
 }
 
 impl View for PackageListView {
     fn tick(&mut self) {
+        // Debounced search: fire fetch once input settles for SEARCH_DEBOUNCE.
+        if let Some(changed_at) = self.search_changed_at {
+            if changed_at.elapsed() >= SEARCH_DEBOUNCE {
+                self.commit_search();
+            }
+        }
+
         if let Some(rx) = &mut self.rx {
             if let Ok(result) = rx.try_recv() {
                 self.rx = None;
@@ -118,10 +161,12 @@ impl View for PackageListView {
     }
 
     fn render(&mut self, frame: &mut Frame, area: Rect, theme: &Theme) {
-        let [header_area, main_area, footer_area] = Layout::vertical([
+        let footer_rows: u16 = if self.searching { 2 } else { 1 };
+
+        let [header_area, main_area, bottom_area] = Layout::vertical([
             Constraint::Length(1),
             Constraint::Min(0),
-            Constraint::Length(1),
+            Constraint::Length(footer_rows),
         ])
         .areas(area);
 
@@ -135,11 +180,9 @@ impl View for PackageListView {
 
         match &self.load {
             Load::Loading => {
-                use ratatui::widgets::Paragraph;
                 frame.render_widget(Paragraph::new("⠙ Fetching packages..."), main_area);
             }
             Load::Error(e) => {
-                use ratatui::widgets::Paragraph;
                 frame.render_widget(
                     Paragraph::new(format!("✗ {e}\n\n<r>retry  <q>quit"))
                         .style(theme.danger()),
@@ -147,14 +190,19 @@ impl View for PackageListView {
                 );
             }
             Load::Loaded => {
-                let rows: Vec<Row> = self.state.items.iter().map(|p| {
-                    Row::new(vec![
-                        p.name.clone(),
-                        p.namespace.clone(),
-                        p.latest_version.clone().unwrap_or_default(),
-                        p.description.clone().unwrap_or_default(),
-                    ])
-                }).collect();
+                let rows: Vec<Row> = self
+                    .state
+                    .items
+                    .iter()
+                    .map(|p| {
+                        Row::new(vec![
+                            p.name.clone(),
+                            p.namespace.clone(),
+                            p.latest_version.clone().unwrap_or_default(),
+                            p.description.clone().unwrap_or_default(),
+                        ])
+                    })
+                    .collect();
 
                 let table = Table::new(
                     rows,
@@ -176,22 +224,66 @@ impl View for PackageListView {
             }
         }
 
-        Footer {
-            hints: &[
-                ("/", "search"),
-                ("i", "install"),
-                ("enter", "detail"),
-                ("c", "context"),
-                ("q", "quit"),
-            ],
+        if self.searching {
+            let [search_area, footer_area] =
+                Layout::vertical([Constraint::Length(1), Constraint::Length(1)])
+                    .areas(bottom_area);
+
+            let filter_line = Line::from(vec![
+                Span::styled("/", theme.accent()),
+                Span::raw(" "),
+                Span::raw(self.search_input.as_str()),
+                Span::styled("█", theme.muted()),
+            ]);
+            frame.render_widget(Paragraph::new(filter_line), search_area);
+
+            Footer { hints: &[("esc", "cancel"), ("enter", "search")] }
+                .render(frame, footer_area, theme);
+        } else if !self.query.is_empty() {
+            let filter_hint = format!(
+                "Filter: \"{}\" · {} result{}",
+                self.query,
+                self.state.items.len(),
+                if self.state.items.len() == 1 { "" } else { "s" },
+            );
+            frame.render_widget(
+                Paragraph::new(filter_hint).style(theme.accent()),
+                bottom_area,
+            );
+        } else {
+            Footer {
+                hints: &[
+                    ("/", "search"),
+                    ("i", "install"),
+                    ("enter", "detail"),
+                    ("c", "context"),
+                    ("q", "quit"),
+                ],
+            }
+            .render(frame, bottom_area, theme);
         }
-        .render(frame, footer_area, theme);
     }
 
     fn handle_event(&mut self, event: Event) -> Action {
+        if self.searching {
+            return self.handle_search_event(event);
+        }
+
         match event {
             Event::Key(KeyEvent { code, .. }) => match code {
-                KeyCode::Char('q') | KeyCode::Esc => Action::Quit,
+                KeyCode::Char('q') | KeyCode::Esc => {
+                    if !self.query.is_empty() {
+                        self.clear_search();
+                        Action::None
+                    } else {
+                        Action::Quit
+                    }
+                }
+                KeyCode::Char('/') => {
+                    self.searching = true;
+                    self.search_input = self.query.clone();
+                    Action::None
+                }
                 KeyCode::Down | KeyCode::Char('j') => {
                     self.state.move_down();
                     Action::None
@@ -238,6 +330,41 @@ impl View for PackageListView {
                     } else {
                         Action::None
                     }
+                }
+                _ => Action::None,
+            },
+            _ => Action::None,
+        }
+    }
+}
+
+impl PackageListView {
+    fn handle_search_event(&mut self, event: Event) -> Action {
+        match event {
+            Event::Key(KeyEvent { code, modifiers, .. }) => match code {
+                KeyCode::Esc => {
+                    self.clear_search();
+                    Action::None
+                }
+                KeyCode::Enter => {
+                    self.searching = false;
+                    self.commit_search();
+                    Action::None
+                }
+                KeyCode::Backspace => {
+                    self.search_input.pop();
+                    self.search_changed_at = Some(Instant::now());
+                    Action::None
+                }
+                KeyCode::Char('u') if modifiers.contains(KeyModifiers::CONTROL) => {
+                    self.search_input.clear();
+                    self.search_changed_at = Some(Instant::now());
+                    Action::None
+                }
+                KeyCode::Char(c) => {
+                    self.search_input.push(c);
+                    self.search_changed_at = Some(Instant::now());
+                    Action::None
                 }
                 _ => Action::None,
             },
