@@ -3,6 +3,7 @@ FROM rust:1.91-slim AS builder
 WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
 COPY crates/ crates/
+COPY certs/ certs/
 RUN cargo build --release -p skreg-worker
 
 FROM debian:bookworm-slim
