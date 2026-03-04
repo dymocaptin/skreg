@@ -1,3 +1,4 @@
 .worktrees/
 target/
 docs/plans/
+infra/Pulumi.*.yaml
