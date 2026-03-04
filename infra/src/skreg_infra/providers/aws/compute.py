@@ -221,6 +221,36 @@ class AwsCompute(pulumi.ComponentResource):
             opts=pulumi.ResourceOptions(parent=self),
         )
 
+        _ssm_exec_policy = json.dumps(
+            {
+                "Version": "2012-10-17",
+                "Statement": [
+                    {
+                        "Effect": "Allow",
+                        "Action": [
+                            "ssmmessages:CreateControlChannel",
+                            "ssmmessages:CreateDataChannel",
+                            "ssmmessages:OpenControlChannel",
+                            "ssmmessages:OpenDataChannel",
+                        ],
+                        "Resource": "*",
+                    }
+                ],
+            }
+        )
+
+        aws.iam.RolePolicy(
+            f"{name}-api-task-ssm-policy",
+            aws.iam.RolePolicyArgs(role=api_task_role.name, policy=_ssm_exec_policy),
+            opts=pulumi.ResourceOptions(parent=self),
+        )
+
+        aws.iam.RolePolicy(
+            f"{name}-worker-task-ssm-policy",
+            aws.iam.RolePolicyArgs(role=worker_task_role.name, policy=_ssm_exec_policy),
+            opts=pulumi.ResourceOptions(parent=self),
+        )
+
         aws.cloudwatch.LogGroup(
             f"{name}-api-logs",
             aws.cloudwatch.LogGroupArgs(name="/ecs/skreg-api", retention_in_days=30),
@@ -520,6 +550,7 @@ class AwsCompute(pulumi.ComponentResource):
                 task_definition=api_task.arn,
                 launch_type="FARGATE",
                 desired_count=1,
+                enable_execute_command=True,
                 network_configuration=aws.ecs.ServiceNetworkConfigurationArgs(
                     subnets=args.private_subnet_ids,
                     security_groups=[api_sg.id],
@@ -542,6 +573,7 @@ class AwsCompute(pulumi.ComponentResource):
                 task_definition=worker_task.arn,
                 launch_type="FARGATE",
                 desired_count=1,
+                enable_execute_command=True,
                 network_configuration=aws.ecs.ServiceNetworkConfigurationArgs(
                     subnets=args.private_subnet_ids,
                     security_groups=[worker_sg.id],
