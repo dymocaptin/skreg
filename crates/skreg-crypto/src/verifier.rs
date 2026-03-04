@@ -79,8 +79,7 @@ impl RsaPkcs1Verifier {
             .subject_public_key_info
             .to_der()
             .map_err(|e| VerifyError::Der(e.to_string()))?;
-        RsaPublicKey::from_public_key_der(&spki_der)
-            .map_err(|e| VerifyError::Der(e.to_string()))
+        RsaPublicKey::from_public_key_der(&spki_der).map_err(|e| VerifyError::Der(e.to_string()))
     }
 }
 
@@ -107,11 +106,10 @@ impl SignatureVerifier for RsaPkcs1Verifier {
         let verifying_key = VerifyingKey::<Sha256>::new(public_key);
 
         // Sha256Digest::from_hex validates hex at construction; this cannot fail.
-        let digest_bytes = hex::decode(digest.as_hex())
-            .expect("Sha256Digest always contains valid lowercase hex");
+        let digest_bytes =
+            hex::decode(digest.as_hex()).expect("Sha256Digest always contains valid lowercase hex");
 
-        let sig = RsaSignature::try_from(signature)
-            .map_err(|_| VerifyError::SignatureMismatch)?;
+        let sig = RsaSignature::try_from(signature).map_err(|_| VerifyError::SignatureMismatch)?;
 
         // verify_prehash treats digest_bytes as the pre-computed SHA-256 hash
         // and applies PKCS#1 v1.5 without re-hashing.

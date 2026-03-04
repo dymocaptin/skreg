@@ -111,7 +111,8 @@ impl RegistryClient for HttpRegistryClient {
                 self.base_url, pkg_ref.namespace, pkg_ref.name, manifest.version,
             );
 
-            let tarball = self.http
+            let tarball = self
+                .http
                 .get(&dl_url)
                 .send()
                 .await?

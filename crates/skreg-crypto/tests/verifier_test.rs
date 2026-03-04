@@ -84,7 +84,10 @@ fn verifier_rejects_wrong_signature() {
     let verifier = RsaPkcs1Verifier::new_with_root_pem(ca_pem.as_bytes());
     let result = verifier.verify(&digest, &signature, &[]);
     assert!(
-        matches!(result, Err(skreg_crypto::error::VerifyError::SignatureMismatch)),
+        matches!(
+            result,
+            Err(skreg_crypto::error::VerifyError::SignatureMismatch)
+        ),
         "expected SignatureMismatch, got {result:?}"
     );
 }
@@ -96,7 +99,10 @@ fn verifier_rejects_nonempty_cert_chain() {
     let verifier = RsaPkcs1Verifier::new_with_root_pem(ca_pem.as_bytes());
     let result = verifier.verify(&digest, &[], &["fake-cert".to_owned()]);
     assert!(
-        matches!(result, Err(skreg_crypto::error::VerifyError::InvalidCertChain(_))),
+        matches!(
+            result,
+            Err(skreg_crypto::error::VerifyError::InvalidCertChain(_))
+        ),
         "expected InvalidCertChain, got {result:?}"
     );
 }
@@ -113,7 +119,10 @@ fn verifier_rejects_signature_from_different_key() {
     let verifier = RsaPkcs1Verifier::new_with_root_pem(ca_pem.as_bytes());
     let result = verifier.verify(&digest, &signature, &[]);
     assert!(
-        matches!(result, Err(skreg_crypto::error::VerifyError::SignatureMismatch)),
+        matches!(
+            result,
+            Err(skreg_crypto::error::VerifyError::SignatureMismatch)
+        ),
         "expected SignatureMismatch, got {result:?}"
     );
 }

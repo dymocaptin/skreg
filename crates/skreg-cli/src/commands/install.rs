@@ -13,8 +13,8 @@ use crate::config::{default_config_path, load_config};
 use crate::installer::Installer;
 
 fn default_install_root() -> Result<PathBuf> {
-    let home = home::home_dir()
-        .ok_or_else(|| anyhow::anyhow!("cannot determine home directory"))?;
+    let home =
+        home::home_dir().ok_or_else(|| anyhow::anyhow!("cannot determine home directory"))?;
     Ok(home.join(".skreg").join("packages"))
 }
 
@@ -31,8 +31,8 @@ pub async fn run_install(package_ref: &str) -> Result<()> {
         .with_context(|| format!("invalid package reference: {package_ref:?}"))?;
 
     let cfg_path = default_config_path();
-    let cfg = load_config(&cfg_path)
-        .context("not logged in — run `skreg login <namespace>` first")?;
+    let cfg =
+        load_config(&cfg_path).context("not logged in — run `skreg login <namespace>` first")?;
 
     let client = Arc::new(HttpRegistryClient::new(&cfg.registry));
     let verifier = Arc::new(RsaPkcs1Verifier::new());
