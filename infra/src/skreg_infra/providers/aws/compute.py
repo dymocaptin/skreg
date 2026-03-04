@@ -93,6 +93,20 @@ class AwsCompute(pulumi.ComponentResource):
             opts=pulumi.ResourceOptions(parent=self),
         )
 
+        aws.iam.RolePolicy(
+            f"{name}-exec-secrets-policy",
+            aws.iam.RolePolicyArgs(
+                role=exec_role.name,
+                policy=pulumi.Output.from_input(args.db_secret_arn).apply(
+                    lambda arn: json.dumps({
+                        "Version": "2012-10-17",
+                        "Statement": [{"Effect": "Allow", "Action": "secretsmanager:GetSecretValue", "Resource": arn}],
+                    })
+                ),
+            ),
+            opts=pulumi.ResourceOptions(parent=self),
+        )
+
         aws.cloudwatch.LogGroup(
             f"{name}-api-logs",
             aws.cloudwatch.LogGroupArgs(name="/ecs/skreg-api", retention_in_days=30),
