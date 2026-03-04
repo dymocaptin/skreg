@@ -1,0 +1,16 @@
+[package]
+name = "skreg-tui"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ratatui = "0.29"
+tokio = { workspace = true }
+skreg-client = { path = "../skreg-client" }
+skreg-core = { path = "../skreg-core" }
+anyhow = { workspace = true }
+serde = { workspace = true }
+dirs = "5"
+
+[dev-dependencies]
+tempfile = "3"
