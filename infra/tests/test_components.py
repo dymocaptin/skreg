@@ -32,6 +32,7 @@ def test_database_outputs_constructible() -> None:
         host=pulumi.Output.from_input("localhost"),
         port=pulumi.Output.from_input(5432),
         database_name=pulumi.Output.from_input("skreg"),
+        security_group_id=pulumi.Output.from_input("sg-abc123"),
     )
     assert outputs is not None
 

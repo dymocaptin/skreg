@@ -66,6 +66,7 @@ class SkregStack:
                 from_email=config.from_email,
                 ses_region=config.ses_region,
                 ca_secret_arn=pki.outputs.hsm_key_id,
+                db_sg_id=database.outputs.security_group_id,
             ),
         )
         pulumi.export(
