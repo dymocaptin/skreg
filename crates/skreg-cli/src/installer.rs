@@ -11,6 +11,7 @@ use skreg_client::client::RegistryClient;
 use skreg_core::installed::{InstalledPackage, SignerKind};
 use skreg_core::package_ref::PackageRef;
 use skreg_core::types::Sha256Digest;
+use skreg_crypto::verifier::SignatureVerifier;
 use skreg_pack::unpack::unpack_tarball;
 
 /// Errors that can occur during package installation.
@@ -45,6 +46,7 @@ pub enum InstallError {
 pub struct Installer {
     client: Arc<dyn RegistryClient>,
     install_root: PathBuf,
+    verifier: Option<Arc<dyn SignatureVerifier>>,
 }
 
 impl Installer {
@@ -59,7 +61,18 @@ impl Installer {
         Self {
             client,
             install_root,
+            verifier: None,
         }
+    }
+
+    /// Attach an optional signature verifier.
+    ///
+    /// When set, `install()` will call `verifier.verify()` after the sha256
+    /// check and return an error if the signature is invalid.
+    #[must_use]
+    pub fn with_verifier(mut self, verifier: Arc<dyn SignatureVerifier>) -> Self {
+        self.verifier = Some(verifier);
+        self
     }
 
     /// Download, verify, and extract a package.
@@ -68,8 +81,8 @@ impl Installer {
     ///
     /// # Errors
     ///
-    /// Returns [`InstallError`] if any step fails. Partial installs are
-    /// cleaned up before returning.
+    /// Returns [`InstallError`] if any step fails. On extraction failure, the
+    /// partially-created installation directory may remain on disk.
     pub async fn install(&self, pkg_ref: &PackageRef) -> Result<InstalledPackage, InstallError> {
         info!("installing {pkg_ref}");
 
@@ -91,6 +104,20 @@ impl Installer {
 
         debug!("sha256 verified for {pkg_ref}");
 
+        // Safety: actual_hex comes from sha2::Digest::finalize(), always valid hex.
+        let digest = Sha256Digest::from_hex(&actual_hex)?;
+
+        if let Some(ref verifier) = self.verifier {
+            verifier
+                .verify(
+                    &digest,
+                    &resolved.signature,
+                    &resolved.manifest.cert_chain_pem,
+                )
+                .map_err(|e| InstallError::Crypto(e.to_string()))?;
+            debug!("signature verified for {pkg_ref}");
+        }
+
         let install_path = self
             .install_root
             .join(resolved.manifest.namespace.as_str())
@@ -106,7 +133,7 @@ impl Installer {
 
         Ok(InstalledPackage {
             pkg_ref: pkg_ref.clone(),
-            sha256: Sha256Digest::from_hex(&actual_hex)?,
+            sha256: digest,
             signer: SignerKind::Registry,
             install_path,
         })

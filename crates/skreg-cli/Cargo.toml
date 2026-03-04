@@ -25,6 +25,7 @@ reqwest         = { workspace = true }
 hex             = "0.4"
 tempfile        = "3"
 thiserror       = { workspace = true }
+home            = "0.5"
 
 [lib]
 name = "skreg_cli"

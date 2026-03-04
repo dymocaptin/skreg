@@ -27,7 +27,10 @@ pub async fn search_handler(
 
     let rows: Vec<PackageSummary> = sqlx::query_as(
         "
-        SELECT p.id, n.slug AS namespace, p.name, p.description, p.category, p.created_at
+        SELECT p.id, n.slug AS namespace, p.name, p.description, p.category, p.created_at,
+               (SELECT v2.version FROM versions v2
+                WHERE v2.package_id = p.id AND v2.yanked_at IS NULL
+                ORDER BY v2.published_at DESC LIMIT 1) AS latest_version
         FROM packages p
         JOIN namespaces n ON n.id = p.namespace_id
         LEFT JOIN package_search ps ON ps.package_id = p.id

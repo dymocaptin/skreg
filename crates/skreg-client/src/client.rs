@@ -24,6 +24,19 @@ pub struct ResolvedVersion {
     pub signature: Vec<u8>,
 }
 
+/// A single result from a registry search.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct SearchResult {
+    /// Namespace slug the package belongs to.
+    pub namespace: String,
+    /// Package name slug.
+    pub name: String,
+    /// Human-readable description, if any.
+    pub description: Option<String>,
+    /// Latest published version string (most recent by `published_at`), if any.
+    pub latest_version: Option<String>,
+}
+
 /// Communicates with a skreg-compatible registry.
 pub trait RegistryClient: Send + Sync {
     /// Resolve a package reference to its latest (or pinned) version metadata.
@@ -35,6 +48,16 @@ pub trait RegistryClient: Send + Sync {
         &'a self,
         pkg_ref: &'a PackageRef,
     ) -> BoxFuture<'a, Result<ResolvedVersion, ClientError>>;
+
+    /// Search the registry for packages matching `query`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ClientError`] on network or parse failure.
+    fn search<'a>(
+        &'a self,
+        query: &'a str,
+    ) -> BoxFuture<'a, Result<Vec<SearchResult>, ClientError>>;
 }
 
 /// `reqwest`-backed implementation of [`RegistryClient`].
@@ -88,13 +111,24 @@ impl RegistryClient for HttpRegistryClient {
                 self.base_url, pkg_ref.namespace, pkg_ref.name, manifest.version,
             );
 
-            let tarball = self.http.get(&dl_url).send().await?.bytes().await?.to_vec();
+            let tarball = self
+                .http
+                .get(&dl_url)
+                .send()
+                .await?
+                .error_for_status()
+                .map_err(ClientError::Http)?
+                .bytes()
+                .await?
+                .to_vec();
             let sig_url = format!("{dl_url}/sig");
             let signature = self
                 .http
                 .get(&sig_url)
                 .send()
                 .await?
+                .error_for_status()
+                .map_err(ClientError::Http)?
                 .bytes()
                 .await?
                 .to_vec();
@@ -104,6 +138,35 @@ impl RegistryClient for HttpRegistryClient {
                 tarball,
                 signature,
             })
+        })
+    }
+
+    fn search<'a>(
+        &'a self,
+        query: &'a str,
+    ) -> BoxFuture<'a, Result<Vec<SearchResult>, ClientError>> {
+        #[derive(serde::Deserialize)]
+        struct SearchResponse {
+            packages: Vec<SearchResult>,
+        }
+
+        Box::pin(async move {
+            let url = format!("{}/v1/search", self.base_url);
+            debug!("searching registry: {url}?q={query}");
+
+            let resp: SearchResponse = self
+                .http
+                .get(&url)
+                .query(&[("q", query)])
+                .send()
+                .await?
+                .error_for_status()
+                .map_err(ClientError::Http)?
+                .json()
+                .await
+                .map_err(|e| ClientError::Parse(e.to_string()))?;
+
+            Ok(resp.packages)
         })
     }
 }
