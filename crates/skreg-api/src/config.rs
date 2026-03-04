@@ -23,6 +23,8 @@ pub struct ApiConfig {
     pub s3_bucket: String,
     /// Sender address used for SES transactional email.
     pub from_email: String,
+    /// AWS region where SES is configured (e.g. `us-east-1`).
+    pub ses_region: String,
 }
 
 impl ApiConfig {
@@ -40,6 +42,8 @@ impl ApiConfig {
                 .map_err(|_| ConfigError::Missing("S3_BUCKET".to_owned()))?,
             from_email: env::var("FROM_EMAIL")
                 .map_err(|_| ConfigError::Missing("FROM_EMAIL".to_owned()))?,
+            ses_region: env::var("SES_REGION")
+                .map_err(|_| ConfigError::Missing("SES_REGION".to_owned()))?,
         })
     }
 }

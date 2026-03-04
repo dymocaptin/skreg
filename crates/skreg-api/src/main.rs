@@ -12,10 +12,15 @@ async fn main() -> anyhow::Result<()> {
     let config = ApiConfig::from_env()?;
     let pool = connect_and_migrate(&config.database_url).await?;
     let aws_cfg = aws_config::load_from_env().await;
+    let ses_conf = aws_sdk_sesv2::config::Builder::from(&aws_cfg)
+        .region(aws_sdk_sesv2::config::Region::new(
+            config.ses_region.clone(),
+        ))
+        .build();
     let state = AppState {
         pool,
         s3: aws_sdk_s3::Client::new(&aws_cfg),
-        ses: aws_sdk_sesv2::Client::new(&aws_cfg),
+        ses: aws_sdk_sesv2::Client::from_conf(ses_conf),
         s3_bucket: config.s3_bucket.clone(),
         from_email: config.from_email.clone(),
     };
