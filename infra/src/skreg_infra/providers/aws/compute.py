@@ -98,10 +98,18 @@ class AwsCompute(pulumi.ComponentResource):
             aws.iam.RolePolicyArgs(
                 role=exec_role.name,
                 policy=pulumi.Output.from_input(args.db_secret_arn).apply(
-                    lambda arn: json.dumps({
-                        "Version": "2012-10-17",
-                        "Statement": [{"Effect": "Allow", "Action": "secretsmanager:GetSecretValue", "Resource": arn}],
-                    })
+                    lambda arn: json.dumps(
+                        {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Effect": "Allow",
+                                    "Action": "secretsmanager:GetSecretValue",
+                                    "Resource": arn,
+                                }
+                            ],
+                        }
+                    )
                 ),
             ),
             opts=pulumi.ResourceOptions(parent=self),
