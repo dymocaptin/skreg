@@ -18,7 +18,7 @@ struct ApiKeyResponse {
 /// or the OTP is invalid.
 pub async fn run_login(namespace: &str) -> Result<()> {
     let registry = std::env::var("SKILLPKG_REGISTRY")
-        .unwrap_or_else(|_| "https://registry.skreg.dev".to_owned());
+        .unwrap_or_else(|_| "https://api.skreg.ai".to_owned());
 
     print!("Email: ");
     std::io::Write::flush(&mut std::io::stdout())?;
