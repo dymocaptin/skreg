@@ -105,7 +105,7 @@ class AwsPki(pulumi.ComponentResource):
                 secret_id=ca_cert_secret.id,
                 secret_string=pem_cert,
             ),
-            opts=pulumi.ResourceOptions(parent=self),
+            opts=pulumi.ResourceOptions(parent=self, ignore_changes=["secret_string"]),
         )
 
         aws.s3.BucketObject(
