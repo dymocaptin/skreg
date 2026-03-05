@@ -51,16 +51,10 @@ describe('App', () => {
     expect(document.documentElement).toHaveAttribute('data-theme', 'light')
   })
 
-  it('renders CategoryFilter with All pill', async () => {
+  it('renders PackageGrid table', async () => {
     render(<App />)
-    expect(screen.getByRole('button', { name: 'All' })).toBeInTheDocument()
-  })
-
-  it('renders PackageGrid (shows loading or results area)', async () => {
-    render(<App />)
-    // PackageGrid renders either loading text or the grid section
     await waitFor(() => {
-      expect(document.querySelector('section') || screen.queryByText(/loading/i)).toBeTruthy()
+      expect(document.querySelector('table')).toBeInTheDocument()
     })
   })
 })

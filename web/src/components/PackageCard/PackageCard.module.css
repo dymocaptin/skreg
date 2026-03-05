@@ -1,10 +1,21 @@
 .row {
   border-bottom: 1px solid var(--border);
-  transition: background 0.1s;
+  cursor: default;
 }
 
 .row:hover {
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  background: color-mix(in srgb, var(--accent) 6%, transparent);
+}
+
+.row.selected {
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.cursor {
+  display: inline-block;
+  width: 1.2em;
+  color: var(--accent);
+  font-weight: 700;
 }
 
 .name {
@@ -12,7 +23,7 @@
   font-size: 0.875rem;
   color: var(--accent);
   white-space: nowrap;
-  padding: 0.6rem 1rem 0.6rem 1.5rem;
+  padding: 0.45rem 1rem 0.45rem 1rem;
 }
 
 .namespace {
@@ -20,7 +31,7 @@
   font-size: 0.875rem;
   color: var(--yellow);
   white-space: nowrap;
-  padding: 0.6rem 1rem;
+  padding: 0.45rem 1rem;
 }
 
 .version {
@@ -28,22 +39,22 @@
   font-size: 0.875rem;
   color: var(--yellow);
   white-space: nowrap;
-  padding: 0.6rem 1rem;
+  padding: 0.45rem 1rem;
 }
 
 .desc {
   font-family: var(--font-mono);
   font-size: 0.875rem;
   color: var(--text-muted);
-  max-width: 400px;
+  max-width: 420px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  padding: 0.6rem 1rem;
+  padding: 0.45rem 1rem;
 }
 
 .actions {
-  padding: 0.6rem 1.5rem 0.6rem 0;
+  padding: 0.45rem 1.5rem 0.45rem 0;
   white-space: nowrap;
   text-align: right;
 }
@@ -51,12 +62,12 @@
 .copy {
   background: none;
   border: 1px solid var(--border);
-  padding: 0.15rem 0.5rem;
+  padding: 0.1rem 0.4rem;
   font-size: 0.75rem;
   font-family: var(--font-mono);
   color: var(--text-muted);
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
+  transition: color 0.1s, border-color 0.1s;
 }
 
 .copy:hover {

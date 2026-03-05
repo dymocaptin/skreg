@@ -1,24 +1,38 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { searchPackages } from '../../api.js'
 import PackageCard from '../PackageCard/PackageCard.jsx'
+import Footer from '../Footer/Footer.jsx'
 import styles from './PackageGrid.module.css'
 
-export default function PackageGrid({ query, category }) {
+export default function PackageGrid() {
   const [packages, setPackages] = useState([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
+  const [selectedIndex, setSelectedIndex] = useState(-1)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const [debouncedQuery, setDebouncedQuery] = useState('')
+
+  const tableRef = useRef(null)
+  const searchInputRef = useRef(null)
   const fetchSeqRef = useRef(0)
 
-  const fetchPage = useCallback(async (q, cat, pg, append = false) => {
+  // Debounce search query
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedQuery(query), 300)
+    return () => clearTimeout(id)
+  }, [query])
+
+  const fetchPage = useCallback(async (q, pg, append = false) => {
     const seq = ++fetchSeqRef.current
     setLoading(true)
     setError(null)
     try {
-      const data = await searchPackages({ query: q, category: cat, page: pg })
-      if (seq !== fetchSeqRef.current) return // discard stale response
+      const data = await searchPackages({ query: q, page: pg })
+      if (seq !== fetchSeqRef.current) return
       setPackages(prev => append ? [...prev, ...data.packages] : data.packages)
       setTotal(data.total)
     } catch (err) {
@@ -31,26 +45,104 @@ export default function PackageGrid({ query, category }) {
 
   useEffect(() => {
     setPage(1)
-    fetchPage(query, category, 1, false)
-  }, [query, category, fetchPage])
+    setSelectedIndex(-1)
+    fetchPage(debouncedQuery, 1, false)
+  }, [debouncedQuery, fetchPage])
+
+  // Auto-focus search input when it opens
+  useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus()
+  }, [searchOpen])
+
+  // Scroll selected row into view
+  useEffect(() => {
+    if (selectedIndex < 0) return
+    const rows = tableRef.current?.querySelectorAll('tbody tr')
+    rows?.[selectedIndex]?.scrollIntoView({ block: 'nearest' })
+  }, [selectedIndex])
+
+  // Keyboard navigation
+  useEffect(() => {
+    function onKeyDown(e) {
+      // Let the search input handle its own keys except Escape
+      if (searchOpen && e.key !== 'Escape') return
+
+      switch (e.key) {
+        case '/':
+          if (!searchOpen) {
+            e.preventDefault()
+            setSearchOpen(true)
+          }
+          break
+        case 'Escape':
+          if (searchOpen) {
+            setSearchOpen(false)
+            setQuery('')
+          } else {
+            setSelectedIndex(-1)
+          }
+          break
+        case 'j':
+        case 'ArrowDown':
+          e.preventDefault()
+          setSelectedIndex(i => Math.min(i + 1, packages.length - 1))
+          break
+        case 'k':
+        case 'ArrowUp':
+          e.preventDefault()
+          setSelectedIndex(i => Math.max(i - 1, 0))
+          break
+        case 'g':
+          if (!e.shiftKey) {
+            e.preventDefault()
+            setSelectedIndex(0)
+          }
+          break
+        case 'G':
+          e.preventDefault()
+          setSelectedIndex(packages.length - 1)
+          break
+        case 'Enter':
+          if (selectedIndex >= 0 && packages[selectedIndex]) {
+            const pkg = packages[selectedIndex]
+            navigator.clipboard.writeText(`skreg install ${pkg.namespace}/${pkg.name}`).catch(() => {})
+          }
+          break
+      }
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [searchOpen, packages, selectedIndex])
 
   function handleLoadMore() {
     const next = page + 1
     setPage(next)
-    fetchPage(query, category, next, true)
-  }
-
-  if (error) {
-    return <p className={styles.message}>Failed to load packages: {error}</p>
+    fetchPage(debouncedQuery, next, true)
   }
 
   return (
-    <section className={styles.section}>
-      {loading && packages.length === 0 ? (
-        <p className={styles.message}>Loading…</p>
-      ) : (
-        <>
-          <table className={styles.table}>
+    <div className={styles.outer}>
+      {searchOpen && (
+        <div className={styles.searchBar}>
+          <span className={styles.searchPrompt}>/</span>
+          <input
+            ref={searchInputRef}
+            className={styles.searchInput}
+            type="search"
+            placeholder="search packages…"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            aria-label="Search packages"
+          />
+        </div>
+      )}
+
+      <div className={styles.scrollArea}>
+        {error && <p className={styles.message}>Failed to load packages: {error}</p>}
+        {loading && packages.length === 0 && <p className={styles.message}>Loading…</p>}
+        {!error && (loading || packages.length > 0) && (
+          <table ref={tableRef} className={styles.table}>
             <thead>
               <tr>
                 <th className={styles.th}>NAME</th>
@@ -61,20 +153,34 @@ export default function PackageGrid({ query, category }) {
               </tr>
             </thead>
             <tbody>
-              {packages.map(pkg => <PackageCard key={pkg.id} pkg={pkg} />)}
+              {packages.map((pkg, i) => (
+                <PackageCard
+                  key={pkg.id}
+                  pkg={pkg}
+                  selected={i === selectedIndex}
+                  onClick={() => setSelectedIndex(i)}
+                />
+              ))}
             </tbody>
           </table>
-          {packages.length < total && (
-            <button
-              className={styles.loadMore}
-              onClick={handleLoadMore}
-              disabled={loading}
-            >
-              {loading ? 'Loading…' : 'Load more'}
-            </button>
-          )}
-        </>
-      )}
-    </section>
+        )}
+        {!loading && packages.length === 0 && !error && (
+          <p className={styles.message}>
+            {query ? `No packages found for "${query}"` : 'No packages found'}
+          </p>
+        )}
+        {packages.length < total && (
+          <button
+            className={styles.loadMore}
+            onClick={handleLoadMore}
+            disabled={loading}
+          >
+            {loading ? 'Loading…' : 'Load more'}
+          </button>
+        )}
+      </div>
+
+      <Footer searchOpen={searchOpen} query={query} resultCount={packages.length} />
+    </div>
   )
 }

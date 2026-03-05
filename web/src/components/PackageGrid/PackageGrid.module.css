@@ -1,5 +1,47 @@
-.section {
-  padding: 1.5rem 0;
+.outer {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.searchBar {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.3rem 1rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  flex-shrink: 0;
+}
+
+.searchPrompt {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.searchInput {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  outline: none;
+  caret-color: var(--accent);
+}
+
+.searchInput::placeholder {
+  color: var(--text-muted);
+}
+
+.scrollArea {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
 }
 
 .table {
@@ -13,10 +55,18 @@
   font-size: 0.75rem;
   font-weight: 700;
   color: var(--text);
-  letter-spacing: 0.05em;
-  padding: 0.5rem 1rem 0.5rem 1.5rem;
+  letter-spacing: 0.06em;
+  padding: 0.4rem 1rem 0.4rem 1rem;
   border-bottom: 1px solid var(--accent);
   white-space: nowrap;
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  z-index: 1;
+}
+
+.th:first-child {
+  padding-left: 1.5rem;
 }
 
 .th:last-child {
@@ -27,14 +77,14 @@
   text-align: center;
   color: var(--text-muted);
   padding: 3rem 0;
-  font-size: 0.9rem;
+  font-size: 0.875rem;
   font-family: var(--font-mono);
 }
 
 .loadMore {
   display: block;
-  margin: 1.5rem auto 0;
-  padding: 0.5rem 2rem;
+  margin: 1rem auto;
+  padding: 0.4rem 1.5rem;
   background: none;
   border: 1px solid var(--border);
   color: var(--text-muted);
