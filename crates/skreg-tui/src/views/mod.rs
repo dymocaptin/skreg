@@ -18,8 +18,11 @@ pub trait View {
     fn render(&mut self, frame: &mut Frame, area: Rect, theme: &Theme);
     /// Handle a terminal event and return the resulting action.
     fn handle_event(&mut self, event: Event) -> Action;
-    /// Called once per event-loop tick (default: no-op).
-    fn tick(&mut self) {}
+    /// Called once per event-loop tick. Returns an action to process immediately
+    /// (e.g. a toast from a completed async operation) without waiting for a keypress.
+    fn tick(&mut self) -> Option<Action> {
+        None
+    }
 }
 
 /// Actions returned by views to drive the app event loop.

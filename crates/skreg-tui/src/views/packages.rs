@@ -27,6 +27,8 @@ use super::{Action, ToastKind, View};
 
 /// Debounce delay before issuing a search fetch after the last keystroke.
 const SEARCH_DEBOUNCE: Duration = Duration::from_millis(300);
+/// Maximum description length before truncation.
+const DESC_MAX: usize = 28;
 
 /// Cursor and items for the package list table.
 pub struct ListState {
@@ -38,12 +40,23 @@ pub struct ListState {
     pub table_state: RatatuiTableState,
 }
 
+impl Default for ListState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ListState {
     /// Create a new empty list state.
+    #[must_use]
     pub fn new() -> Self {
         let mut table_state = RatatuiTableState::default();
         table_state.select(Some(0));
-        Self { items: vec![], selected: 0, table_state }
+        Self {
+            items: vec![],
+            selected: 0,
+            table_state,
+        }
     }
 
     /// Move the cursor down one row, clamped at the last item.
@@ -63,6 +76,7 @@ impl ListState {
     }
 
     /// Return a reference to the currently highlighted item, if any.
+    #[must_use]
     pub fn selected_item(&self) -> Option<&SearchResult> {
         self.items.get(self.selected)
     }
@@ -91,14 +105,13 @@ pub struct PackageListView {
     search_changed_at: Option<Instant>,
     /// In-flight install result: `Ok(label)` on success, `Err(msg)` on failure.
     install_rx: Option<oneshot::Receiver<Result<String, String>>>,
-    /// Toast to emit on the next event dispatch (set by tick when install completes).
-    pending_action: Option<Action>,
     /// Set of `"namespace/name"` keys that are currently installed locally.
     installed: HashSet<String>,
 }
 
 impl PackageListView {
     /// Create a new view and kick off the initial package fetch.
+    #[must_use]
     pub fn new(config: CliConfig) -> Self {
         let mut v = Self {
             config,
@@ -110,7 +123,6 @@ impl PackageListView {
             search_input: String::new(),
             search_changed_at: None,
             install_rx: None,
-            pending_action: None,
             installed: Self::scan_installed_set(),
         };
         v.fetch();
@@ -118,7 +130,10 @@ impl PackageListView {
     }
 
     fn scan_installed_set() -> HashSet<String> {
-        let base = dirs::home_dir().unwrap_or_default().join(".skreg").join("packages");
+        let base = dirs::home_dir()
+            .unwrap_or_default()
+            .join(".skreg")
+            .join("packages");
         scan_installed(&base)
             .unwrap_or_default()
             .into_iter()
@@ -128,8 +143,10 @@ impl PackageListView {
 
     fn install_selected(&mut self, namespace: String, name: String, version: String) {
         let registry = self.config.registry().to_string();
-        let install_root =
-            dirs::home_dir().unwrap_or_default().join(".skreg").join("packages");
+        let install_root = dirs::home_dir()
+            .unwrap_or_default()
+            .join(".skreg")
+            .join("packages");
         let (tx, rx) = oneshot::channel();
         self.install_rx = Some(rx);
         tokio::spawn(async move {
@@ -140,7 +157,16 @@ impl PackageListView {
             let result = installer
                 .install(&pkg_ref)
                 .await
-                .map(|p| format!("{} v{}", p.pkg_ref.name, p.pkg_ref.version.as_ref().map_or_else(|| "?".to_string(), |v| v.to_string())))
+                .map(|p| {
+                    format!(
+                        "{} v{}",
+                        p.pkg_ref.name,
+                        p.pkg_ref
+                            .version
+                            .as_ref()
+                            .map_or_else(|| "?".to_string(), std::string::ToString::to_string)
+                    )
+                })
                 .map_err(|e| e.to_string());
             let _ = tx.send(result);
         });
@@ -181,7 +207,7 @@ impl PackageListView {
 }
 
 impl View for PackageListView {
-    fn tick(&mut self) {
+    fn tick(&mut self) -> Option<Action> {
         // Debounced search: fire fetch once input settles for SEARCH_DEBOUNCE.
         if let Some(changed_at) = self.search_changed_at {
             if changed_at.elapsed() >= SEARCH_DEBOUNCE {
@@ -207,7 +233,7 @@ impl View for PackageListView {
         if let Some(rx) = &mut self.install_rx {
             if let Ok(result) = rx.try_recv() {
                 self.install_rx = None;
-                self.pending_action = Some(match result {
+                return Some(match result {
                     Ok(label) => {
                         self.installed = Self::scan_installed_set();
                         Action::Toast(ToastKind::Success, format!("Installed {label}"))
@@ -216,8 +242,11 @@ impl View for PackageListView {
                 });
             }
         }
+
+        None
     }
 
+    #[allow(clippy::too_many_lines)]
     fn render(&mut self, frame: &mut Frame, area: Rect, theme: &Theme) {
         let footer_rows: u16 = if self.searching { 2 } else { 1 };
 
@@ -242,8 +271,7 @@ impl View for PackageListView {
             }
             Load::Error(e) => {
                 frame.render_widget(
-                    Paragraph::new(format!("✗ {e}\n\n<r>retry  <q>quit"))
-                        .style(theme.danger()),
+                    Paragraph::new(format!("✗ {e}\n\n<r>retry  <q>quit")).style(theme.danger()),
                     main_area,
                 );
             }
@@ -274,21 +302,14 @@ impl View for PackageListView {
                 let header_cols = Layout::horizontal(widths).spacing(1).areas::<4>(header_row);
                 let labels = ["NAME", "NAMESPACE", "VERSION", "DESCRIPTION"];
                 for (area, label) in header_cols.iter().zip(labels.iter()) {
-                    frame.render_widget(
-                        Paragraph::new(*label).style(theme.header()),
-                        *area,
-                    );
+                    frame.render_widget(Paragraph::new(*label).style(theme.header()), *area);
                 }
 
                 // Separator line under the header.
                 let sep_line = "─".repeat(table_area.width as usize);
-                frame.render_widget(
-                    Paragraph::new(sep_line).style(theme.border()),
-                    sep_row,
-                );
+                frame.render_widget(Paragraph::new(sep_line).style(theme.border()), sep_row);
 
                 // Truncate description to fit the fixed column width.
-                const DESC_MAX: usize = 28;
                 let rows: Vec<Row> = self
                     .state
                     .items
@@ -329,8 +350,7 @@ impl View for PackageListView {
 
         if self.searching {
             let [search_area, footer_area] =
-                Layout::vertical([Constraint::Length(1), Constraint::Length(1)])
-                    .areas(bottom_area);
+                Layout::vertical([Constraint::Length(1), Constraint::Length(1)]).areas(bottom_area);
 
             let filter_line = Line::from(vec![
                 Span::styled("/", theme.accent()),
@@ -340,8 +360,10 @@ impl View for PackageListView {
             ]);
             frame.render_widget(Paragraph::new(filter_line), search_area);
 
-            Footer { hints: &[("esc", "cancel"), ("enter", "search")] }
-                .render(frame, footer_area, theme);
+            Footer {
+                hints: &[("esc", "cancel"), ("enter", "search")],
+            }
+            .render(frame, footer_area, theme);
         } else if !self.query.is_empty() {
             let filter_hint = format!(
                 "Filter: \"{}\" · {} result{}",
@@ -368,23 +390,18 @@ impl View for PackageListView {
     }
 
     fn handle_event(&mut self, event: Event) -> Action {
-        // Drain any action queued by tick() (e.g. install completion toast).
-        if let Some(action) = self.pending_action.take() {
-            return action;
-        }
-
         if self.searching {
-            return self.handle_search_event(event);
+            return self.handle_search_event(&event);
         }
 
         match event {
             Event::Key(KeyEvent { code, .. }) => match code {
                 KeyCode::Char('q') | KeyCode::Esc => {
-                    if !self.query.is_empty() {
+                    if self.query.is_empty() {
+                        Action::Quit
+                    } else {
                         self.clear_search();
                         Action::None
-                    } else {
-                        Action::Quit
                     }
                 }
                 KeyCode::Char('/') => {
@@ -419,13 +436,18 @@ impl View for PackageListView {
                 KeyCode::Char('c') => Action::OpenContextSwitcher,
                 KeyCode::Char('i') => {
                     if let Some(p) = self.state.selected_item() {
-                        let (ns, name, ver) = (
-                            p.namespace.clone(),
-                            p.name.clone(),
-                            p.latest_version.clone().unwrap_or_default(),
-                        );
-                        self.install_selected(ns, name, ver);
-                        Action::Toast(ToastKind::Success, "Installing…".to_string())
+                        let key = format!("{}/{}", p.namespace, p.name);
+                        if self.installed.contains(&key) {
+                            Action::Toast(ToastKind::Error, "Already installed".to_string())
+                        } else {
+                            let (ns, name, ver) = (
+                                p.namespace.clone(),
+                                p.name.clone(),
+                                p.latest_version.clone().unwrap_or_default(),
+                            );
+                            self.install_selected(ns, name, ver);
+                            Action::Toast(ToastKind::Success, "Installing…".to_string())
+                        }
                     } else {
                         Action::None
                     }
@@ -450,9 +472,11 @@ impl View for PackageListView {
 }
 
 impl PackageListView {
-    fn handle_search_event(&mut self, event: Event) -> Action {
+    fn handle_search_event(&mut self, event: &Event) -> Action {
         match event {
-            Event::Key(KeyEvent { code, modifiers, .. }) => match code {
+            Event::Key(KeyEvent {
+                code, modifiers, ..
+            }) => match code {
                 KeyCode::Esc => {
                     self.clear_search();
                     Action::None
@@ -473,7 +497,7 @@ impl PackageListView {
                     Action::None
                 }
                 KeyCode::Char(c) => {
-                    self.search_input.push(c);
+                    self.search_input.push(*c);
                     self.search_changed_at = Some(Instant::now());
                     Action::None
                 }
@@ -493,7 +517,7 @@ mod tests {
             .iter()
             .map(|n| SearchResult {
                 namespace: "ns".into(),
-                name: n.to_string(),
+                name: (*n).to_string(),
                 description: None,
                 latest_version: Some("1.0.0".into()),
             })

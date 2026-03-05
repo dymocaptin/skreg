@@ -23,11 +23,11 @@ impl Default for Theme {
     fn default() -> Self {
         Self {
             primary: Color::Cyan,
-            accent:  Color::Yellow,
+            accent: Color::Yellow,
             success: Color::Green,
-            danger:  Color::Red,
-            muted:   Color::DarkGray,
-            fg:      Color::White,
+            danger: Color::Red,
+            muted: Color::DarkGray,
+            fg: Color::White,
         }
     }
 }
@@ -36,7 +36,9 @@ impl Theme {
     /// Style for the selected/highlighted row.
     #[must_use]
     pub fn selected(&self) -> Style {
-        Style::default().fg(self.primary).add_modifier(Modifier::BOLD)
+        Style::default()
+            .fg(self.primary)
+            .add_modifier(Modifier::BOLD)
     }
 
     /// Style for column headers and bold labels.
@@ -60,7 +62,9 @@ impl Theme {
     /// Style for accented text (context name, version).
     #[must_use]
     pub fn accent(&self) -> Style {
-        Style::default().fg(self.accent).add_modifier(Modifier::BOLD)
+        Style::default()
+            .fg(self.accent)
+            .add_modifier(Modifier::BOLD)
     }
 
     /// Style for success indicators.

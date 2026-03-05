@@ -89,10 +89,7 @@ impl HttpRegistryClient {
         name: &str,
         version: &str,
     ) -> Result<Manifest, ClientError> {
-        let url = format!(
-            "{}/v1/packages/{namespace}/{name}/{version}",
-            self.base_url,
-        );
+        let url = format!("{}/v1/packages/{namespace}/{name}/{version}", self.base_url,);
         debug!("fetching manifest from {url}");
         self.http
             .get(&url)

@@ -70,7 +70,10 @@ pub fn scan_installed(base: &Path) -> anyhow::Result<Vec<InstalledPkg>> {
 }
 
 fn packages_dir() -> PathBuf {
-    dirs::home_dir().unwrap_or_default().join(".skreg").join("packages")
+    dirs::home_dir()
+        .unwrap_or_default()
+        .join(".skreg")
+        .join("packages")
 }
 
 /// View listing locally installed skill packages with uninstall support.
@@ -85,13 +88,20 @@ pub struct InstalledView {
 
 impl InstalledView {
     /// Create a new view, scanning `~/.skreg/packages/` immediately.
+    #[must_use]
     pub fn new(config: CliConfig) -> Self {
         let packages = scan_installed(&packages_dir()).unwrap_or_default();
         let mut table_state = TableState::default();
         if !packages.is_empty() {
             table_state.select(Some(0));
         }
-        Self { config, packages, selected: 0, table_state, confirming: false }
+        Self {
+            config,
+            packages,
+            selected: 0,
+            table_state,
+            confirming: false,
+        }
     }
 
     fn uninstall_selected(&mut self) -> anyhow::Result<String> {
@@ -102,7 +112,11 @@ impl InstalledView {
         if self.selected > 0 {
             self.selected -= 1;
         }
-        let sel = if self.packages.is_empty() { None } else { Some(self.selected) };
+        let sel = if self.packages.is_empty() {
+            None
+        } else {
+            Some(self.selected)
+        };
         self.table_state.select(sel);
         Ok(label)
     }
@@ -133,7 +147,11 @@ impl View for InstalledView {
 
         let table = Table::new(
             rows,
-            [Constraint::Min(20), Constraint::Length(14), Constraint::Length(10)],
+            [
+                Constraint::Min(20),
+                Constraint::Length(14),
+                Constraint::Length(10),
+            ],
         )
         .header(Row::new(["NAME", "NAMESPACE", "VERSION"]).style(theme.header()))
         .row_highlight_style(theme.selected())

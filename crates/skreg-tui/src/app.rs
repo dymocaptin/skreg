@@ -21,14 +21,14 @@ use crate::widgets::toast::Toast;
 ///
 /// # Errors
 /// Returns an error if terminal initialisation fails or an I/O error occurs.
-pub async fn run(config: CliConfig) -> Result<()> {
+pub fn run(config: CliConfig) -> Result<()> {
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    let result = run_loop(&mut terminal, config).await;
+    let result = run_loop(&mut terminal, config);
 
     disable_raw_mode()?;
     execute!(terminal.backend_mut(), LeaveAlternateScreen)?;
@@ -36,7 +36,7 @@ pub async fn run(config: CliConfig) -> Result<()> {
     result
 }
 
-async fn run_loop(
+fn run_loop(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
     mut config: CliConfig,
 ) -> Result<()> {
@@ -48,7 +48,9 @@ async fn run_loop(
 
     loop {
         for view in &mut stack {
-            view.tick();
+            if let Some(Action::Toast(kind, msg)) = view.tick() {
+                toast = Some((Toast { kind, message: msg }, std::time::Instant::now()));
+            }
         }
 
         terminal.draw(|frame| {
@@ -101,7 +103,7 @@ async fn run_loop(
             toast = None;
 
             if let Some(overlay) = &mut context_overlay {
-                match overlay.handle_event(ev) {
+                match overlay.handle_event(&ev) {
                     Action::Pop => {
                         context_overlay = None;
                     }
@@ -115,7 +117,6 @@ async fn run_loop(
                 }
             } else if let Some(view) = stack.last_mut() {
                 match view.handle_event(ev) {
-                    Action::None => {}
                     Action::Push(v) => stack.push(v),
                     Action::Pop | Action::Quit if stack.len() == 1 => break,
                     Action::Pop => {
@@ -123,14 +124,13 @@ async fn run_loop(
                     }
                     Action::Quit => break,
                     Action::Toast(kind, msg) => {
-                        toast =
-                            Some((Toast { kind, message: msg }, std::time::Instant::now()));
+                        toast = Some((Toast { kind, message: msg }, std::time::Instant::now()));
                     }
                     Action::OpenContextSwitcher => {
                         context_overlay =
                             Some(crate::views::context::ContextOverlay::new(config.clone()));
                     }
-                    Action::SwitchContext(_) => {}
+                    Action::None | Action::SwitchContext(_) => {}
                 }
             }
         }

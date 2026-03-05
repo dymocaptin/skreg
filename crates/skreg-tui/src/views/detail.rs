@@ -1,20 +1,25 @@
 //! Package detail view — split pane with version info and manifest description.
 
+use std::sync::Arc;
+
 use ratatui::crossterm::event::{Event, KeyCode, KeyEvent};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
+    text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
     Frame,
 };
 use skreg_client::client::HttpRegistryClient;
+use skreg_client::installer::Installer;
 use skreg_core::config::CliConfig;
 use skreg_core::manifest::Manifest;
+use skreg_core::package_ref::PackageRef;
 use tokio::sync::oneshot;
 
 use crate::theme::Theme;
 use crate::widgets::{footer::Footer, header::Header};
 
-use super::{Action, View};
+use super::{Action, ToastKind, View};
 
 /// Which pane currently holds keyboard focus in the detail view.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -37,15 +42,31 @@ pub struct DetailState {
     pub selected_version: usize,
 }
 
+impl Default for DetailState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DetailState {
     /// Create a new state with focus on the versions pane.
+    #[must_use]
     pub fn new() -> Self {
-        Self { focus: Pane::Versions, scroll: 0, content_lines: 0, selected_version: 0 }
+        Self {
+            focus: Pane::Versions,
+            scroll: 0,
+            content_lines: 0,
+            selected_version: 0,
+        }
     }
 
     /// Toggle focus between the versions and content panes.
     pub fn toggle_pane(&mut self) {
-        self.focus = if self.focus == Pane::Versions { Pane::SkillMd } else { Pane::Versions };
+        self.focus = if self.focus == Pane::Versions {
+            Pane::SkillMd
+        } else {
+            Pane::Versions
+        };
     }
 
     /// Scroll the content pane down one line, clamped at the last line.
@@ -74,11 +95,16 @@ pub struct PackageDetailView {
     state: DetailState,
     data: Option<DetailData>,
     rx: Option<oneshot::Receiver<Result<DetailData, String>>>,
+    install_rx: Option<oneshot::Receiver<Result<String, String>>>,
+    /// Whether the currently displayed version is locally installed.
+    is_installed: bool,
 }
 
 impl PackageDetailView {
     /// Create a new detail view and begin fetching the given version.
+    #[must_use]
     pub fn new(config: CliConfig, namespace: String, name: String, latest: String) -> Self {
+        let is_installed = Self::check_installed(&namespace, &name, &latest);
         let mut v = Self {
             config,
             namespace,
@@ -86,9 +112,22 @@ impl PackageDetailView {
             state: DetailState::new(),
             data: None,
             rx: None,
+            install_rx: None,
+            is_installed,
         };
         v.fetch(latest);
         v
+    }
+
+    fn check_installed(namespace: &str, name: &str, version: &str) -> bool {
+        let path = dirs::home_dir()
+            .unwrap_or_default()
+            .join(".skreg")
+            .join("packages")
+            .join(namespace)
+            .join(name)
+            .join(version);
+        path.exists()
     }
 
     fn fetch(&mut self, version: String) {
@@ -107,18 +146,72 @@ impl PackageDetailView {
             let _ = tx.send(result);
         });
     }
+
+    fn install(&mut self) {
+        let Some(data) = &self.data else { return };
+        let registry = self.config.registry().to_string();
+        let install_root = dirs::home_dir()
+            .unwrap_or_default()
+            .join(".skreg")
+            .join("packages");
+        let ref_str = format!("{}/{}@{}", self.namespace, self.name, data.manifest.version);
+        let (tx, rx) = oneshot::channel();
+        self.install_rx = Some(rx);
+        tokio::spawn(async move {
+            let client = Arc::new(HttpRegistryClient::new(registry));
+            let installer = Installer::new(client, install_root);
+            let pkg_ref = PackageRef::parse(&ref_str)
+                .unwrap_or_else(|_| PackageRef::parse(&ref_str).unwrap());
+            let result = installer
+                .install(&pkg_ref)
+                .await
+                .map(|p| {
+                    format!(
+                        "{} v{}",
+                        p.pkg_ref.name,
+                        p.pkg_ref
+                            .version
+                            .as_ref()
+                            .map_or_else(|| "?".to_string(), std::string::ToString::to_string),
+                    )
+                })
+                .map_err(|e| e.to_string());
+            let _ = tx.send(result);
+        });
+    }
 }
 
 impl View for PackageDetailView {
-    fn tick(&mut self) {
+    fn tick(&mut self) -> Option<Action> {
         if let Some(rx) = &mut self.rx {
             if let Ok(result) = rx.try_recv() {
                 self.rx = None;
                 if let Ok(data) = result {
+                    // Refresh installed state for this version.
+                    self.is_installed = Self::check_installed(
+                        &self.namespace,
+                        &self.name,
+                        &data.manifest.version.to_string(),
+                    );
                     self.data = Some(data);
                 }
             }
         }
+
+        if let Some(rx) = &mut self.install_rx {
+            if let Ok(result) = rx.try_recv() {
+                self.install_rx = None;
+                return Some(match result {
+                    Ok(label) => {
+                        self.is_installed = true;
+                        Action::Toast(ToastKind::Success, format!("Installed {label}"))
+                    }
+                    Err(e) => Action::Toast(ToastKind::Error, e),
+                });
+            }
+        }
+
+        None
     }
 
     fn render(&mut self, frame: &mut Frame, area: Rect, theme: &Theme) {
@@ -143,7 +236,11 @@ impl View for PackageDetailView {
 
         // Versions pane
         let focused_left = self.state.focus == Pane::Versions;
-        let left_border = if focused_left { theme.selected() } else { theme.border() };
+        let left_border = if focused_left {
+            theme.selected()
+        } else {
+            theme.border()
+        };
         let left_block = Block::default()
             .title(" Versions ")
             .borders(Borders::ALL)
@@ -153,9 +250,20 @@ impl View for PackageDetailView {
 
         if let Some(data) = &self.data {
             let version_str = data.manifest.version.to_string();
-            let prefix =
-                if self.state.selected_version == 0 { "▶ " } else { "  " };
-            let item = ListItem::new(format!("{prefix}{version_str}"));
+            let prefix = if self.state.selected_version == 0 {
+                "▶ "
+            } else {
+                "  "
+            };
+            let installed_span = if self.is_installed {
+                Span::styled(" ●", theme.success())
+            } else {
+                Span::raw("")
+            };
+            let item = ListItem::new(Line::from(vec![
+                Span::raw(format!("{prefix}{version_str}")),
+                installed_span,
+            ]));
             frame.render_widget(List::new(vec![item]), left_inner);
         } else {
             frame.render_widget(Paragraph::new("⠙ Loading..."), left_inner);
@@ -163,7 +271,11 @@ impl View for PackageDetailView {
 
         // Description / SKILL.md pane
         let focused_right = self.state.focus == Pane::SkillMd;
-        let right_border = if focused_right { theme.selected() } else { theme.border() };
+        let right_border = if focused_right {
+            theme.selected()
+        } else {
+            theme.border()
+        };
         let right_block = Block::default()
             .title(" SKILL.md ")
             .borders(Borders::ALL)
@@ -174,11 +286,11 @@ impl View for PackageDetailView {
         if let Some(data) = &self.data {
             let content = format!(
                 "# {}\n\nv{}\n\n{}\n",
-                data.manifest.name,
-                data.manifest.version,
-                data.manifest.description,
+                data.manifest.name, data.manifest.version, data.manifest.description,
             );
-            self.state.content_lines = content.lines().count() as u16;
+            #[allow(clippy::cast_possible_truncation)]
+            let lines = content.lines().count() as u16;
+            self.state.content_lines = lines;
             frame.render_widget(
                 Paragraph::new(content)
                     .scroll((self.state.scroll, 0))
@@ -187,9 +299,14 @@ impl View for PackageDetailView {
             );
         }
 
+        let install_hint = if self.is_installed {
+            "installed"
+        } else {
+            "install"
+        };
         Footer {
             hints: &[
-                ("i", "install"),
+                ("i", install_hint),
                 ("tab", "switch pane"),
                 ("j/k", "scroll"),
                 ("esc", "back"),
@@ -213,6 +330,16 @@ impl View for PackageDetailView {
                 KeyCode::Up | KeyCode::Char('k') if self.state.focus == Pane::SkillMd => {
                     self.state.scroll_up();
                     Action::None
+                }
+                KeyCode::Char('i') => {
+                    if self.is_installed {
+                        Action::Toast(ToastKind::Error, "Already installed".to_string())
+                    } else if self.install_rx.is_none() {
+                        self.install();
+                        Action::Toast(ToastKind::Success, "Installing…".to_string())
+                    } else {
+                        Action::None
+                    }
                 }
                 KeyCode::Char('c') => Action::OpenContextSwitcher,
                 _ => Action::None,

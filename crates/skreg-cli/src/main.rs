@@ -51,7 +51,7 @@ async fn main() -> anyhow::Result<()> {
             skreg_cli::commands::install::run_install(&package_ref).await?;
         }
         Commands::Tui => {
-            skreg_cli::commands::tui::run_tui().await?;
+            skreg_cli::commands::tui::run_tui()?;
         }
     }
     Ok(())

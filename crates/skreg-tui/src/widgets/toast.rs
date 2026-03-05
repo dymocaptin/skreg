@@ -48,8 +48,7 @@ pub fn render_toast(frame: &mut Frame, area: Rect, toast: &Toast, theme: &Theme)
 
     frame.render_widget(Clear, toast_area);
     frame.render_widget(
-        Paragraph::new(text)
-            .block(Block::default().borders(Borders::ALL).border_style(style)),
+        Paragraph::new(text).block(Block::default().borders(Borders::ALL).border_style(style)),
         toast_area,
     );
 }

@@ -19,7 +19,7 @@ pub struct Header<'a> {
     pub breadcrumb: &'a [&'a str],
 }
 
-impl<'a> Header<'a> {
+impl Header<'_> {
     /// Render the header into `area`.
     pub fn render(&self, frame: &mut Frame, area: Rect, theme: &Theme) {
         let crumbs: Vec<Span> = self
@@ -81,7 +81,7 @@ mod tests {
             .buffer()
             .content()
             .iter()
-            .map(|c| c.symbol())
+            .map(ratatui::buffer::Cell::symbol)
             .collect();
         assert!(content.contains("skreg"));
         assert!(content.contains("public"));

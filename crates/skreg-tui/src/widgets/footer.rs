@@ -1,10 +1,10 @@
 //! Footer widget — keybinding hints.
 
 use ratatui::{
+    layout::Rect,
     text::{Line, Span},
     widgets::Paragraph,
     Frame,
-    layout::Rect,
 };
 
 use crate::theme::Theme;
@@ -15,7 +15,7 @@ pub struct Footer<'a> {
     pub hints: &'a [(&'a str, &'a str)],
 }
 
-impl<'a> Footer<'a> {
+impl Footer<'_> {
     /// Render the footer into `area`.
     pub fn render(&self, frame: &mut Frame, area: Rect, theme: &Theme) {
         let spans: Vec<Span> = self
@@ -24,7 +24,7 @@ impl<'a> Footer<'a> {
             .flat_map(|(key, desc)| {
                 vec![
                     Span::styled(format!("<{key}>"), theme.key_hint()),
-                    Span::styled(desc.to_string(), theme.hint_desc()),
+                    Span::styled((*desc).to_string(), theme.hint_desc()),
                     Span::raw("  "),
                 ]
             })

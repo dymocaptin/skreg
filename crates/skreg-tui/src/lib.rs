@@ -18,7 +18,6 @@ use skreg_core::config::CliConfig;
 ///
 /// # Errors
 /// Returns an error if the terminal cannot be initialized or if an I/O error occurs.
-#[allow(clippy::unused_async)]
-pub async fn run(config: CliConfig) -> Result<()> {
-    app::run(config).await
+pub fn run(config: CliConfig) -> Result<()> {
+    app::run(config)
 }

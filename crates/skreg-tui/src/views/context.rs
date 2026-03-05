@@ -25,6 +25,7 @@ pub struct ContextOverlay {
 
 impl ContextOverlay {
     /// Create a new overlay; the initially highlighted entry is the active context.
+    #[must_use]
     pub fn new(config: CliConfig) -> Self {
         let mut names: Vec<String> = config.contexts.keys().cloned().collect();
         names.sort();
@@ -32,16 +33,21 @@ impl ContextOverlay {
             .iter()
             .position(|n| n == &config.active_context)
             .unwrap_or(0);
-        Self { config, names, selected }
+        Self {
+            config,
+            names,
+            selected,
+        }
     }
 
     /// Return the name of the currently selected context.
+    #[must_use]
     pub fn selected_name(&self) -> &str {
         &self.names[self.selected]
     }
 
     /// Handle input events for the overlay.
-    pub fn handle_event(&mut self, event: Event) -> Action {
+    pub fn handle_event(&mut self, event: &Event) -> Action {
         if let Event::Key(KeyEvent { code, .. }) = event {
             match code {
                 KeyCode::Esc => return Action::Pop,
@@ -67,6 +73,7 @@ impl ContextOverlay {
     /// Render the overlay centred over `area`.
     pub fn render(&self, frame: &mut Frame, area: Rect, theme: &Theme) {
         let width: u16 = 48;
+        #[allow(clippy::cast_possible_truncation)]
         let height: u16 = (self.names.len() as u16 + 4).min(area.height.saturating_sub(4));
         let x = area.x + (area.width.saturating_sub(width)) / 2;
         let y = area.y + (area.height.saturating_sub(height)) / 2;
@@ -90,8 +97,11 @@ impl ContextOverlay {
                 let is_active = name == &self.config.active_context;
                 let is_selected = i == self.selected;
                 let prefix = if is_selected { "▶ " } else { "  " };
-                let name_style =
-                    if is_active { theme.accent() } else { theme.muted() };
+                let name_style = if is_active {
+                    theme.accent()
+                } else {
+                    theme.muted()
+                };
                 ListItem::new(Line::from(vec![
                     Span::raw(prefix),
                     Span::styled(format!("{name:<14}"), name_style),
@@ -124,7 +134,10 @@ mod tests {
                 },
             );
         }
-        CliConfig { active_context: active.to_string(), contexts }
+        CliConfig {
+            active_context: active.to_string(),
+            contexts,
+        }
     }
 
     #[test]

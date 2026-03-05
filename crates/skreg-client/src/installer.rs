@@ -60,7 +60,11 @@ impl Installer {
     /// * `install_root` — Base directory for installed packages
     ///   (e.g. `~/.skreg/packages`).
     pub fn new(client: Arc<dyn RegistryClient>, install_root: PathBuf) -> Self {
-        Self { client, install_root, verifier: None }
+        Self {
+            client,
+            install_root,
+            verifier: None,
+        }
     }
 
     /// Attach an optional signature verifier.
@@ -104,7 +108,11 @@ impl Installer {
 
         if let Some(ref verifier) = self.verifier {
             verifier
-                .verify(&digest, &resolved.signature, &resolved.manifest.cert_chain_pem)
+                .verify(
+                    &digest,
+                    &resolved.signature,
+                    &resolved.manifest.cert_chain_pem,
+                )
                 .map_err(|e| InstallError::Crypto(e.to_string()))?;
             debug!("signature verified for {pkg_ref}");
         }
@@ -121,6 +129,11 @@ impl Installer {
 
         info!("installed {} to {}", pkg_ref, install_path.display());
 
-        Ok(InstalledPackage { pkg_ref: pkg_ref.clone(), sha256: digest, signer: SignerKind::Registry, install_path })
+        Ok(InstalledPackage {
+            pkg_ref: pkg_ref.clone(),
+            sha256: digest,
+            signer: SignerKind::Registry,
+            install_path,
+        })
     }
 }
