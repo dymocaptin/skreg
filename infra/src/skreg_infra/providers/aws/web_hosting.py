@@ -152,30 +152,30 @@ class AwsWebHosting(pulumi.ComponentResource):
             opts=pulumi.ResourceOptions(parent=self),
         )
 
-        bucket_policy = distribution.arn.apply(
-            lambda dist_arn: bucket.arn.apply(
-                lambda bucket_arn: aws.iam.get_policy_document(
-                    statements=[
-                        aws.iam.GetPolicyDocumentStatementArgs(
-                            principals=[
-                                aws.iam.GetPolicyDocumentStatementPrincipalArgs(
-                                    type="Service",
-                                    identifiers=["cloudfront.amazonaws.com"],
-                                )
-                            ],
-                            actions=["s3:GetObject"],
-                            resources=[f"{bucket_arn}/*"],
-                            conditions=[
-                                aws.iam.GetPolicyDocumentStatementConditionArgs(
-                                    test="StringEquals",
-                                    variable="AWS:SourceArn",
-                                    values=[dist_arn],
-                                )
-                            ],
-                        )
-                    ]
-                ).json
-            )
+        bucket_policy: pulumi.Output[str] = pulumi.Output.all(
+            dist_arn=distribution.arn, bucket_arn=bucket.arn
+        ).apply(
+            lambda args: aws.iam.get_policy_document(
+                statements=[
+                    aws.iam.GetPolicyDocumentStatementArgs(
+                        principals=[
+                            aws.iam.GetPolicyDocumentStatementPrincipalArgs(
+                                type="Service",
+                                identifiers=["cloudfront.amazonaws.com"],
+                            )
+                        ],
+                        actions=["s3:GetObject"],
+                        resources=[f"{args['bucket_arn']}/*"],
+                        conditions=[
+                            aws.iam.GetPolicyDocumentStatementConditionArgs(
+                                test="StringEquals",
+                                variable="AWS:SourceArn",
+                                values=[args["dist_arn"]],
+                            )
+                        ],
+                    )
+                ]
+            ).json
         )
 
         aws.s3.BucketPolicy(
