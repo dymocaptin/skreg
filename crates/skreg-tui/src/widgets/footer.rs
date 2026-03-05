@@ -1,0 +1,34 @@
+//! Footer widget — keybinding hints.
+
+use ratatui::{
+    layout::Rect,
+    text::{Line, Span},
+    widgets::Paragraph,
+    Frame,
+};
+
+use crate::theme::Theme;
+
+/// Renders the single-row footer bar with keybinding hints.
+pub struct Footer<'a> {
+    /// Pairs of `(key, description)` shown as `<key>description`.
+    pub hints: &'a [(&'a str, &'a str)],
+}
+
+impl Footer<'_> {
+    /// Render the footer into `area`.
+    pub fn render(&self, frame: &mut Frame, area: Rect, theme: &Theme) {
+        let spans: Vec<Span> = self
+            .hints
+            .iter()
+            .flat_map(|(key, desc)| {
+                vec![
+                    Span::styled(format!("<{key}>"), theme.key_hint()),
+                    Span::styled((*desc).to_string(), theme.hint_desc()),
+                    Span::raw("  "),
+                ]
+            })
+            .collect();
+        frame.render_widget(Paragraph::new(Line::from(spans)), area);
+    }
+}

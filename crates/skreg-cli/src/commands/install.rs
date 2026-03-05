@@ -34,7 +34,7 @@ pub async fn run_install(package_ref: &str) -> Result<()> {
     let cfg =
         load_config(&cfg_path).context("not logged in — run `skreg login <namespace>` first")?;
 
-    let client = Arc::new(HttpRegistryClient::new(&cfg.registry));
+    let client = Arc::new(HttpRegistryClient::new(cfg.registry()));
     let verifier = Arc::new(RsaPkcs1Verifier::new());
     let install_root = default_install_root()?;
 

@@ -26,6 +26,8 @@ enum Commands {
         #[arg(value_name = "PACKAGE")]
         package_ref: String,
     },
+    /// Launch the interactive terminal UI
+    Tui,
 }
 
 #[tokio::main]
@@ -47,6 +49,9 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::Install { package_ref } => {
             skreg_cli::commands::install::run_install(&package_ref).await?;
+        }
+        Commands::Tui => {
+            skreg_cli::commands::tui::run_tui()?;
         }
     }
     Ok(())
