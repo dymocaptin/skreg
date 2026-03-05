@@ -1,0 +1,32 @@
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 0.3rem 1rem;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.key {
+  color: var(--text);
+  font-weight: 700;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  font-style: normal;
+}
+
+.filter {
+  color: var(--accent);
+  margin-left: 0.5rem;
+}
