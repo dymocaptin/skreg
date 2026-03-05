@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { searchPackages } from '../../api.js'
 import PackageCard from '../PackageCard/PackageCard.jsx'
 import styles from './PackageGrid.module.css'
@@ -10,17 +10,22 @@ export default function PackageGrid({ query, category }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
 
+  const fetchSeqRef = useRef(0)
+
   const fetchPage = useCallback(async (q, cat, pg, append = false) => {
+    const seq = ++fetchSeqRef.current
     setLoading(true)
     setError(null)
     try {
       const data = await searchPackages({ query: q, category: cat, page: pg })
+      if (seq !== fetchSeqRef.current) return // discard stale response
       setPackages(prev => append ? [...prev, ...data.packages] : data.packages)
       setTotal(data.total)
     } catch (err) {
+      if (seq !== fetchSeqRef.current) return
       setError(err.message)
     } finally {
-      setLoading(false)
+      if (seq === fetchSeqRef.current) setLoading(false)
     }
   }, [])
 
