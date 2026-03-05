@@ -13,6 +13,7 @@ from skreg_infra.providers.aws.database import AwsDatabase, AwsDatabaseArgs
 from skreg_infra.providers.aws.network import AwsNetwork
 from skreg_infra.providers.aws.pki import AwsPki, AwsPkiArgs
 from skreg_infra.providers.aws.storage import AwsStorage
+from skreg_infra.providers.aws.web_hosting import AwsWebHosting
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -51,6 +52,7 @@ class SkregStack:
                 multi_az=config.multi_az,
             ),
         )
+        web_hosting = AwsWebHosting("skreg-web")
         compute = AwsCompute(
             "skreg-compute",
             AwsComputeArgs(
@@ -83,6 +85,7 @@ class SkregStack:
         pulumi.export("root_ca_cert", pki.root_ca_cert_pem)
         pulumi.export("ecr_api_repo", compute.ecr_api_repo)
         pulumi.export("ecr_worker_repo", compute.ecr_worker_repo)
+        pulumi.export("web_cdn_url", web_hosting.outputs.cdn_url)
 
 
 if __name__ == "__main__":
