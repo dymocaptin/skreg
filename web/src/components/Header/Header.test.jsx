@@ -25,7 +25,7 @@ describe('Header', () => {
 
   it('renders theme toggle button', () => {
     render(<Header query="" onQueryChange={() => {}} theme="dark" onThemeToggle={() => {}} />)
-    expect(screen.getByRole('button', { name: /theme/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /switch to light mode/i })).toBeInTheDocument()
   })
 
   it('calls onThemeToggle when toggle clicked', async () => {
@@ -33,7 +33,15 @@ describe('Header', () => {
     const onToggle = vi.fn()
     render(<Header query="" onQueryChange={() => {}} theme="dark" onThemeToggle={onToggle} />)
 
-    await user.click(screen.getByRole('button', { name: /theme/i }))
+    await user.click(screen.getByRole('button', { name: /switch to light mode/i }))
     expect(onToggle).toHaveBeenCalled()
+  })
+
+  it('shows sun icon in dark theme and moon icon in light theme', () => {
+    const { rerender } = render(<Header query="" onQueryChange={() => {}} theme="dark" onThemeToggle={() => {}} />)
+    expect(screen.getByRole('button').textContent).toContain('☀️')
+
+    rerender(<Header query="" onQueryChange={() => {}} theme="light" onThemeToggle={() => {}} />)
+    expect(screen.getByRole('button').textContent).toContain('🌙')
   })
 })
