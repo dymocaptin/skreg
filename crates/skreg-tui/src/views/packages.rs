@@ -9,8 +9,12 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Row, Table, TableState as RatatuiTableState},
     Frame,
 };
+use std::sync::Arc;
+
 use skreg_client::client::{HttpRegistryClient, RegistryClient, SearchResult};
+use skreg_client::installer::Installer;
 use skreg_core::config::CliConfig;
+use skreg_core::package_ref::PackageRef;
 use tokio::sync::oneshot;
 
 use crate::theme::Theme;
@@ -82,6 +86,10 @@ pub struct PackageListView {
     search_input: String,
     /// When the search input last changed (used for debouncing).
     search_changed_at: Option<Instant>,
+    /// In-flight install result: `Ok(label)` on success, `Err(msg)` on failure.
+    install_rx: Option<oneshot::Receiver<Result<String, String>>>,
+    /// Toast to emit on the next event dispatch (set by tick when install completes).
+    pending_action: Option<Action>,
 }
 
 impl PackageListView {
@@ -96,9 +104,31 @@ impl PackageListView {
             searching: false,
             search_input: String::new(),
             search_changed_at: None,
+            install_rx: None,
+            pending_action: None,
         };
         v.fetch();
         v
+    }
+
+    fn install_selected(&mut self, namespace: String, name: String, version: String) {
+        let registry = self.config.registry().to_string();
+        let install_root =
+            dirs::home_dir().unwrap_or_default().join(".skreg").join("packages");
+        let (tx, rx) = oneshot::channel();
+        self.install_rx = Some(rx);
+        tokio::spawn(async move {
+            let client = Arc::new(HttpRegistryClient::new(registry));
+            let installer = Installer::new(client, install_root);
+            let pkg_ref = PackageRef::parse(&format!("{namespace}/{name}@{version}"))
+                .unwrap_or_else(|_| PackageRef::parse(&format!("{namespace}/{name}")).unwrap());
+            let result = installer
+                .install(&pkg_ref)
+                .await
+                .map(|p| format!("{} v{}", p.pkg_ref.name, p.pkg_ref.version.as_ref().map_or_else(|| "?".to_string(), |v| v.to_string())))
+                .map_err(|e| e.to_string());
+            let _ = tx.send(result);
+        });
     }
 
     fn fetch(&mut self) {
@@ -156,6 +186,16 @@ impl View for PackageListView {
                         self.load = Load::Error(e);
                     }
                 }
+            }
+        }
+
+        if let Some(rx) = &mut self.install_rx {
+            if let Ok(result) = rx.try_recv() {
+                self.install_rx = None;
+                self.pending_action = Some(match result {
+                    Ok(label) => Action::Toast(ToastKind::Success, format!("Installed {label}")),
+                    Err(e) => Action::Toast(ToastKind::Error, e),
+                });
             }
         }
     }
@@ -301,6 +341,11 @@ impl View for PackageListView {
     }
 
     fn handle_event(&mut self, event: Event) -> Action {
+        // Drain any action queued by tick() (e.g. install completion toast).
+        if let Some(action) = self.pending_action.take() {
+            return action;
+        }
+
         if self.searching {
             return self.handle_search_event(event);
         }
@@ -347,10 +392,13 @@ impl View for PackageListView {
                 KeyCode::Char('c') => Action::OpenContextSwitcher,
                 KeyCode::Char('i') => {
                     if let Some(p) = self.state.selected_item() {
-                        Action::Toast(
-                            ToastKind::Success,
-                            format!("Installing {}/{}...", p.namespace, p.name),
-                        )
+                        let (ns, name, ver) = (
+                            p.namespace.clone(),
+                            p.name.clone(),
+                            p.latest_version.clone().unwrap_or_default(),
+                        );
+                        self.install_selected(ns, name, ver);
+                        Action::Toast(ToastKind::Success, "Installing…".to_string())
                     } else {
                         Action::None
                     }
