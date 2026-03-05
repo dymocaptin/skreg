@@ -2,3 +2,4 @@
 target/
 docs/plans/
 infra/Pulumi.*.yaml
+web/node_modules/
