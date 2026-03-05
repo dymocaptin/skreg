@@ -6,9 +6,10 @@ use ratatui::crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
     text::{Line, Span},
-    widgets::{Block, Borders, Paragraph, Row, Table, TableState as RatatuiTableState},
+    widgets::{Block, Borders, Cell, Paragraph, Row, Table, TableState as RatatuiTableState},
     Frame,
 };
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use skreg_client::client::{HttpRegistryClient, RegistryClient, SearchResult};
@@ -16,6 +17,8 @@ use skreg_client::installer::Installer;
 use skreg_core::config::CliConfig;
 use skreg_core::package_ref::PackageRef;
 use tokio::sync::oneshot;
+
+use super::installed::scan_installed;
 
 use crate::theme::Theme;
 use crate::widgets::{footer::Footer, header::Header};
@@ -90,6 +93,8 @@ pub struct PackageListView {
     install_rx: Option<oneshot::Receiver<Result<String, String>>>,
     /// Toast to emit on the next event dispatch (set by tick when install completes).
     pending_action: Option<Action>,
+    /// Set of `"namespace/name"` keys that are currently installed locally.
+    installed: HashSet<String>,
 }
 
 impl PackageListView {
@@ -106,9 +111,19 @@ impl PackageListView {
             search_changed_at: None,
             install_rx: None,
             pending_action: None,
+            installed: Self::scan_installed_set(),
         };
         v.fetch();
         v
+    }
+
+    fn scan_installed_set() -> HashSet<String> {
+        let base = dirs::home_dir().unwrap_or_default().join(".skreg").join("packages");
+        scan_installed(&base)
+            .unwrap_or_default()
+            .into_iter()
+            .map(|p| format!("{}/{}", p.namespace, p.name))
+            .collect()
     }
 
     fn install_selected(&mut self, namespace: String, name: String, version: String) {
@@ -193,7 +208,10 @@ impl View for PackageListView {
             if let Ok(result) = rx.try_recv() {
                 self.install_rx = None;
                 self.pending_action = Some(match result {
-                    Ok(label) => Action::Toast(ToastKind::Success, format!("Installed {label}")),
+                    Ok(label) => {
+                        self.installed = Self::scan_installed_set();
+                        Action::Toast(ToastKind::Success, format!("Installed {label}"))
+                    }
                     Err(e) => Action::Toast(ToastKind::Error, e),
                 });
             }
@@ -282,11 +300,20 @@ impl View for PackageListView {
                         } else {
                             desc.to_string()
                         };
+                        let key = format!("{}/{}", p.namespace, p.name);
+                        let name_cell = if self.installed.contains(&key) {
+                            Cell::from(Line::from(vec![
+                                Span::raw(p.name.clone()),
+                                Span::styled(" ●", theme.success()),
+                            ]))
+                        } else {
+                            Cell::from(p.name.clone())
+                        };
                         Row::new(vec![
-                            p.name.clone(),
-                            p.namespace.clone(),
-                            p.latest_version.clone().unwrap_or_default(),
-                            desc_truncated,
+                            name_cell,
+                            Cell::from(p.namespace.clone()),
+                            Cell::from(p.latest_version.clone().unwrap_or_default()),
+                            Cell::from(desc_truncated),
                         ])
                     })
                     .collect();
