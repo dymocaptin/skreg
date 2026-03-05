@@ -49,6 +49,20 @@ describe('PackageCard', () => {
     expect(writeText).toHaveBeenCalledWith('skreg install dymocaptin/color-analysis')
   })
 
+  it('does not show Copied! when clipboard write fails', async () => {
+    const user = userEvent.setup()
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText: vi.fn().mockRejectedValue(new Error('Permission denied')) },
+      writable: true,
+      configurable: true,
+    })
+
+    render(<PackageCard pkg={PKG} />)
+    await user.click(screen.getByRole('button', { name: /copy install command/i }))
+
+    expect(screen.queryByText('Copied!')).not.toBeInTheDocument()
+  })
+
   it('shows Copied! text after copy', async () => {
     vi.useFakeTimers()
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })

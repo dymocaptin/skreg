@@ -6,9 +6,14 @@ export default function PackageCard({ pkg }) {
   const installCmd = `skreg install ${pkg.namespace}/${pkg.name}`
 
   async function handleCopy() {
-    await navigator.clipboard.writeText(installCmd)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 1500)
+    try {
+      await navigator.clipboard.writeText(installCmd)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      // Clipboard write failed (e.g. permissions denied) — silently ignore
+      // The button label stays as "$ copy" giving the user no false confirmation
+    }
   }
 
   const date = new Date(pkg.created_at).toLocaleDateString('en-US', {
