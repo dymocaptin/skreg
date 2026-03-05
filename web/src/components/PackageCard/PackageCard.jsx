@@ -16,22 +16,13 @@ export default function PackageCard({ pkg }) {
     }
   }
 
-  const date = new Date(pkg.created_at).toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  })
-
   return (
-    <article className={styles.card}>
-      <div className={styles.top}>
-        <span className={styles.ref}>{pkg.namespace}/{pkg.name}</span>
-        <span className={styles.badge}>{pkg.category}</span>
-      </div>
-      <p className={styles.desc}>{pkg.description}</p>
-      <div className={styles.bottom}>
-        <span className={styles.version}>v{pkg.latest_version}</span>
-        <span className={styles.date}>{date}</span>
+    <tr className={styles.row}>
+      <td className={styles.name}>{pkg.name}</td>
+      <td className={styles.namespace}>{pkg.namespace}</td>
+      <td className={styles.version}>v{pkg.latest_version}</td>
+      <td className={styles.desc}>{pkg.description}</td>
+      <td className={styles.actions}>
         <button
           className={styles.copy}
           onClick={handleCopy}
@@ -39,7 +30,7 @@ export default function PackageCard({ pkg }) {
         >
           {copied ? 'Copied!' : '$ copy'}
         </button>
-      </div>
-    </article>
+      </td>
+    </tr>
   )
 }

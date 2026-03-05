@@ -1,11 +1,26 @@
 .section {
-  padding: 1.5rem;
+  padding: 1.5rem 0;
 }
 
-.grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 1rem;
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--font-mono);
+}
+
+.th {
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: 0.05em;
+  padding: 0.5rem 1rem 0.5rem 1.5rem;
+  border-bottom: 1px solid var(--accent);
+  white-space: nowrap;
+}
+
+.th:last-child {
+  padding-right: 1.5rem;
 }
 
 .message {
@@ -13,17 +28,18 @@
   color: var(--text-muted);
   padding: 3rem 0;
   font-size: 0.9rem;
+  font-family: var(--font-mono);
 }
 
 .loadMore {
   display: block;
-  margin: 2rem auto 0;
-  padding: 0.6rem 2rem;
+  margin: 1.5rem auto 0;
+  padding: 0.5rem 2rem;
   background: none;
   border: 1px solid var(--border);
-  border-radius: 6px;
   color: var(--text-muted);
-  font-size: 0.85rem;
+  font-size: 0.8rem;
+  font-family: var(--font-mono);
   cursor: pointer;
   transition: color 0.15s, border-color 0.15s;
 }

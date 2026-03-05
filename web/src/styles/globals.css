@@ -5,7 +5,8 @@
   --border: #2e2e2e;
   --text: #e8e8e8;
   --text-muted: #888888;
-  --accent: #00d4aa;
+  --accent: #00d4d4;   /* TUI primary: cyan — focus, hover, selection */
+  --yellow: #c8a800;   /* TUI accent: yellow — versions, highlights */
   --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
 }
@@ -16,7 +17,8 @@
   --border: #e0e0e0;
   --text: #111111;
   --text-muted: #666666;
-  --accent: #007a63;
+  --accent: #007a7a;
+  --yellow: #7a5c00;
 }
 
 /* Reset */

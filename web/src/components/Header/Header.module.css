@@ -14,7 +14,7 @@
   font-family: var(--font-mono);
   font-size: 1.25rem;
   font-weight: 700;
-  color: var(--accent);
+  color: var(--text);
   letter-spacing: -0.02em;
   flex-shrink: 0;
 }

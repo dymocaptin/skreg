@@ -50,9 +50,20 @@ export default function PackageGrid({ query, category }) {
         <p className={styles.message}>Loading…</p>
       ) : (
         <>
-          <div className={styles.grid}>
-            {packages.map(pkg => <PackageCard key={pkg.id} pkg={pkg} />)}
-          </div>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th className={styles.th}>NAME</th>
+                <th className={styles.th}>NAMESPACE</th>
+                <th className={styles.th}>VERSION</th>
+                <th className={styles.th}>DESCRIPTION</th>
+                <th className={styles.th}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {packages.map(pkg => <PackageCard key={pkg.id} pkg={pkg} />)}
+            </tbody>
+          </table>
           {packages.length < total && (
             <button
               className={styles.loadMore}

@@ -28,8 +28,8 @@ describe('PackageGrid', () => {
     render(<PackageGrid query="" category="" />)
 
     await waitFor(() => {
-      expect(screen.getByText('ns/alpha')).toBeInTheDocument()
-      expect(screen.getByText('ns/beta')).toBeInTheDocument()
+      expect(screen.getByText('alpha')).toBeInTheDocument()
+      expect(screen.getByText('beta')).toBeInTheDocument()
     })
   })
 

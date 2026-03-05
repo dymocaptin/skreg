@@ -13,25 +13,24 @@ const PKG = {
   created_at: '2026-02-20T00:00:00Z',
 }
 
+// PackageCard renders a <tr> so it needs a table context
+const wrapper = ({ children }) => <table><tbody>{children}</tbody></table>
+
 describe('PackageCard', () => {
-  it('renders namespace/name', () => {
-    render(<PackageCard pkg={PKG} />)
-    expect(screen.getByText('dymocaptin/color-analysis')).toBeInTheDocument()
+  it('renders name and namespace in separate columns', () => {
+    render(<PackageCard pkg={PKG} />, { wrapper })
+    expect(screen.getByText('color-analysis')).toBeInTheDocument()
+    expect(screen.getByText('dymocaptin')).toBeInTheDocument()
   })
 
   it('renders description', () => {
-    render(<PackageCard pkg={PKG} />)
+    render(<PackageCard pkg={PKG} />, { wrapper })
     expect(screen.getByText('Analyzes dominant colors in images.')).toBeInTheDocument()
   })
 
   it('renders version', () => {
-    render(<PackageCard pkg={PKG} />)
+    render(<PackageCard pkg={PKG} />, { wrapper })
     expect(screen.getByText('v1.0.1')).toBeInTheDocument()
-  })
-
-  it('renders category badge', () => {
-    render(<PackageCard pkg={PKG} />)
-    expect(screen.getByText('tools')).toBeInTheDocument()
   })
 
   it('copies install command to clipboard on button click', async () => {
@@ -43,7 +42,7 @@ describe('PackageCard', () => {
       configurable: true,
     })
 
-    render(<PackageCard pkg={PKG} />)
+    render(<PackageCard pkg={PKG} />, { wrapper })
     await user.click(screen.getByRole('button', { name: /copy install command/i }))
 
     expect(writeText).toHaveBeenCalledWith('skreg install dymocaptin/color-analysis')
@@ -57,7 +56,7 @@ describe('PackageCard', () => {
       configurable: true,
     })
 
-    render(<PackageCard pkg={PKG} />)
+    render(<PackageCard pkg={PKG} />, { wrapper })
     await user.click(screen.getByRole('button', { name: /copy install command/i }))
 
     expect(screen.queryByText('Copied!')).not.toBeInTheDocument()
@@ -72,7 +71,7 @@ describe('PackageCard', () => {
       configurable: true,
     })
 
-    render(<PackageCard pkg={PKG} />)
+    render(<PackageCard pkg={PKG} />, { wrapper })
     await user.click(screen.getByRole('button', { name: /copy install command/i }))
 
     expect(screen.getByRole('button', { name: /copy install command/i }).textContent).toContain('Copied!')
