@@ -22,6 +22,10 @@ pub fn run_uninstall_with_root(package_ref: &str, install_root: &Path) -> Result
     let pkg_ref = PackageRef::parse(package_ref)
         .with_context(|| format!("invalid package reference: {package_ref:?}"))?;
 
+    if pkg_ref.version.is_some() {
+        anyhow::bail!("version suffix not supported for uninstall — use 'namespace/name'");
+    }
+
     let name_dir = install_root
         .join(pkg_ref.namespace.as_str())
         .join(pkg_ref.name.as_str());
@@ -30,22 +34,27 @@ pub fn run_uninstall_with_root(package_ref: &str, install_root: &Path) -> Result
         anyhow::bail!("{pkg_ref} is not installed");
     }
 
-    // Find the single version directory
-    let version_dir = std::fs::read_dir(&name_dir)
+    // Collect all version directories
+    let version_dirs: Vec<_> = std::fs::read_dir(&name_dir)
         .with_context(|| format!("failed to read {}", name_dir.display()))?
         .filter_map(std::result::Result::ok)
-        .find(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
-        .map(|e| e.path())
-        .ok_or_else(|| anyhow::anyhow!("{pkg_ref} is not installed"))?;
+        .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
+        .collect();
 
-    let version = version_dir
+    if version_dirs.is_empty() {
+        anyhow::bail!("{pkg_ref} is not installed");
+    }
+
+    // Use the first (and normally only) version for the success message
+    let version = version_dirs[0]
         .file_name()
-        .unwrap_or_default()
         .to_string_lossy()
         .into_owned();
 
-    std::fs::remove_dir_all(&version_dir)
-        .with_context(|| format!("failed to remove {}", version_dir.display()))?;
+    for entry in &version_dirs {
+        std::fs::remove_dir_all(entry.path())
+            .with_context(|| format!("failed to remove {}", entry.path().display()))?;
+    }
 
     // Best-effort cleanup of empty parent dirs
     if std::fs::read_dir(&name_dir)
@@ -132,5 +141,16 @@ mod tests {
         let tmp = TempDir::new().unwrap();
         let result = run_uninstall_with_root("notavalidref", tmp.path());
         assert!(result.is_err());
+    }
+
+    #[test]
+    fn uninstall_errors_when_name_dir_empty() {
+        let tmp = TempDir::new().unwrap();
+        // Create name dir but no version subdir inside
+        std::fs::create_dir_all(tmp.path().join("acme").join("my-skill")).unwrap();
+        let result = run_uninstall_with_root("acme/my-skill", tmp.path());
+        assert!(result.is_err());
+        let msg = result.unwrap_err().to_string();
+        assert!(msg.contains("not installed"), "error was: {msg}");
     }
 }
