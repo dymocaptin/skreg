@@ -7,6 +7,12 @@ description = "A command line tool for manging AI skills which are verified and 
 license = "Apache 2.0"
 authors = ["dymocaptin"]
 
+[package.metadata.wix]
+upgrade-guid = "E922C0E3-3385-458F-8D8E-C98989F89246"
+path-guid = "81761CDC-7CCD-4CE2-BA99-0BBA8216CF39"
+license = false
+eula = false
+
 [[bin]]
 name = "skreg"
 path = "src/main.rs"

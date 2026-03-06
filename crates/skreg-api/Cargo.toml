@@ -2,6 +2,16 @@
 name    = "skreg-api"
 version = "0.1.0"
 edition = "2021"
+repository = "https://github.com/dymocaptin/skreg"
+description = "The api which supports Skreg skills and package management"
+license = "Apache 2.0"
+authors = ["dymocaptin"]
+
+[package.metadata.wix]
+upgrade-guid = "2D2C1434-5ED4-4EEC-9555-6ACD6F161133"
+path-guid = "42C9CDED-0841-42BE-993C-DE9A0C99DB01"
+license = false
+eula = false
 
 [[bin]]
 name = "skreg-api"

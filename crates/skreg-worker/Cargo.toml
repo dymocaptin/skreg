@@ -2,6 +2,16 @@
 name    = "skreg-worker"
 version = "0.1.0"
 edition = "2021"
+repository = "https://github.com/dymocaptin/skreg"
+description = "The background vetting and signing pipeline for Skreg"
+license = "Apache 2.0"
+authors = ["dymocaptin"]
+
+[package.metadata.wix]
+upgrade-guid = "CB28A81E-BABC-4453-AA9D-8AF19BD3A72C"
+path-guid = "B019CB58-2626-4142-BF09-DFBB1B23AE5C"
+license = false
+eula = false
 
 [[bin]]
 name = "skreg-worker"
