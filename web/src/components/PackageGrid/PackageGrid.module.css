@@ -109,3 +109,17 @@
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent);
   border-color: var(--accent);
 }
+
+.body {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.tablePane {
+  flex: 0 0 55%;
+  overflow-y: auto;
+  min-height: 0;
+}
