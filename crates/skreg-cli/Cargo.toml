@@ -2,6 +2,9 @@
 name    = "skreg-cli"
 version = "0.1.0"
 edition = "2021"
+repository = "https://github.com/dymocaptin/skreg"
+description = "A command line tool for manging AI skills which are verified and trusted"
+license = "Apache 2.0"
 
 [[bin]]
 name = "skreg"
