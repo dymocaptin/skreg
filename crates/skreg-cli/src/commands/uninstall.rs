@@ -46,10 +46,7 @@ pub fn run_uninstall_with_root(package_ref: &str, install_root: &Path) -> Result
     }
 
     // Use the first (and normally only) version for the success message
-    let version = version_dirs[0]
-        .file_name()
-        .to_string_lossy()
-        .into_owned();
+    let version = version_dirs[0].file_name().to_string_lossy().into_owned();
 
     for entry in &version_dirs {
         std::fs::remove_dir_all(entry.path())
