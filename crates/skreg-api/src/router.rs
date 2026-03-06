@@ -47,10 +47,18 @@ struct HealthResponse {
 }
 
 /// Build the Axum application router.
+///
+/// # Panics
+///
+/// Panics if the hard-coded `skreg.ai` origin cannot be parsed as an HTTP
+/// header value (this should never happen in practice).
 pub fn build_router(state: AppState) -> Router {
     let shared = Arc::new(state);
+    let origin: HeaderValue = "https://skreg.ai"
+        .parse()
+        .expect("skreg.ai is a valid header value");
     let cors = CorsLayer::new()
-        .allow_origin("https://skreg.ai".parse::<HeaderValue>().unwrap())
+        .allow_origin(origin)
         .allow_methods(AllowMethods::mirror_request())
         .allow_headers(AllowHeaders::mirror_request());
     Router::new()
