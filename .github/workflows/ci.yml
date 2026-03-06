@@ -284,8 +284,9 @@ jobs:
 
   create-release:
     name: Create GitHub Release
-    needs: [publish-cli]
+    needs: [publish-cli, changes]
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.changes.outputs.rust == 'true'
     permissions:
       contents: write
     steps:
@@ -296,6 +297,7 @@ jobs:
           merge-multiple: true
 
       - name: Create GitHub release
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
@@ -303,8 +305,12 @@ jobs:
           SHA="${{ github.sha }}"
           SHORT_SHA="${SHA:0:7}"
           TAG="main-${SHORT_SHA}"
-          gh release create "$TAG" \
-            --title "$TAG" \
-            --prerelease \
-            --notes "Automated CLI build from [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})" \
-            skreg-*.tar.gz
+          if gh release view "$TAG" &>/dev/null; then
+            gh release upload "$TAG" skreg-*.tar.gz --clobber
+          else
+            gh release create "$TAG" \
+              --title "$TAG" \
+              --prerelease \
+              --notes "Automated CLI build from [${{ github.sha }}](https://github.com/${{ github.repository }}/commit/${{ github.sha }})" \
+              skreg-*.tar.gz
+          fi

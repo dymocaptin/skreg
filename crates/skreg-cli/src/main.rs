@@ -28,6 +28,12 @@ enum Commands {
     },
     /// Launch the interactive terminal UI
     Tui,
+    /// Remove an installed skill
+    Uninstall {
+        /// Package reference (namespace/name)
+        #[arg(value_name = "PACKAGE")]
+        package_ref: String,
+    },
 }
 
 #[tokio::main]
@@ -52,6 +58,9 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::Tui => {
             skreg_cli::commands::tui::run_tui()?;
+        }
+        Commands::Uninstall { package_ref } => {
+            skreg_cli::commands::uninstall::run_uninstall(&package_ref)?;
         }
     }
     Ok(())

@@ -1,6 +1,6 @@
 //! Orchestrates the full package install pipeline.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use log::{debug, info};
@@ -47,6 +47,23 @@ pub struct Installer {
     client: Arc<dyn RegistryClient>,
     install_root: PathBuf,
     verifier: Option<Arc<dyn SignatureVerifier>>,
+}
+
+/// Remove all version subdirectories under `name_dir`, enforcing the
+/// single-version constraint. No-op if `name_dir` does not exist.
+fn clear_existing_versions(name_dir: &Path) -> std::io::Result<()> {
+    if !name_dir.exists() {
+        return Ok(());
+    }
+    for entry in std::fs::read_dir(name_dir)? {
+        let entry = entry?;
+        if entry.file_type()?.is_dir() {
+            std::fs::remove_dir_all(entry.path())?;
+        } else {
+            std::fs::remove_file(entry.path())?;
+        }
+    }
+    Ok(())
 }
 
 impl Installer {
@@ -118,11 +135,13 @@ impl Installer {
             debug!("signature verified for {pkg_ref}");
         }
 
-        let install_path = self
+        let name_dir = self
             .install_root
             .join(resolved.manifest.namespace.as_str())
-            .join(resolved.manifest.name.as_str())
-            .join(resolved.manifest.version.to_string());
+            .join(resolved.manifest.name.as_str());
+        clear_existing_versions(&name_dir)?;
+
+        let install_path = name_dir.join(resolved.manifest.version.to_string());
 
         // Write tarball to temp file then unpack
         let tmp = tempfile::NamedTempFile::new()?;
@@ -137,5 +156,49 @@ impl Installer {
             signer: SignerKind::Registry,
             install_path,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    #[test]
+    fn clear_existing_versions_removes_old_version_dirs() {
+        let tmp = TempDir::new().unwrap();
+        let name_dir = tmp.path().join("acme").join("my-skill");
+        // Simulate an old installed version with a file inside
+        let old_version = name_dir.join("1.0.0");
+        std::fs::create_dir_all(old_version.join("subdir")).unwrap();
+
+        clear_existing_versions(&name_dir).unwrap();
+
+        // Version dir should be gone
+        assert!(!old_version.exists());
+        // name_dir itself should still exist (we only remove children)
+        assert!(name_dir.exists());
+    }
+
+    #[test]
+    fn clear_existing_versions_is_noop_when_dir_absent() {
+        let tmp = TempDir::new().unwrap();
+        let name_dir = tmp.path().join("acme").join("my-skill");
+        // Should not error even if name_dir doesn't exist
+        clear_existing_versions(&name_dir).unwrap();
+    }
+
+    #[test]
+    fn clear_existing_versions_removes_multiple_version_dirs() {
+        let tmp = TempDir::new().unwrap();
+        let name_dir = tmp.path().join("acme").join("my-skill");
+        std::fs::create_dir_all(name_dir.join("1.0.0")).unwrap();
+        std::fs::create_dir_all(name_dir.join("2.0.0")).unwrap();
+
+        clear_existing_versions(&name_dir).unwrap();
+
+        assert!(!name_dir.join("1.0.0").exists());
+        assert!(!name_dir.join("2.0.0").exists());
+        assert!(name_dir.exists());
     }
 }
