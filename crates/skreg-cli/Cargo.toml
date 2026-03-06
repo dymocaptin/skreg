@@ -6,6 +6,7 @@ repository = "https://github.com/dymocaptin/skreg"
 description = "A command line tool for manging AI skills which are verified and trusted"
 license = "Apache 2.0"
 authors = ["dymocaptin"]
+homepage = "https://skreg.ai"
 
 [package.metadata.wix]
 upgrade-guid = "E922C0E3-3385-458F-8D8E-C98989F89246"

@@ -6,6 +6,7 @@ repository = "https://github.com/dymocaptin/skreg"
 description = "The background vetting and signing pipeline for Skreg"
 license = "Apache 2.0"
 authors = ["dymocaptin"]
+homepage = "https://skreg.ai"
 
 [package.metadata.wix]
 upgrade-guid = "CB28A81E-BABC-4453-AA9D-8AF19BD3A72C"
