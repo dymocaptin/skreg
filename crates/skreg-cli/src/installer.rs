@@ -1,6 +1,6 @@
 //! Orchestrates the full package install pipeline.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use log::{debug, info};
@@ -51,14 +51,16 @@ pub struct Installer {
 
 /// Remove all version subdirectories under `name_dir`, enforcing the
 /// single-version constraint. No-op if `name_dir` does not exist.
-fn clear_existing_versions(name_dir: &std::path::Path) -> std::io::Result<()> {
+fn clear_existing_versions(name_dir: &Path) -> std::io::Result<()> {
     if !name_dir.exists() {
         return Ok(());
     }
     for entry in std::fs::read_dir(name_dir)? {
         let entry = entry?;
-        if entry.path().is_dir() {
+        if entry.file_type()?.is_dir() {
             std::fs::remove_dir_all(entry.path())?;
+        } else {
+            std::fs::remove_file(entry.path())?;
         }
     }
     Ok(())
@@ -184,5 +186,19 @@ mod tests {
         let name_dir = tmp.path().join("acme").join("my-skill");
         // Should not error even if name_dir doesn't exist
         clear_existing_versions(&name_dir).unwrap();
+    }
+
+    #[test]
+    fn clear_existing_versions_removes_multiple_version_dirs() {
+        let tmp = TempDir::new().unwrap();
+        let name_dir = tmp.path().join("acme").join("my-skill");
+        std::fs::create_dir_all(name_dir.join("1.0.0")).unwrap();
+        std::fs::create_dir_all(name_dir.join("2.0.0")).unwrap();
+
+        clear_existing_versions(&name_dir).unwrap();
+
+        assert!(!name_dir.join("1.0.0").exists());
+        assert!(!name_dir.join("2.0.0").exists());
+        assert!(name_dir.exists());
     }
 }
