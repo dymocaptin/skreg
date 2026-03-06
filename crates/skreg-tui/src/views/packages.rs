@@ -107,6 +107,8 @@ pub struct PackageListView {
     install_rx: Option<oneshot::Receiver<Result<String, String>>>,
     /// Set of `"namespace/name"` keys that are currently installed locally.
     installed: HashSet<String>,
+    /// Whether the uninstall confirmation prompt is active.
+    confirming: bool,
 }
 
 impl PackageListView {
@@ -124,6 +126,7 @@ impl PackageListView {
             search_changed_at: None,
             install_rx: None,
             installed: Self::scan_installed_set(),
+            confirming: false,
         };
         v.fetch();
         v
@@ -183,6 +186,28 @@ impl PackageListView {
             let result = client.search(&query).await.map_err(|e| e.to_string());
             let _ = tx.send(result);
         });
+    }
+
+    fn uninstall_selected(&mut self) -> Action {
+        let Some(item) = self.state.selected_item() else {
+            return Action::None;
+        };
+        let ns = item.namespace.clone();
+        let name = item.name.clone();
+        let label = format!("{ns}/{name}");
+        let path = dirs::home_dir()
+            .unwrap_or_default()
+            .join(".skreg")
+            .join("packages")
+            .join(&ns)
+            .join(&name);
+        match std::fs::remove_dir_all(&path) {
+            Ok(()) => {
+                self.installed = Self::scan_installed_set();
+                Action::Toast(ToastKind::Success, format!("Uninstalled {label}"))
+            }
+            Err(e) => Action::Toast(ToastKind::Error, e.to_string()),
+        }
     }
 
     fn commit_search(&mut self) {
@@ -375,21 +400,42 @@ impl View for PackageListView {
                 Paragraph::new(filter_hint).style(theme.accent()),
                 bottom_area,
             );
-        } else {
+        } else if self.confirming {
             Footer {
-                hints: &[
-                    ("/", "search"),
-                    ("i", "install"),
-                    ("enter", "detail"),
-                    ("c", "context"),
-                    ("q", "quit"),
-                ],
+                hints: &[("y", " confirm uninstall"), ("N", " cancel")],
             }
             .render(frame, bottom_area, theme);
+        } else {
+            let is_installed_selected = self.state.selected_item().is_some_and(|item| {
+                self.installed
+                    .contains(&format!("{}/{}", item.namespace, item.name))
+            });
+            let mut hints: Vec<(&str, &str)> = vec![
+                ("/", "search"),
+                ("i", "install"),
+                ("enter", "detail"),
+                ("c", "context"),
+                ("q", "quit"),
+            ];
+            if is_installed_selected {
+                hints.push(("del", "uninstall"));
+            }
+            Footer { hints: &hints }.render(frame, bottom_area, theme);
         }
     }
 
     fn handle_event(&mut self, event: Event) -> Action {
+        // Confirmation prompt takes priority over all other keys.
+        if self.confirming {
+            if let Event::Key(KeyEvent { code, .. }) = event {
+                self.confirming = false;
+                if code == KeyCode::Char('y') {
+                    return self.uninstall_selected();
+                }
+            }
+            return Action::None;
+        }
+
         if self.searching {
             return self.handle_search_event(&event);
         }
@@ -431,6 +477,15 @@ impl View for PackageListView {
                 }
                 KeyCode::Char('r') => {
                     self.fetch();
+                    Action::None
+                }
+                KeyCode::Delete => {
+                    if let Some(item) = self.state.selected_item() {
+                        let key = format!("{}/{}", item.namespace, item.name);
+                        if self.installed.contains(&key) {
+                            self.confirming = true;
+                        }
+                    }
                     Action::None
                 }
                 KeyCode::Char('c') => Action::OpenContextSwitcher,
