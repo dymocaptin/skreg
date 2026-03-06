@@ -68,4 +68,47 @@ describe('PackageGrid', () => {
       expect(screen.queryByRole('button', { name: /load more/i })).not.toBeInTheDocument()
     })
   })
+
+  it('shows PackageDetail with package name when a row is clicked', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ packages: PKGS, total: 2, page: 1 }),
+    })
+
+    render(<PackageGrid query="" category="" />)
+    await waitFor(() => expect(screen.getByText('alpha')).toBeInTheDocument())
+
+    // Click the first row — find the row by its package name
+    await user.click(screen.getByText('alpha'))
+
+    // PackageDetail should appear with the package name as a heading
+    // (PackageDetail renders pkg.name in a .name span — it appears twice:
+    //  once in the table row, once in the detail panel)
+    await waitFor(() => {
+      const nameEls = screen.getAllByText('alpha')
+      expect(nameEls.length).toBeGreaterThanOrEqual(2)
+    })
+  })
+
+  it('hides DESCRIPTION column header when panel is open', async () => {
+    const user = userEvent.setup()
+    vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ packages: PKGS, total: 2, page: 1 }),
+    })
+
+    render(<PackageGrid query="" category="" />)
+    await waitFor(() => expect(screen.getByText('alpha')).toBeInTheDocument())
+
+    // Before selection: DESCRIPTION header is visible
+    expect(screen.getByText('DESCRIPTION')).toBeInTheDocument()
+
+    await user.click(screen.getByText('alpha'))
+
+    // After selection: DESCRIPTION header should be gone
+    await waitFor(() => {
+      expect(screen.queryByText('DESCRIPTION')).not.toBeInTheDocument()
+    })
+  })
 })

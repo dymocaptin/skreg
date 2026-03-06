@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { searchPackages } from '../../api.js'
 import PackageCard from '../PackageCard/PackageCard.jsx'
+import PackageDetail from '../PackageDetail/PackageDetail.jsx'
 import Footer from '../Footer/Footer.jsx'
 import styles from './PackageGrid.module.css'
 
@@ -58,7 +59,7 @@ export default function PackageGrid() {
   useEffect(() => {
     if (selectedIndex < 0) return
     const rows = tableRef.current?.querySelectorAll('tbody tr')
-    rows?.[selectedIndex]?.scrollIntoView({ block: 'nearest' })
+    rows?.[selectedIndex]?.scrollIntoView?.({ block: 'nearest' })
   }, [selectedIndex])
 
   // Keyboard navigation
@@ -138,45 +139,51 @@ export default function PackageGrid() {
         </div>
       )}
 
-      <div className={styles.scrollArea}>
-        {error && <p className={styles.message}>Failed to load packages: {error}</p>}
-        {loading && packages.length === 0 && <p className={styles.message}>Loading…</p>}
-        {!error && (loading || packages.length > 0) && (
-          <table ref={tableRef} className={styles.table}>
-            <thead>
-              <tr>
-                <th className={styles.th}>NAME</th>
-                <th className={styles.th}>NAMESPACE</th>
-                <th className={styles.th}>VERSION</th>
-                <th className={styles.th}>DESCRIPTION</th>
-                <th className={styles.th}></th>
-              </tr>
-            </thead>
-            <tbody>
-              {packages.map((pkg, i) => (
-                <PackageCard
-                  key={pkg.id}
-                  pkg={pkg}
-                  selected={i === selectedIndex}
-                  onClick={() => setSelectedIndex(i)}
-                />
-              ))}
-            </tbody>
-          </table>
-        )}
-        {!loading && packages.length === 0 && !error && (
-          <p className={styles.message}>
-            {query ? `No packages found for "${query}"` : 'No packages found'}
-          </p>
-        )}
-        {packages.length < total && (
-          <button
-            className={styles.loadMore}
-            onClick={handleLoadMore}
-            disabled={loading}
-          >
-            {loading ? 'Loading…' : 'Load more'}
-          </button>
+      <div className={selectedIndex >= 0 ? styles.body : styles.scrollArea}>
+        <div className={selectedIndex >= 0 ? styles.tablePane : undefined}>
+          {error && <p className={styles.message}>Failed to load packages: {error}</p>}
+          {loading && packages.length === 0 && <p className={styles.message}>Loading…</p>}
+          {!error && (loading || packages.length > 0) && (
+            <table ref={tableRef} className={styles.table}>
+              <thead>
+                <tr>
+                  <th className={styles.th}>NAME</th>
+                  <th className={styles.th}>NAMESPACE</th>
+                  <th className={styles.th}>VERSION</th>
+                  {selectedIndex < 0 && <th className={styles.th}>DESCRIPTION</th>}
+                  <th className={styles.th}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {packages.map((pkg, i) => (
+                  <PackageCard
+                    key={pkg.id}
+                    pkg={pkg}
+                    selected={i === selectedIndex}
+                    hideDesc={selectedIndex >= 0}
+                    onClick={() => setSelectedIndex(i)}
+                  />
+                ))}
+              </tbody>
+            </table>
+          )}
+          {!loading && packages.length === 0 && !error && (
+            <p className={styles.message}>
+              {query ? `No packages found for "${query}"` : 'No packages found'}
+            </p>
+          )}
+          {packages.length < total && (
+            <button
+              className={styles.loadMore}
+              onClick={handleLoadMore}
+              disabled={loading}
+            >
+              {loading ? 'Loading…' : 'Load more'}
+            </button>
+          )}
+        </div>
+        {selectedIndex >= 0 && packages[selectedIndex] && (
+          <PackageDetail pkg={packages[selectedIndex]} />
         )}
       </div>
 
