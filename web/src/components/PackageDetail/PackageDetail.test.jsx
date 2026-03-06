@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import PackageDetail from './PackageDetail.jsx'
 
@@ -67,6 +67,10 @@ describe('PackageDetail', () => {
     render(<PackageDetail pkg={PKG} />)
     await user.click(screen.getByRole('button', { name: /copy install command/i }))
     expect(screen.getByRole('button', { name: /copy install command/i }).textContent).toContain('copied!')
+    vi.advanceTimersByTime(1500)
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: /copy install command/i }).textContent).not.toContain('copied!')
+    )
     vi.useRealTimers()
   })
 })

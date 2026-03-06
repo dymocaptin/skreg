@@ -1,15 +1,27 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import styles from './PackageDetail.module.css'
 
 export default function PackageDetail({ pkg }) {
   const [copied, setCopied] = useState(false)
   const installCmd = `skreg install ${pkg.namespace}/${pkg.name}`
+  const timerRef = useRef(null)
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current)
+    }
+  }, [])
+
+  useEffect(() => {
+    setCopied(false)
+  }, [pkg])
 
   async function handleCopy() {
     try {
       await navigator.clipboard.writeText(installCmd)
       setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
+      if (timerRef.current) clearTimeout(timerRef.current)
+      timerRef.current = setTimeout(() => setCopied(false), 1500)
     } catch {
       // clipboard write failed — silently ignore
     }
