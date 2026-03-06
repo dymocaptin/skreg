@@ -31,15 +31,18 @@ class WebHostingOutputs:
         self,
         bucket_name: pulumi.Output[str],
         cdn_url: pulumi.Output[str],
+        cdn_domain: pulumi.Output[str],
     ) -> None:
         """Initialise web hosting outputs.
 
         Args:
             bucket_name: Name of the S3 bucket holding the built assets.
             cdn_url: HTTPS URL of the CloudFront distribution serving the site.
+            cdn_domain: Bare CloudFront domain name (for DNS CNAME/ALIAS records).
         """
         self.bucket_name: pulumi.Output[str] = bucket_name
         self.cdn_url: pulumi.Output[str] = cdn_url
+        self.cdn_domain: pulumi.Output[str] = cdn_domain
 
 
 class AwsWebHosting(pulumi.ComponentResource):
@@ -54,6 +57,8 @@ class AwsWebHosting(pulumi.ComponentResource):
         self,
         name: str,
         dist_dir: str = _DIST_DIR,
+        domain_name: str = "",
+        cert_arn: str = "",
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
         """Initialise and provision the static web hosting component.
@@ -61,6 +66,12 @@ class AwsWebHosting(pulumi.ComponentResource):
         Args:
             name: Logical Pulumi resource name.
             dist_dir: Filesystem path to the built ``web/dist/`` directory.
+            domain_name: Custom domain (e.g. ``skreg.ai``). When set, the
+                CloudFront distribution advertises this alias and uses the
+                supplied ACM certificate.  Both ``domain_name`` and
+                ``cert_arn`` must be provided together.
+            cert_arn: ARN of an ACM certificate **in us-east-1** covering
+                ``domain_name``.  Required when ``domain_name`` is set.
             opts: Optional Pulumi resource options.
         """
         super().__init__("skreg:aws:WebHosting", name, {}, opts)
@@ -104,11 +115,25 @@ class AwsWebHosting(pulumi.ComponentResource):
             opts=pulumi.ResourceOptions(parent=self),
         )
 
+        if domain_name and cert_arn:
+            viewer_certificate = aws.cloudfront.DistributionViewerCertificateArgs(
+                acm_certificate_arn=cert_arn,
+                ssl_support_method="sni-only",
+                minimum_protocol_version="TLSv1.2_2021",
+            )
+            aliases = [domain_name]
+        else:
+            viewer_certificate = aws.cloudfront.DistributionViewerCertificateArgs(
+                cloudfront_default_certificate=True,
+            )
+            aliases = []
+
         distribution = aws.cloudfront.Distribution(
             f"{name}-cdn",
             aws.cloudfront.DistributionArgs(
                 enabled=True,
                 default_root_object="index.html",
+                aliases=aliases,
                 origins=[
                     aws.cloudfront.DistributionOriginArgs(
                         origin_id="s3-web-origin",
@@ -145,9 +170,7 @@ class AwsWebHosting(pulumi.ComponentResource):
                         restriction_type="none",
                     ),
                 ),
-                viewer_certificate=aws.cloudfront.DistributionViewerCertificateArgs(
-                    cloudfront_default_certificate=True,
-                ),
+                viewer_certificate=viewer_certificate,
             ),
             opts=pulumi.ResourceOptions(parent=self),
         )
@@ -192,12 +215,14 @@ class AwsWebHosting(pulumi.ComponentResource):
         self._outputs = WebHostingOutputs(
             bucket_name=bucket.bucket,
             cdn_url=distribution.domain_name.apply(lambda d: f"https://{d}"),
+            cdn_domain=distribution.domain_name,
         )
 
         self.register_outputs(
             {
                 "bucket_name": self._outputs.bucket_name,
                 "cdn_url": self._outputs.cdn_url,
+                "cdn_domain": self._outputs.cdn_domain,
             }
         )
 

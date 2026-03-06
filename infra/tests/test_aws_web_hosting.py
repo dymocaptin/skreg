@@ -43,9 +43,26 @@ def test_web_hosting_cdn_url_starts_with_https() -> None:
 
 @pulumi.runtime.test
 def test_web_hosting_outputs_are_pulumi_outputs() -> None:
-    """AwsWebHosting exposes both bucket_name and cdn_url as Pulumi Outputs."""
+    """AwsWebHosting exposes bucket_name, cdn_url, and cdn_domain as Pulumi Outputs."""
     import pulumi as _pulumi
 
     hosting = AwsWebHosting("test-web-outputs", dist_dir="/nonexistent/dist")
     assert isinstance(hosting.outputs.bucket_name, _pulumi.Output)
     assert isinstance(hosting.outputs.cdn_url, _pulumi.Output)
+    assert isinstance(hosting.outputs.cdn_domain, _pulumi.Output)
+
+
+@pulumi.runtime.test
+def test_web_hosting_custom_domain_uses_acm_cert() -> None:
+    """When domain_name and cert_arn are supplied the distribution uses the ACM cert."""
+    hosting = AwsWebHosting(
+        "test-web-custom",
+        dist_dir="/nonexistent/dist",
+        domain_name="skreg.ai",
+        cert_arn="arn:aws:acm:us-east-1:123456789012:certificate/test",
+    )
+
+    def assert_custom_domain(url: str) -> None:
+        assert url.startswith("https://"), f"Expected https://, got {url!r}"
+
+    return hosting.outputs.cdn_url.apply(assert_custom_domain)
