@@ -108,6 +108,9 @@ pub struct PackageListView {
     /// Set of `"namespace/name"` keys that are currently installed locally.
     installed: HashSet<String>,
     /// Whether the uninstall confirmation prompt is active.
+    /// Resets to `false` on any non-`y` keypress, so stale state resolves
+    /// itself on the next user interaction even if the view is re-entered
+    /// from the navigation stack.
     confirming: bool,
 }
 
@@ -132,11 +135,15 @@ impl PackageListView {
         v
     }
 
-    fn scan_installed_set() -> HashSet<String> {
-        let base = dirs::home_dir()
+    fn packages_dir() -> std::path::PathBuf {
+        dirs::home_dir()
             .unwrap_or_default()
             .join(".skreg")
-            .join("packages");
+            .join("packages")
+    }
+
+    fn scan_installed_set() -> HashSet<String> {
+        let base = Self::packages_dir();
         scan_installed(&base)
             .unwrap_or_default()
             .into_iter()
@@ -146,10 +153,7 @@ impl PackageListView {
 
     fn install_selected(&mut self, namespace: String, name: String, version: String) {
         let registry = self.config.registry().to_string();
-        let install_root = dirs::home_dir()
-            .unwrap_or_default()
-            .join(".skreg")
-            .join("packages");
+        let install_root = Self::packages_dir();
         let (tx, rx) = oneshot::channel();
         self.install_rx = Some(rx);
         tokio::spawn(async move {
@@ -195,12 +199,7 @@ impl PackageListView {
         let ns = item.namespace.clone();
         let name = item.name.clone();
         let label = format!("{ns}/{name}");
-        let path = dirs::home_dir()
-            .unwrap_or_default()
-            .join(".skreg")
-            .join("packages")
-            .join(&ns)
-            .join(&name);
+        let path = Self::packages_dir().join(&ns).join(&name);
         match std::fs::remove_dir_all(&path) {
             Ok(()) => {
                 self.installed = Self::scan_installed_set();
@@ -389,6 +388,11 @@ impl View for PackageListView {
                 hints: &[("esc", "cancel"), ("enter", "search")],
             }
             .render(frame, footer_area, theme);
+        } else if self.confirming {
+            Footer {
+                hints: &[("y", " confirm uninstall"), ("N", " cancel")],
+            }
+            .render(frame, bottom_area, theme);
         } else if !self.query.is_empty() {
             let filter_hint = format!(
                 "Filter: \"{}\" · {} result{}",
@@ -400,11 +404,6 @@ impl View for PackageListView {
                 Paragraph::new(filter_hint).style(theme.accent()),
                 bottom_area,
             );
-        } else if self.confirming {
-            Footer {
-                hints: &[("y", " confirm uninstall"), ("N", " cancel")],
-            }
-            .render(frame, bottom_area, theme);
         } else {
             let is_installed_selected = self.state.selected_item().is_some_and(|item| {
                 self.installed
