@@ -75,6 +75,12 @@ jobs:
       - name: Build
         run: npm run build
         working-directory: web
+      - name: Upload web dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist
+          path: web/dist/
+          retention-days: 1
 
   changes:
     name: Detect changed paths
@@ -185,6 +191,12 @@ jobs:
             echo "SKREG_API_IMAGE_URI=${REGISTRY}/skreg-api:latest" >> "$GITHUB_ENV"
             echo "SKREG_WORKER_IMAGE_URI=${REGISTRY}/skreg-worker:latest" >> "$GITHUB_ENV"
           fi
+
+      - name: Download web dist
+        uses: actions/download-artifact@v4
+        with:
+          name: web-dist
+          path: web/dist/
 
       - name: Install Pulumi CLI
         uses: pulumi/actions@v5
