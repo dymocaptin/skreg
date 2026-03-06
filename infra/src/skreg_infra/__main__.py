@@ -52,7 +52,11 @@ class SkregStack:
                 multi_az=config.multi_az,
             ),
         )
-        web_hosting = AwsWebHosting("skreg-web")
+        web_hosting = AwsWebHosting(
+            "skreg-web",
+            domain_name=config.web_domain_name,
+            cert_arn=config.web_cert_arn,
+        )
         compute = AwsCompute(
             "skreg-compute",
             AwsComputeArgs(
@@ -86,6 +90,7 @@ class SkregStack:
         pulumi.export("ecr_api_repo", compute.ecr_api_repo)
         pulumi.export("ecr_worker_repo", compute.ecr_worker_repo)
         pulumi.export("web_cdn_url", web_hosting.outputs.cdn_url)
+        pulumi.export("web_cdn_domain", web_hosting.outputs.cdn_domain)
 
 
 if __name__ == "__main__":
