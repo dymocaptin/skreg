@@ -6,3 +6,4 @@ pub mod pack;
 pub mod publish;
 pub mod search;
 pub mod tui;
+pub mod uninstall;
