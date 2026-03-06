@@ -36,6 +36,8 @@ class StackConfig(BaseSettings):
     worker_image_uri: str = ""
     domain_name: str = ""
     existing_cert_arn: str = ""
+    web_domain_name: str = ""
+    web_cert_arn: str = ""
     from_email: str = ""
     ses_region: str = ""
     hsm_backend: HsmBackend = HsmBackend.HSM

@@ -204,6 +204,8 @@ jobs:
           SKREG_EXISTING_CERT_ARN: ${{ secrets.SKREG_EXISTING_CERT_ARN }}
           SKREG_FROM_EMAIL: ${{ vars.SKREG_FROM_EMAIL }}
           SKREG_SES_REGION: ${{ vars.SKREG_SES_REGION }}
+          SKREG_WEB_DOMAIN_NAME: ${{ vars.SKREG_WEB_DOMAIN_NAME }}
+          SKREG_WEB_CERT_ARN: ${{ secrets.SKREG_WEB_CERT_ARN }}
         run: |
           pulumi stack select main
           pulumi up --yes
