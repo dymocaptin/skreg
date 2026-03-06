@@ -1,4 +1,4 @@
-//! Installed skills view — lists locally installed packages and supports uninstall.
+//! Installed package scanning — discovers locally installed packages structured as `{ns}/{name}/{version}/`.
 
 use std::path::{Path, PathBuf};
 
