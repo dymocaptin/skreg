@@ -18,7 +18,6 @@ _DIST_DIR = os.path.join(
     "..",
     "..",
     "..",
-    "..",
     "web",
     "dist",
 )
