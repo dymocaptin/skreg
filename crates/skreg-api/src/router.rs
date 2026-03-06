@@ -5,11 +5,13 @@ use std::sync::Arc;
 use aws_sdk_s3::Client as S3Client;
 use aws_sdk_sesv2::Client as SesClient;
 use axum::{
+    http::HeaderValue,
     routing::{get, post},
     Json, Router,
 };
 use serde::Serialize;
 use sqlx::PgPool;
+use tower_http::cors::{AllowHeaders, AllowMethods, CorsLayer};
 
 use crate::handlers::auth::{login_handler, token_handler};
 use crate::handlers::jobs::job_status_handler;
@@ -47,6 +49,10 @@ struct HealthResponse {
 /// Build the Axum application router.
 pub fn build_router(state: AppState) -> Router {
     let shared = Arc::new(state);
+    let cors = CorsLayer::new()
+        .allow_origin("https://skreg.ai".parse::<HeaderValue>().unwrap())
+        .allow_methods(AllowMethods::mirror_request())
+        .allow_headers(AllowHeaders::mirror_request());
     Router::new()
         .route("/healthz", get(health_handler))
         .route("/v1/search", get(search_handler))
@@ -64,6 +70,7 @@ pub fn build_router(state: AppState) -> Router {
             "/v1/download/:ns/:name/:version/sig",
             get(package_sig_handler),
         )
+        .layer(cors)
         .with_state(shared)
 }
 
