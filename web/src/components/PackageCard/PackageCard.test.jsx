@@ -77,4 +77,14 @@ describe('PackageCard', () => {
     expect(screen.getByRole('button', { name: /copy install command/i }).textContent).toContain('Copied!')
     vi.useRealTimers()
   })
+
+  it('hides description cell when hideDesc is true', () => {
+    render(<PackageCard pkg={PKG} hideDesc />, { wrapper })
+    expect(screen.queryByText('Analyzes dominant colors in images.')).not.toBeInTheDocument()
+  })
+
+  it('shows description cell when hideDesc is false (default)', () => {
+    render(<PackageCard pkg={PKG} />, { wrapper })
+    expect(screen.getByText('Analyzes dominant colors in images.')).toBeInTheDocument()
+  })
 })
