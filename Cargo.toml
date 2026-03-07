@@ -35,3 +35,8 @@ tar         = "0.4"
 [profile.release]
 strip = true
 lto   = true
+
+# The profile that 'dist' will build with
+[profile.dist]
+inherits = "release"
+lto = "thin"
