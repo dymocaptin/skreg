@@ -98,6 +98,9 @@ pub struct PackageDetailView {
     install_rx: Option<oneshot::Receiver<Result<String, String>>>,
     /// Whether the currently displayed version is locally installed.
     is_installed: bool,
+    /// Whether the uninstall confirmation prompt is active.
+    /// Resets to false on any keypress; stale `true` resolves itself on next interaction.
+    confirming: bool,
 }
 
 impl PackageDetailView {
@@ -114,6 +117,7 @@ impl PackageDetailView {
             rx: None,
             install_rx: None,
             is_installed,
+            confirming: false,
         };
         v.fetch(latest);
         v
@@ -178,6 +182,28 @@ impl PackageDetailView {
                 .map_err(|e| e.to_string());
             let _ = tx.send(result);
         });
+    }
+
+    fn do_uninstall(&mut self) -> Action {
+        let Some(data) = &self.data else {
+            return Action::None;
+        };
+        let version = data.manifest.version.to_string();
+        let label = format!("{}/{} v{}", self.namespace, self.name, version);
+        let path = dirs::home_dir()
+            .unwrap_or_default()
+            .join(".skreg")
+            .join("packages")
+            .join(&self.namespace)
+            .join(&self.name)
+            .join(&version);
+        match std::fs::remove_dir_all(&path) {
+            Ok(()) => {
+                self.is_installed = false;
+                Action::Toast(ToastKind::Success, format!("Uninstalled {label}"))
+            }
+            Err(e) => Action::Toast(ToastKind::Error, e.to_string()),
+        }
     }
 }
 
@@ -299,23 +325,37 @@ impl View for PackageDetailView {
             );
         }
 
-        let install_hint = if self.is_installed {
-            "installed"
-        } else {
-            "install"
-        };
-        Footer {
-            hints: &[
-                ("i", install_hint),
+        let hints_vec: Vec<(&str, &str)> = if self.confirming {
+            vec![("y", " confirm uninstall"), ("N", " cancel")]
+        } else if self.is_installed {
+            vec![
+                ("i", "installed"),
+                ("del", "uninstall"),
                 ("tab", "switch pane"),
                 ("j/k", "scroll"),
                 ("esc", "back"),
-            ],
-        }
-        .render(frame, footer_area, theme);
+            ]
+        } else {
+            vec![
+                ("i", "install"),
+                ("tab", "switch pane"),
+                ("j/k", "scroll"),
+                ("esc", "back"),
+            ]
+        };
+        Footer { hints: &hints_vec }.render(frame, footer_area, theme);
     }
 
     fn handle_event(&mut self, event: Event) -> Action {
+        if self.confirming {
+            if let Event::Key(KeyEvent { code, .. }) = event {
+                self.confirming = false;
+                if code == KeyCode::Char('y') {
+                    return self.do_uninstall();
+                }
+            }
+            return Action::None;
+        }
         match event {
             Event::Key(KeyEvent { code, .. }) => match code {
                 KeyCode::Esc | KeyCode::Char('q') => Action::Pop,
@@ -340,6 +380,10 @@ impl View for PackageDetailView {
                     } else {
                         Action::None
                     }
+                }
+                KeyCode::Delete if self.is_installed => {
+                    self.confirming = true;
+                    Action::None
                 }
                 KeyCode::Char('c') => Action::OpenContextSwitcher,
                 _ => Action::None,

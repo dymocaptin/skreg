@@ -82,12 +82,9 @@ describe('PackageGrid', () => {
     // Click the first row — find the row by its package name
     await user.click(screen.getByText('alpha'))
 
-    // PackageDetail should appear with the package name as a heading
-    // (PackageDetail renders pkg.name in a .name span — it appears twice:
-    //  once in the table row, once in the detail panel)
+    // PackageDetail should appear — assert the ref string it uniquely renders
     await waitFor(() => {
-      const nameEls = screen.getAllByText('alpha')
-      expect(nameEls.length).toBeGreaterThanOrEqual(2)
+      expect(screen.getByText('ns/alpha@1.0.0')).toBeInTheDocument()
     })
   })
 

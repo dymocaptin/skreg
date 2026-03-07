@@ -122,4 +122,5 @@
   flex: 0 0 55%;
   overflow-y: auto;
   min-height: 0;
+  border-right: 1px solid var(--border);
 }
