@@ -19,6 +19,7 @@ use tokio::sync::oneshot;
 use crate::theme::Theme;
 use crate::widgets::{footer::Footer, header::Header};
 
+use super::installed::packages_dir;
 use super::{Action, ToastKind, View};
 
 /// Which pane currently holds keyboard focus in the detail view.
@@ -124,13 +125,7 @@ impl PackageDetailView {
     }
 
     fn check_installed(namespace: &str, name: &str, version: &str) -> bool {
-        let path = dirs::home_dir()
-            .unwrap_or_default()
-            .join(".skreg")
-            .join("packages")
-            .join(namespace)
-            .join(name)
-            .join(version);
+        let path = packages_dir().join(namespace).join(name).join(version);
         path.exists()
     }
 
@@ -154,10 +149,7 @@ impl PackageDetailView {
     fn install(&mut self) {
         let Some(data) = &self.data else { return };
         let registry = self.config.registry().to_string();
-        let install_root = dirs::home_dir()
-            .unwrap_or_default()
-            .join(".skreg")
-            .join("packages");
+        let install_root = packages_dir();
         let ref_str = format!("{}/{}@{}", self.namespace, self.name, data.manifest.version);
         let (tx, rx) = oneshot::channel();
         self.install_rx = Some(rx);
@@ -190,10 +182,7 @@ impl PackageDetailView {
         };
         let version = data.manifest.version.to_string();
         let label = format!("{}/{} v{}", self.namespace, self.name, version);
-        let path = dirs::home_dir()
-            .unwrap_or_default()
-            .join(".skreg")
-            .join("packages")
+        let path = packages_dir()
             .join(&self.namespace)
             .join(&self.name)
             .join(&version);
