@@ -20,11 +20,16 @@ const BINDINGS: &[(&str, &str, &str)] = &[
     ("Esc / q", "Back / quit", "all views"),
     ("Ctrl+C", "Force quit", "always"),
     ("/", "Open search", "package list"),
+    ("Tab (in search)", "Filter: installed", "package list"),
     ("i", "Install selected", "package list, detail"),
     ("c", "Context switcher", "all views"),
     ("r", "Reload", "all views"),
     ("Tab", "Switch pane focus", "detail view"),
-    ("Del", "Uninstall selected", "installed list"),
+    (
+        "Del",
+        "Uninstall selected",
+        "package list (installed), detail",
+    ),
     ("?", "Toggle this help", "always"),
 ];
 
