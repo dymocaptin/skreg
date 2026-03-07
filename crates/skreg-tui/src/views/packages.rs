@@ -205,6 +205,9 @@ impl PackageListView {
         let path = Self::packages_dir().join(&ns).join(&name);
         match std::fs::remove_dir_all(&path) {
             Ok(()) => {
+                if self.installed_mode {
+                    self.load_installed_packages();
+                }
                 self.installed = Self::scan_installed_set();
                 Action::Toast(ToastKind::Success, format!("Uninstalled {label}"))
             }
