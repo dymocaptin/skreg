@@ -2,6 +2,8 @@
 
 use std::path::{Path, PathBuf};
 
+use dirs;
+
 /// A single installed package entry.
 #[derive(Debug)]
 pub struct InstalledPkg {
@@ -13,6 +15,15 @@ pub struct InstalledPkg {
     pub version: String,
     /// Path to the version directory on disk.
     pub path: PathBuf,
+}
+
+/// Returns the root directory where skill packages are installed (`~/.skreg/packages/`).
+#[must_use]
+pub fn packages_dir() -> PathBuf {
+    dirs::home_dir()
+        .unwrap_or_default()
+        .join(".skreg")
+        .join("packages")
 }
 
 /// Scan `base` for installed packages structured as `{ns}/{name}/{version}/`.

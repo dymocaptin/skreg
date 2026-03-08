@@ -18,7 +18,7 @@ use skreg_core::config::CliConfig;
 use skreg_core::package_ref::PackageRef;
 use tokio::sync::oneshot;
 
-use super::installed::scan_installed;
+use super::installed::{packages_dir, scan_installed};
 
 use crate::theme::Theme;
 use crate::widgets::{footer::Footer, header::Header};
@@ -113,6 +113,8 @@ pub struct PackageListView {
     /// from the navigation stack.
     confirming: bool,
     /// When true, the list is populated from local disk instead of the registry.
+    /// Persists across navigation (e.g. Enter/Esc into detail view and back),
+    /// which is intentional — the filter remains active until the user clears it.
     installed_mode: bool,
 }
 
@@ -138,15 +140,8 @@ impl PackageListView {
         v
     }
 
-    fn packages_dir() -> std::path::PathBuf {
-        dirs::home_dir()
-            .unwrap_or_default()
-            .join(".skreg")
-            .join("packages")
-    }
-
     fn scan_installed_set() -> HashSet<String> {
-        let base = Self::packages_dir();
+        let base = packages_dir();
         scan_installed(&base)
             .unwrap_or_default()
             .into_iter()
@@ -156,7 +151,7 @@ impl PackageListView {
 
     fn install_selected(&mut self, namespace: String, name: String, version: String) {
         let registry = self.config.registry().to_string();
-        let install_root = Self::packages_dir();
+        let install_root = packages_dir();
         let (tx, rx) = oneshot::channel();
         self.install_rx = Some(rx);
         tokio::spawn(async move {
@@ -202,9 +197,12 @@ impl PackageListView {
         let ns = item.namespace.clone();
         let name = item.name.clone();
         let label = format!("{ns}/{name}");
-        let path = Self::packages_dir().join(&ns).join(&name);
+        let path = packages_dir().join(&ns).join(&name);
         match std::fs::remove_dir_all(&path) {
             Ok(()) => {
+                if self.installed_mode {
+                    self.load_installed_packages();
+                }
                 self.installed = Self::scan_installed_set();
                 Action::Toast(ToastKind::Success, format!("Uninstalled {label}"))
             }
@@ -213,7 +211,7 @@ impl PackageListView {
     }
 
     fn load_installed_packages(&mut self) {
-        let base = Self::packages_dir();
+        let base = packages_dir();
         let pkgs = scan_installed(&base).unwrap_or_default();
         self.state.items = pkgs
             .into_iter()
