@@ -24,7 +24,7 @@ pub async fn search_handler(
     let page = params.page.unwrap_or(1).max(1);
     let offset = (page - 1) * PAGE_SIZE;
     let query = params.q.unwrap_or_default();
-    let signed = params.signed.unwrap_or(false);
+    let trusted_only = params.trusted.unwrap_or(false);
 
     let rows: Vec<PackageSummary> = sqlx::query_as(
         "
@@ -56,7 +56,7 @@ pub async fn search_handler(
     )
     .bind(&query)
     .bind(&params.category)
-    .bind(signed)
+    .bind(trusted_only)
     .bind(PAGE_SIZE)
     .bind(offset)
     .fetch_all(pool)
@@ -84,7 +84,7 @@ pub async fn search_handler(
     )
     .bind(&query)
     .bind(&params.category)
-    .bind(signed)
+    .bind(trusted_only)
     .fetch_one(pool)
     .await
     .map_err(|e| {

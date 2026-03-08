@@ -46,5 +46,5 @@ pub struct SearchQuery {
     /// Page number (default 1).
     pub page: Option<i64>,
     /// When `true`, restrict results to packages from trusted publishers.
-    pub signed: Option<bool>,
+    pub trusted: Option<bool>,
 }
