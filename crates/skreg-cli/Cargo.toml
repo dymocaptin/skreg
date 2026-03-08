@@ -38,6 +38,7 @@ hex             = "0.4"
 tempfile        = "3"
 thiserror       = { workspace = true }
 home            = "0.5"
+chrono          = { workspace = true }
 
 [lib]
 name = "skreg_cli"
