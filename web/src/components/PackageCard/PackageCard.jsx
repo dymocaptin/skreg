@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import styles from './PackageCard.module.css'
 
-export default function PackageCard({ pkg, selected, onClick }) {
+export default function PackageCard({ pkg, selected, onClick, hideDesc = false }) {
   const [copied, setCopied] = useState(false)
   const installCmd = `skreg install ${pkg.namespace}/${pkg.name}`
 
@@ -27,7 +27,7 @@ export default function PackageCard({ pkg, selected, onClick }) {
       </td>
       <td className={styles.namespace}>{pkg.namespace}</td>
       <td className={styles.version}>v{pkg.latest_version}</td>
-      <td className={styles.desc}>{pkg.description}</td>
+      {!hideDesc && <td className={styles.desc}>{pkg.description}</td>}
       <td className={styles.actions}>
         <button
           className={styles.copy}

@@ -107,6 +107,13 @@ pub struct PackageListView {
     install_rx: Option<oneshot::Receiver<Result<String, String>>>,
     /// Set of `"namespace/name"` keys that are currently installed locally.
     installed: HashSet<String>,
+    /// Whether the uninstall confirmation prompt is active.
+    /// Resets to `false` on any non-`y` keypress, so stale state resolves
+    /// itself on the next user interaction even if the view is re-entered
+    /// from the navigation stack.
+    confirming: bool,
+    /// When true, the list is populated from local disk instead of the registry.
+    installed_mode: bool,
 }
 
 impl PackageListView {
@@ -124,16 +131,22 @@ impl PackageListView {
             search_changed_at: None,
             install_rx: None,
             installed: Self::scan_installed_set(),
+            confirming: false,
+            installed_mode: false,
         };
         v.fetch();
         v
     }
 
-    fn scan_installed_set() -> HashSet<String> {
-        let base = dirs::home_dir()
+    fn packages_dir() -> std::path::PathBuf {
+        dirs::home_dir()
             .unwrap_or_default()
             .join(".skreg")
-            .join("packages");
+            .join("packages")
+    }
+
+    fn scan_installed_set() -> HashSet<String> {
+        let base = Self::packages_dir();
         scan_installed(&base)
             .unwrap_or_default()
             .into_iter()
@@ -143,10 +156,7 @@ impl PackageListView {
 
     fn install_selected(&mut self, namespace: String, name: String, version: String) {
         let registry = self.config.registry().to_string();
-        let install_root = dirs::home_dir()
-            .unwrap_or_default()
-            .join(".skreg")
-            .join("packages");
+        let install_root = Self::packages_dir();
         let (tx, rx) = oneshot::channel();
         self.install_rx = Some(rx);
         tokio::spawn(async move {
@@ -185,15 +195,67 @@ impl PackageListView {
         });
     }
 
+    fn uninstall_selected(&mut self) -> Action {
+        let Some(item) = self.state.selected_item() else {
+            return Action::None;
+        };
+        let ns = item.namespace.clone();
+        let name = item.name.clone();
+        let label = format!("{ns}/{name}");
+        let path = Self::packages_dir().join(&ns).join(&name);
+        match std::fs::remove_dir_all(&path) {
+            Ok(()) => {
+                self.installed = Self::scan_installed_set();
+                Action::Toast(ToastKind::Success, format!("Uninstalled {label}"))
+            }
+            Err(e) => Action::Toast(ToastKind::Error, e.to_string()),
+        }
+    }
+
+    fn load_installed_packages(&mut self) {
+        let base = Self::packages_dir();
+        let pkgs = scan_installed(&base).unwrap_or_default();
+        self.state.items = pkgs
+            .into_iter()
+            .map(|p| {
+                let description = {
+                    let manifest_path = p.path.join("manifest.json");
+                    std::fs::read_to_string(&manifest_path)
+                        .ok()
+                        .and_then(|s| {
+                            serde_json::from_str::<skreg_core::manifest::Manifest>(&s).ok()
+                        })
+                        .map(|m| m.description)
+                };
+                skreg_client::client::SearchResult {
+                    namespace: p.namespace,
+                    name: p.name,
+                    latest_version: Some(p.version),
+                    description,
+                }
+            })
+            .collect();
+        self.state.selected = 0;
+        self.state.table_state.select(Some(0));
+        self.load = Load::Loaded;
+        self.installed_mode = true;
+    }
+
     fn commit_search(&mut self) {
         self.query = self.search_input.clone();
         self.search_changed_at = None;
         self.state.selected = 0;
         self.state.table_state.select(Some(0));
-        self.fetch();
+        if self.query == "installed" {
+            self.load_installed_packages();
+        } else {
+            self.installed_mode = false;
+            self.fetch();
+        }
     }
 
     fn clear_search(&mut self) {
+        self.installed_mode = false;
         self.searching = false;
         self.search_input.clear();
         self.search_changed_at = None;
@@ -209,9 +271,11 @@ impl PackageListView {
 impl View for PackageListView {
     fn tick(&mut self) -> Option<Action> {
         // Debounced search: fire fetch once input settles for SEARCH_DEBOUNCE.
-        if let Some(changed_at) = self.search_changed_at {
-            if changed_at.elapsed() >= SEARCH_DEBOUNCE {
-                self.commit_search();
+        if !self.installed_mode {
+            if let Some(changed_at) = self.search_changed_at {
+                if changed_at.elapsed() >= SEARCH_DEBOUNCE {
+                    self.commit_search();
+                }
             }
         }
 
@@ -360,36 +424,70 @@ impl View for PackageListView {
             ]);
             frame.render_widget(Paragraph::new(filter_line), search_area);
 
+            let search_hints: &[(&str, &str)] = if self.search_input.is_empty() {
+                &[("tab", "installed"), ("esc", "cancel"), ("enter", "search")]
+            } else {
+                &[("esc", "cancel"), ("enter", "search")]
+            };
             Footer {
-                hints: &[("esc", "cancel"), ("enter", "search")],
+                hints: search_hints,
             }
             .render(frame, footer_area, theme);
+        } else if self.confirming {
+            Footer {
+                hints: &[("y", " confirm uninstall"), ("N", " cancel")],
+            }
+            .render(frame, bottom_area, theme);
         } else if !self.query.is_empty() {
-            let filter_hint = format!(
-                "Filter: \"{}\" · {} result{}",
-                self.query,
-                self.state.items.len(),
-                if self.state.items.len() == 1 { "" } else { "s" },
-            );
+            let filter_hint = if self.installed_mode {
+                format!(
+                    "Filter: installed · {} package{}",
+                    self.state.items.len(),
+                    if self.state.items.len() == 1 { "" } else { "s" },
+                )
+            } else {
+                format!(
+                    "Filter: \"{}\" · {} result{}",
+                    self.query,
+                    self.state.items.len(),
+                    if self.state.items.len() == 1 { "" } else { "s" },
+                )
+            };
             frame.render_widget(
                 Paragraph::new(filter_hint).style(theme.accent()),
                 bottom_area,
             );
         } else {
-            Footer {
-                hints: &[
-                    ("/", "search"),
-                    ("i", "install"),
-                    ("enter", "detail"),
-                    ("c", "context"),
-                    ("q", "quit"),
-                ],
+            let is_installed_selected = self.state.selected_item().is_some_and(|item| {
+                self.installed
+                    .contains(&format!("{}/{}", item.namespace, item.name))
+            });
+            let mut hints: Vec<(&str, &str)> = vec![
+                ("/", "search"),
+                ("i", "install"),
+                ("enter", "detail"),
+                ("c", "context"),
+                ("q", "quit"),
+            ];
+            if is_installed_selected {
+                hints.push(("del", "uninstall"));
             }
-            .render(frame, bottom_area, theme);
+            Footer { hints: &hints }.render(frame, bottom_area, theme);
         }
     }
 
     fn handle_event(&mut self, event: Event) -> Action {
+        // Confirmation prompt takes priority over all other keys.
+        if self.confirming {
+            if let Event::Key(KeyEvent { code, .. }) = event {
+                self.confirming = false;
+                if code == KeyCode::Char('y') {
+                    return self.uninstall_selected();
+                }
+            }
+            return Action::None;
+        }
+
         if self.searching {
             return self.handle_search_event(&event);
         }
@@ -431,6 +529,15 @@ impl View for PackageListView {
                 }
                 KeyCode::Char('r') => {
                     self.fetch();
+                    Action::None
+                }
+                KeyCode::Delete => {
+                    if let Some(item) = self.state.selected_item() {
+                        let key = format!("{}/{}", item.namespace, item.name);
+                        if self.installed.contains(&key) {
+                            self.confirming = true;
+                        }
+                    }
                     Action::None
                 }
                 KeyCode::Char('c') => Action::OpenContextSwitcher,
@@ -499,6 +606,12 @@ impl PackageListView {
                 KeyCode::Char(c) => {
                     self.search_input.push(*c);
                     self.search_changed_at = Some(Instant::now());
+                    Action::None
+                }
+                KeyCode::Tab => {
+                    if self.search_input.is_empty() {
+                        self.search_input = "installed".to_string();
+                    }
                     Action::None
                 }
                 _ => Action::None,
