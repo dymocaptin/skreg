@@ -185,7 +185,10 @@ impl PackageListView {
         self.load = Load::Loading;
         tokio::spawn(async move {
             let client = HttpRegistryClient::new(registry);
-            let result = client.search(&query).await.map_err(|e| e.to_string());
+            let result = client
+                .search(&query, false)
+                .await
+                .map_err(|e| e.to_string());
             let _ = tx.send(result);
         });
     }
@@ -230,6 +233,7 @@ impl PackageListView {
                     name: p.name,
                     latest_version: Some(p.version),
                     description,
+                    trusted: false,
                 }
             })
             .collect();
@@ -631,6 +635,7 @@ mod tests {
                 name: (*n).to_string(),
                 description: None,
                 latest_version: Some("1.0.0".into()),
+                trusted: false,
             })
             .collect()
     }

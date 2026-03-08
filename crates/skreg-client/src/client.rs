@@ -35,6 +35,9 @@ pub struct SearchResult {
     pub description: Option<String>,
     /// Latest published version string (most recent by `published_at`), if any.
     pub latest_version: Option<String>,
+    /// Whether the package's namespace holds a valid publisher cert.
+    #[serde(default)]
+    pub trusted: bool,
 }
 
 /// Communicates with a skreg-compatible registry.
@@ -51,12 +54,16 @@ pub trait RegistryClient: Send + Sync {
 
     /// Search the registry for packages matching `query`.
     ///
+    /// If `trusted_only` is `true`, only packages whose namespace holds a valid
+    /// publisher cert are returned.
+    ///
     /// # Errors
     ///
     /// Returns [`ClientError`] on network or parse failure.
     fn search<'a>(
         &'a self,
         query: &'a str,
+        trusted_only: bool,
     ) -> BoxFuture<'a, Result<Vec<SearchResult>, ClientError>>;
 }
 
@@ -170,6 +177,7 @@ impl RegistryClient for HttpRegistryClient {
     fn search<'a>(
         &'a self,
         query: &'a str,
+        trusted_only: bool,
     ) -> BoxFuture<'a, Result<Vec<SearchResult>, ClientError>> {
         #[derive(serde::Deserialize)]
         struct SearchResponse {
@@ -178,12 +186,14 @@ impl RegistryClient for HttpRegistryClient {
 
         Box::pin(async move {
             let url = format!("{}/v1/search", self.base_url);
-            debug!("searching registry: {url}?q={query}");
+            debug!("searching registry: {url}?q={query} trusted_only={trusted_only}");
 
-            let resp: SearchResponse = self
-                .http
-                .get(&url)
-                .query(&[("q", query)])
+            let mut req = self.http.get(&url).query(&[("q", query)]);
+            if trusted_only {
+                req = req.query(&[("trusted", "true")]);
+            }
+
+            let resp: SearchResponse = req
                 .send()
                 .await?
                 .error_for_status()
