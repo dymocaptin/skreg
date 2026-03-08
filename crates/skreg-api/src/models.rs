@@ -45,4 +45,6 @@ pub struct SearchQuery {
     pub category: Option<String>,
     /// Page number (default 1).
     pub page: Option<i64>,
+    /// When `true`, restrict results to packages from trusted publishers.
+    pub signed: Option<bool>,
 }

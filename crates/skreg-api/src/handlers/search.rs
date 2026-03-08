@@ -24,6 +24,7 @@ pub async fn search_handler(
     let page = params.page.unwrap_or(1).max(1);
     let offset = (page - 1) * PAGE_SIZE;
     let query = params.q.unwrap_or_default();
+    let signed = params.signed.unwrap_or(false);
 
     let rows: Vec<PackageSummary> = sqlx::query_as(
         "
@@ -43,12 +44,19 @@ pub async fn search_handler(
         WHERE n.banned_at IS NULL
           AND ($1 = '' OR ps.search_vector @@ plainto_tsquery('english', $1))
           AND ($2::text IS NULL OR p.category = $2)
+          AND (NOT $3 OR EXISTS (
+              SELECT 1 FROM publisher_certs pc
+              WHERE pc.namespace_id = p.namespace_id
+                AND pc.revoked_at IS NULL
+                AND pc.expires_at > now()
+          ))
         ORDER BY p.created_at DESC
-        LIMIT $3 OFFSET $4
+        LIMIT $4 OFFSET $5
         ",
     )
     .bind(&query)
     .bind(&params.category)
+    .bind(signed)
     .bind(PAGE_SIZE)
     .bind(offset)
     .fetch_all(pool)
@@ -66,10 +74,17 @@ pub async fn search_handler(
         WHERE n.banned_at IS NULL
           AND ($1 = '' OR ps.search_vector @@ plainto_tsquery('english', $1))
           AND ($2::text IS NULL OR p.category = $2)
+          AND (NOT $3 OR EXISTS (
+              SELECT 1 FROM publisher_certs pc
+              WHERE pc.namespace_id = p.namespace_id
+                AND pc.revoked_at IS NULL
+                AND pc.expires_at > now()
+          ))
         ",
     )
     .bind(&query)
     .bind(&params.category)
+    .bind(signed)
     .fetch_one(pool)
     .await
     .map_err(|e| {
