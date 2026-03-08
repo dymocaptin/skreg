@@ -7,7 +7,7 @@ use anyhow::Result;
 use serde::{Deserialize, Serialize};
 
 /// Enforcement level for policy checks.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum EnforcementLevel {
     /// Surface a hint but take no blocking action.
@@ -20,7 +20,7 @@ pub enum EnforcementLevel {
 }
 
 /// Policy configuration for the CLI.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PolicyConfig {
     /// How policy violations are enforced.
     #[serde(default)]
@@ -274,5 +274,64 @@ enforcement = "strict"
 "#;
         let cfg: CliConfig = toml::from_str(toml).unwrap();
         assert_eq!(cfg.policy.enforcement, EnforcementLevel::Strict);
+    }
+
+    #[test]
+    fn policy_config_parses_hint() {
+        let toml = r#"
+active_context = "default"
+
+[contexts.default]
+registry = "https://api.skreg.ai"
+namespace = "testuser"
+api_key = "skreg_abc123"
+
+[policy]
+enforcement = "hint"
+"#;
+        let cfg: CliConfig = toml::from_str(toml).unwrap();
+        assert_eq!(cfg.policy.enforcement, EnforcementLevel::Hint);
+    }
+
+    #[test]
+    fn policy_config_parses_explicit_confirm() {
+        let toml = r#"
+active_context = "default"
+
+[contexts.default]
+registry = "https://api.skreg.ai"
+namespace = "testuser"
+api_key = "skreg_abc123"
+
+[policy]
+enforcement = "confirm"
+"#;
+        let cfg: CliConfig = toml::from_str(toml).unwrap();
+        assert_eq!(cfg.policy.enforcement, EnforcementLevel::Confirm);
+    }
+
+    #[test]
+    fn config_roundtrip_preserves_policy() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("config.toml");
+        let mut contexts = HashMap::new();
+        contexts.insert(
+            "default".to_owned(),
+            ContextConfig {
+                registry: "https://example.com".to_owned(),
+                namespace: "acme".to_owned(),
+                api_key: "skreg_abc".to_owned(),
+            },
+        );
+        let cfg = CliConfig {
+            active_context: "default".to_owned(),
+            contexts,
+            policy: PolicyConfig {
+                enforcement: EnforcementLevel::Strict,
+            },
+        };
+        save_config(&cfg, &path).unwrap();
+        let loaded = load_config(&path).unwrap();
+        assert_eq!(loaded.policy, cfg.policy);
     }
 }
