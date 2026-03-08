@@ -4,9 +4,12 @@ version = "0.1.2"
 edition = "2021"
 repository = "https://github.com/dymocaptin/skreg"
 description = "The api which supports Skreg skills and package management"
-license = "Apache 2.0"
+license = "Apache-2.0"
 authors = ["dymocaptin"]
 homepage = "https://skreg.ai"
+
+[package.metadata.dist]
+dist = false
 
 [package.metadata.wix]
 upgrade-guid = "2D2C1434-5ED4-4EEC-9555-6ACD6F161133"
