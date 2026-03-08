@@ -34,7 +34,7 @@ pub async fn run_search(query: &str, trusted_only: bool) -> Result<()> {
     for r in &results {
         let package = format!("{}/{}", r.namespace, r.name);
         let version = r.latest_version.as_deref().unwrap_or("?");
-        let trusted = if r.trusted { "✓" } else { "" };
+        let trusted = if r.trusted { "✓" } else { "✗" };
         let desc = r.description.as_deref().unwrap_or("");
         table.add_row([package.as_str(), version, trusted, desc]);
     }

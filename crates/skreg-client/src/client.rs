@@ -185,7 +185,7 @@ impl RegistryClient for HttpRegistryClient {
 
         Box::pin(async move {
             let url = format!("{}/v1/search", self.base_url);
-            debug!("searching registry: {url}?q={query}");
+            debug!("searching registry: {url}?q={query} trusted_only={trusted_only}");
 
             let mut req = self.http.get(&url).query(&[("q", query)]);
             if trusted_only {
