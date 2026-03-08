@@ -137,6 +137,7 @@ mod tests {
         CliConfig {
             active_context: active.to_string(),
             contexts,
+            policy: skreg_core::config::PolicyConfig::default(),
         }
     }
 
