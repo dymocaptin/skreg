@@ -21,6 +21,8 @@ pub struct PackageSummary {
     pub created_at: DateTime<Utc>,
     /// Latest published version string (most recent by `published_at`), if any.
     pub latest_version: Option<String>,
+    /// Whether the package's namespace holds a valid publisher cert.
+    pub trusted: bool,
 }
 
 /// Paginated search response.

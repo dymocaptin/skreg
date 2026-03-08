@@ -30,7 +30,13 @@ pub async fn search_handler(
         SELECT p.id, n.slug AS namespace, p.name, p.description, p.category, p.created_at,
                (SELECT v2.version FROM versions v2
                 WHERE v2.package_id = p.id AND v2.yanked_at IS NULL
-                ORDER BY v2.published_at DESC LIMIT 1) AS latest_version
+                ORDER BY v2.published_at DESC LIMIT 1) AS latest_version,
+               EXISTS (
+                   SELECT 1 FROM publisher_certs pc
+                   WHERE pc.namespace_id = p.namespace_id
+                     AND pc.revoked_at IS NULL
+                     AND pc.expires_at > now()
+               ) AS trusted
         FROM packages p
         JOIN namespaces n ON n.id = p.namespace_id
         LEFT JOIN package_search ps ON ps.package_id = p.id
