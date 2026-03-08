@@ -36,6 +36,7 @@ pub struct SearchResult {
     /// Latest published version string (most recent by `published_at`), if any.
     pub latest_version: Option<String>,
     /// Whether the package's namespace holds a valid publisher cert.
+    #[serde(default)]
     pub trusted: bool,
 }
 
