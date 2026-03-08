@@ -3,6 +3,7 @@
 use anyhow::{Context, Result};
 use comfy_table::presets::UTF8_FULL;
 use comfy_table::{ContentArrangement, Table};
+use crossterm::terminal;
 
 use skreg_client::client::{HttpRegistryClient, RegistryClient};
 
@@ -25,10 +26,13 @@ pub async fn run_search(query: &str, trusted_only: bool) -> Result<()> {
         return Ok(());
     }
 
+    let term_width = terminal::size().map(|(w, _)| w).unwrap_or(120);
+
     let mut table = Table::new();
     table
         .load_preset(UTF8_FULL)
         .set_content_arrangement(ContentArrangement::Dynamic)
+        .set_width(term_width)
         .set_header(["Package", "Version", "Trusted", "Description"]);
 
     for r in &results {

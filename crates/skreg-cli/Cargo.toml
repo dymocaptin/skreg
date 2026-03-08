@@ -36,6 +36,7 @@ serde           = { workspace = true }
 reqwest         = { workspace = true }
 hex             = "0.4"
 comfy-table     = { version = "7", default-features = false }
+crossterm       = { version = "0.28", default-features = false }
 tempfile        = "3"
 thiserror       = { workspace = true }
 home            = "0.5"
