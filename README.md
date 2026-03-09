@@ -14,6 +14,12 @@ private registry your team controls.
 
 ## Install
 
+### Pre-built binary (macOS and Linux)
+
+```bash
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/dymocaptin/skreg/releases/download/v0.1.2/skreg-cli-installer.sh | sh
+```
+
 ### Homebrew (macOS and Linux)
 
 ```bash
