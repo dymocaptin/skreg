@@ -5,6 +5,9 @@ from unittest.mock import patch
 
 import pulumi
 from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
+from cryptography.hazmat.primitives.serialization import load_pem_private_key
+from cryptography.x509 import load_pem_x509_certificate
 from pulumi.runtime import Mocks
 
 
@@ -34,8 +37,6 @@ def test_generate_root_ca_returns_pem_strings() -> None:
 
 def test_generate_root_ca_key_is_4096_bits() -> None:
     """_generate_root_ca produces a 4096-bit RSA key."""
-    from cryptography.hazmat.primitives.serialization import load_pem_private_key
-
     key_pem, _ = _generate_root_ca()
     key = load_pem_private_key(key_pem.encode(), password=None)
     assert key.key_size == 4096  # type: ignore[attr-defined]
@@ -73,10 +74,6 @@ def test_pki_hsm_key_id_is_set() -> None:
 
 def test_generate_root_ca_cert_uses_pss_signature() -> None:
     """Root CA cert must use RSA-PSS signature algorithm."""
-    from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
-    from cryptography.hazmat.primitives.serialization import load_pem_private_key
-    from cryptography.x509 import load_pem_x509_certificate
-
     key_pem, cert_pem = _generate_root_ca()
 
     cert = load_pem_x509_certificate(cert_pem.encode())
