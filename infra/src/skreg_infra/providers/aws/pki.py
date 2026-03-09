@@ -9,7 +9,7 @@ import pulumi
 import pulumi_aws as aws
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.hazmat.primitives.asymmetric import padding as asym_padding, rsa
 from cryptography.x509.oid import NameOID
 
 from skreg_infra.components.pki import PkiOutputs
@@ -41,7 +41,14 @@ def _generate_root_ca() -> tuple[str, str]:
         .not_valid_before(now)
         .not_valid_after(now + datetime.timedelta(days=3650))
         .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
-        .sign(private_key, hashes.SHA256())
+        .sign(
+            private_key,
+            hashes.SHA256(),
+            rsa_padding=asym_padding.PSS(
+                mgf=asym_padding.MGF1(hashes.SHA256()),
+                salt_length=32,
+            ),
+        )
     )
     pem_key = private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
