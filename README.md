@@ -14,11 +14,34 @@ private registry your team controls.
 
 ## Install
 
+### Pre-built binary (macOS and Linux)
+
+```bash
+curl --proto '=https' --tlsv1.2 -LsSf https://github.com/dymocaptin/skreg/releases/download/v0.1.2/skreg-cli-installer.sh | sh
+```
+
+### Homebrew (macOS and Linux)
+
+```bash
+brew tap dymocaptin/tap
+brew install skreg
+```
+
+### npm
+
+```bash
+npm install -g skreg-cli
+```
+
+### cargo (build from source)
+
+Requires Rust ([rustup.rs](https://rustup.rs)).
+
 ```bash
 cargo install skreg-cli
 ```
 
-Requires Rust ([rustup.rs](https://rustup.rs)). After installing, verify with:
+After installing with any method, verify with:
 
 ```bash
 skreg --version
