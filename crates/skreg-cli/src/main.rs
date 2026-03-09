@@ -28,6 +28,8 @@ enum Commands {
         #[arg(long, value_name = "LEVEL")]
         enforcement: Option<String>,
     },
+    /// List all tracked skill symlinks
+    Links,
     /// Launch the interactive terminal UI
     Tui,
     /// Remove an installed skill
@@ -69,6 +71,9 @@ async fn main() -> anyhow::Result<()> {
                 ),
             };
             skreg_cli::commands::install::run_install(&package_ref, level).await?;
+        }
+        Commands::Links => {
+            skreg_cli::commands::links::run_links()?;
         }
         Commands::Tui => {
             skreg_cli::commands::tui::run_tui()?;
