@@ -59,6 +59,54 @@ def _generate_root_ca() -> tuple[str, str]:
     return pem_key, pem_cert
 
 
+def _generate_publisher_ca(root_key_pem: str, root_cert_pem: str) -> tuple[str, str]:
+    """Generate an RSA-2048 Publisher CA key and certificate signed by the root CA.
+
+    Returns:
+        ``(pem_key, pem_cert)`` — both as ASCII strings. Validity: 5 years.
+    """
+    from cryptography.hazmat.primitives import serialization as _serialization
+    from cryptography.x509 import load_pem_x509_certificate as _load_cert
+
+    root_key = _serialization.load_pem_private_key(root_key_pem.encode(), password=None)
+    root_cert = _load_cert(root_cert_pem.encode())
+
+    private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+
+    subject = x509.Name(
+        [
+            x509.NameAttribute(NameOID.COMMON_NAME, "skreg Publisher CA"),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, "skreg"),
+        ]
+    )
+    now = datetime.datetime.now(tz=datetime.UTC)
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(root_cert.subject)
+        .public_key(private_key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now)
+        .not_valid_after(now + datetime.timedelta(days=1825))  # 5 years
+        .add_extension(x509.BasicConstraints(ca=True, path_length=0), critical=True)
+        .sign(
+            root_key,
+            hashes.SHA256(),
+            rsa_padding=asym_padding.PSS(
+                mgf=asym_padding.MGF1(hashes.SHA256()),
+                salt_length=32,
+            ),
+        )
+    )
+    pem_key = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.TraditionalOpenSSL,
+        encryption_algorithm=serialization.NoEncryption(),
+    ).decode("ascii")
+    pem_cert = cert.public_bytes(serialization.Encoding.PEM).decode("ascii")
+    return pem_key, pem_cert
+
+
 class AwsPkiArgs:
     """Arguments for the software PKI component."""
 
@@ -115,6 +163,42 @@ class AwsPki(pulumi.ComponentResource):
             opts=pulumi.ResourceOptions(parent=self, ignore_changes=["secret_string"]),
         )
 
+        pem_pub_key, pem_pub_cert = _generate_publisher_ca(pem_key, pem_cert)
+
+        publisher_ca_key_secret = aws.secretsmanager.Secret(
+            f"{name}-publisher-ca-key",
+            aws.secretsmanager.SecretArgs(name="skreg/pki/publisher-ca-key"),
+            opts=pulumi.ResourceOptions(parent=self),
+        )
+
+        aws.secretsmanager.SecretVersion(
+            f"{name}-publisher-ca-key-version",
+            aws.secretsmanager.SecretVersionArgs(
+                secret_id=publisher_ca_key_secret.id,
+                secret_string=pem_pub_key,
+            ),
+            opts=pulumi.ResourceOptions(parent=self, ignore_changes=["secret_string"]),
+        )
+
+        publisher_ca_cert_secret = aws.secretsmanager.Secret(
+            f"{name}-publisher-ca-cert",
+            aws.secretsmanager.SecretArgs(name="skreg/pki/publisher-ca-cert"),
+            opts=pulumi.ResourceOptions(parent=self),
+        )
+
+        publisher_ca_cert_version = aws.secretsmanager.SecretVersion(
+            f"{name}-publisher-ca-cert-version",
+            aws.secretsmanager.SecretVersionArgs(
+                secret_id=publisher_ca_cert_secret.id,
+                secret_string=pem_pub_cert,
+            ),
+            opts=pulumi.ResourceOptions(parent=self, ignore_changes=["secret_string"]),
+        )
+
+        self.publisher_ca_cert_pem: pulumi.Output[str] = publisher_ca_cert_version.secret_string.apply(
+            lambda s: s or ""
+        )
+
         aws.s3.BucketObject(
             f"{name}-crl",
             aws.s3.BucketObjectArgs(
@@ -132,6 +216,7 @@ class AwsPki(pulumi.ComponentResource):
                 lambda b: f"s3://{b}/.well-known/crl.pem"
             ),
             hsm_backend="software",
+            publisher_ca_key_secret_name=publisher_ca_key_secret.name,
         )
         self.root_ca_cert_pem: pulumi.Output[str] = ca_cert_version.secret_string.apply(
             lambda s: s or ""
@@ -143,6 +228,8 @@ class AwsPki(pulumi.ComponentResource):
                 "intermediate_ca_cert_secret_name": self._outputs.intermediate_ca_cert_secret_name,
                 "crl_bucket_path": self._outputs.crl_bucket_path,
                 "root_ca_cert_pem": self.root_ca_cert_pem,
+                "publisher_ca_cert_pem": self.publisher_ca_cert_pem,
+                "publisher_ca_key_secret_name": self._outputs.publisher_ca_key_secret_name,
             }
         )
 

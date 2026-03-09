@@ -52,6 +52,7 @@ def test_pki_outputs_constructible() -> None:
         intermediate_ca_cert_secret_name=pulumi.Output.from_input("ca-secret"),
         crl_bucket_path=pulumi.Output.from_input("s3://bucket/crl.pem"),
         hsm_backend="software",
+        publisher_ca_key_secret_name=pulumi.Output.from_input("publisher-ca-key-secret"),
     )
     assert outputs is not None
 
