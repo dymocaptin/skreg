@@ -1,6 +1,6 @@
 # skreg
 
-A package registry for AI coding assistant skills.
+A package registry for AI coding assistant skills, built on cryptographic publisher identity and trust.
 
 ## What is skreg?
 
@@ -11,6 +11,19 @@ prompts you share across projects and teams.
 Browse and install community skills from [skreg.ai](https://skreg.ai). Package
 your own with a single command and publish them for others to use — or run a
 private registry your team controls.
+
+## Trust & Verification
+
+Every package published to skreg carries a cryptographic publisher signature. Two verification tiers are supported:
+
+| Tier | Badge | How |
+|------|-------|-----|
+| **Self-signed** | `◈ self-signed` | Publisher generated their own key. Key consistency is enforced at the namespace level — once a key is used it cannot be swapped without an explicit rotation. |
+| **CA-verified** | `✦ verified` | Publisher obtained a CA-issued cert from the skreg Publisher CA. Proves organisation identity. |
+
+All packages — regardless of tier — pass content, safety, and structure vetting before appearing in search. The registry does not counter-sign packages; only the publisher's key appears in the signature.
+
+Key material is stored in `~/.skreg/keys/` with `chmod 700`. Run `skreg certify` to obtain a CA-verified cert. Run `skreg rotate` to safely rotate your namespace's signing key.
 
 ## Install
 
