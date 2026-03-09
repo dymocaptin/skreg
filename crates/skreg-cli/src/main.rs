@@ -22,9 +22,11 @@ enum Commands {
     },
     /// Download and install a skill
     Install {
-        /// Package reference (namespace/name or namespace/name@version)
         #[arg(value_name = "PACKAGE")]
         package_ref: String,
+        /// Trust policy enforcement level (hint | confirm | strict)
+        #[arg(long, value_name = "LEVEL")]
+        enforcement: Option<String>,
     },
     /// Launch the interactive terminal UI
     Tui,
@@ -53,8 +55,16 @@ async fn main() -> anyhow::Result<()> {
         Commands::Search { query } => {
             skreg_cli::commands::search::run_search(&query).await?;
         }
-        Commands::Install { package_ref } => {
-            skreg_cli::commands::install::run_install(&package_ref).await?;
+        Commands::Install {
+            package_ref,
+            enforcement,
+        } => {
+            let level = enforcement.as_deref().map(|s| match s {
+                "hint" => skreg_core::config::EnforcementLevel::Hint,
+                "strict" => skreg_core::config::EnforcementLevel::Strict,
+                _ => skreg_core::config::EnforcementLevel::Confirm,
+            });
+            skreg_cli::commands::install::run_install(&package_ref, level).await?;
         }
         Commands::Tui => {
             skreg_cli::commands::tui::run_tui()?;
