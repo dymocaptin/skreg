@@ -93,11 +93,11 @@ pub async fn run_install(
     let ns = result.pkg_ref.namespace.as_str();
     let name = result.pkg_ref.name.as_str();
     let version = result
-        .pkg_ref
-        .version
-        .as_ref()
-        .map(ToString::to_string)
-        .unwrap_or_default();
+        .install_path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("")
+        .to_string();
     let pkg_key = format!("{ns}/{name}@{version}");
 
     println!("✓ Verified {pkg_key}");

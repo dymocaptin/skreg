@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 
+use skreg_core::config::{default_config_path, load_config};
 use skreg_core::package_ref::PackageRef;
 
 use crate::linker::Linker;
@@ -20,7 +21,8 @@ fn default_install_root() -> Result<PathBuf> {
 /// # Errors
 ///
 /// Returns an error if the package is not installed or removal fails.
-pub fn run_uninstall_with_root(package_ref: &str, install_root: &Path) -> Result<()> {
+#[cfg(test)]
+pub(crate) fn run_uninstall_with_root(package_ref: &str, install_root: &Path) -> Result<()> {
     let pkg_ref = PackageRef::parse(package_ref)
         .with_context(|| format!("invalid package reference: {package_ref:?}"))?;
 
@@ -120,6 +122,33 @@ pub fn run_uninstall_with_root_and_links(
     // Remove tracked symlinks before deleting the package directory
     let mut linker = Linker::new(links_path.to_path_buf());
     let removed_links = linker.remove_symlinks(&pkg_key)?;
+
+    // Update ~/.claude/CLAUDE.md if ~/.claude/ exists (best-effort)
+    let home_opt = home::home_dir();
+    if let Some(ref home) = home_opt {
+        let claude_md = home.join(".claude").join("CLAUDE.md");
+        if claude_md.parent().is_some_and(std::path::Path::exists) {
+            let enforcement = {
+                let cfg_path = default_config_path();
+                load_config(&cfg_path)
+                    .map(|c| c.policy.enforcement)
+                    .unwrap_or_default()
+            };
+            let entries: Vec<crate::linker::ClaudeMdEntry> = {
+                let mut seen = std::collections::HashSet::new();
+                linker
+                    .links()
+                    .iter()
+                    .filter(|r| seen.insert(r.package.clone()))
+                    .map(|r| crate::linker::ClaudeMdEntry {
+                        package: r.package.clone(),
+                        verified_date: String::new(),
+                    })
+                    .collect()
+            };
+            let _ = linker.write_claude_md(&claude_md, &entries, &enforcement);
+        }
+    }
 
     for entry in &version_dirs {
         std::fs::remove_dir_all(entry.path())
