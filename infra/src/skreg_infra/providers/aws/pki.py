@@ -9,7 +9,8 @@ import pulumi
 import pulumi_aws as aws
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import padding as asym_padding, rsa
+from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
+from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
 
 from skreg_infra.components.pki import PkiOutputs
@@ -65,11 +66,11 @@ def _generate_publisher_ca(root_key_pem: str, root_cert_pem: str) -> tuple[str, 
     Returns:
         ``(pem_key, pem_cert)`` — both as ASCII strings. Validity: 5 years.
     """
-    from cryptography.hazmat.primitives import serialization as _serialization
-    from cryptography.x509 import load_pem_x509_certificate as _load_cert
-
-    root_key = _serialization.load_pem_private_key(root_key_pem.encode(), password=None)
-    root_cert = _load_cert(root_cert_pem.encode())
+    _root_key_raw = serialization.load_pem_private_key(root_key_pem.encode(), password=None)
+    if not isinstance(_root_key_raw, rsa.RSAPrivateKey):
+        raise TypeError("root CA key must be an RSA private key")
+    root_key: rsa.RSAPrivateKey = _root_key_raw
+    root_cert = x509.load_pem_x509_certificate(root_cert_pem.encode())
 
     private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 
@@ -195,8 +196,8 @@ class AwsPki(pulumi.ComponentResource):
             opts=pulumi.ResourceOptions(parent=self, ignore_changes=["secret_string"]),
         )
 
-        self.publisher_ca_cert_pem: pulumi.Output[str] = publisher_ca_cert_version.secret_string.apply(
-            lambda s: s or ""
+        self.publisher_ca_cert_pem: pulumi.Output[str] = (
+            publisher_ca_cert_version.secret_string.apply(lambda s: s or "")
         )
 
         aws.s3.BucketObject(
