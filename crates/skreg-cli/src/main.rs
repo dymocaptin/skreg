@@ -59,11 +59,15 @@ async fn main() -> anyhow::Result<()> {
             package_ref,
             enforcement,
         } => {
-            let level = enforcement.as_deref().map(|s| match s {
-                "hint" => skreg_core::config::EnforcementLevel::Hint,
-                "strict" => skreg_core::config::EnforcementLevel::Strict,
-                _ => skreg_core::config::EnforcementLevel::Confirm,
-            });
+            let level = match enforcement.as_deref() {
+                None => None,
+                Some("hint") => Some(skreg_core::config::EnforcementLevel::Hint),
+                Some("confirm") => Some(skreg_core::config::EnforcementLevel::Confirm),
+                Some("strict") => Some(skreg_core::config::EnforcementLevel::Strict),
+                Some(other) => anyhow::bail!(
+                    "unknown enforcement level {other:?} — expected hint, confirm, or strict"
+                ),
+            };
             skreg_cli::commands::install::run_install(&package_ref, level).await?;
         }
         Commands::Tui => {
