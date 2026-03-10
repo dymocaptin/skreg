@@ -3288,6 +3288,7 @@ name = "skreg-cli"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "clap",
  "env_logger",
  "hex",
@@ -3380,6 +3381,7 @@ dependencies = [
  "dirs",
  "ratatui",
  "serde",
+ "serde_json",
  "skreg-client",
  "skreg-core",
  "tempfile",
