@@ -3369,6 +3369,7 @@ dependencies = [
  "axum",
  "axum-test",
  "chrono",
+ "der 0.7.10",
  "env_logger",
  "hex",
  "jsonwebtoken",
@@ -3387,6 +3388,7 @@ dependencies = [
  "tokio",
  "tower-http",
  "uuid",
+ "x509-cert",
 ]
 
 [[package]]
@@ -3504,6 +3506,7 @@ dependencies = [
  "aws-config",
  "aws-sdk-s3",
  "aws-sdk-secretsmanager",
+ "aws-sdk-sesv2",
  "chrono",
  "env_logger",
  "hex",
@@ -3522,6 +3525,7 @@ dependencies = [
  "tokio",
  "uuid",
  "walkdir",
+ "x509-cert",
 ]
 
 [[package]]
