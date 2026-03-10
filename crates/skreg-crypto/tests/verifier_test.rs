@@ -30,6 +30,8 @@ use skreg_crypto::verifier::{RsaPssVerifier, SignatureVerifier};
 /// rcgen 0.12 exposes PKCS_RSA_SHA256 publicly; the PSS constant is pub(crate).
 /// For testing the package-signature path, the cert signing algorithm doesn't matter —
 /// we only use the cert to carry the public key.
+///
+/// The cert's subject distinguished name has CN set to `cn` for namespace matching tests.
 fn make_test_ca(cn: &str) -> (String, String) {
     let mut rng = rand::thread_rng();
     let private_key = rsa::RsaPrivateKey::new(&mut rng, 2048).unwrap();
@@ -42,6 +44,10 @@ fn make_test_ca(cn: &str) -> (String, String) {
         .expect("failed to load RSA key into rcgen");
 
     let mut params = rcgen::CertificateParams::new(vec![cn.to_owned()]);
+    params.distinguished_name = rcgen::DistinguishedName::new();
+    params
+        .distinguished_name
+        .push(rcgen::DnType::CommonName, cn);
     params.key_pair = Some(key_pair);
     params.alg = &rcgen::PKCS_RSA_SHA256;
 
@@ -159,4 +165,34 @@ fn verify_error_displays_cn_mismatch() {
         got: "other".to_string(),
     };
     assert!(e.to_string().contains("acme"));
+}
+
+#[test]
+fn pss_verifier_self_signed_with_correct_cn_passes() {
+    let (ca_pem, key_pem) = make_test_ca("acme");
+    let digest_hex = "f".repeat(64);
+    let signature = pss_sign(&key_pem, &digest_hex);
+    let digest = Sha256Digest::from_hex(&digest_hex).unwrap();
+
+    let verifier = RsaPssVerifier::new_with_root_pem(ca_pem.as_bytes());
+    let result = verifier.verify_with_namespace(&digest, &signature, &[ca_pem], "acme");
+    assert!(result.is_ok(), "{result:?}");
+}
+
+#[test]
+fn pss_verifier_self_signed_cn_mismatch_rejects() {
+    let (ca_pem, key_pem) = make_test_ca("acme");
+    let digest_hex = "0".repeat(64);
+    let signature = pss_sign(&key_pem, &digest_hex);
+    let digest = Sha256Digest::from_hex(&digest_hex).unwrap();
+
+    let verifier = RsaPssVerifier::new_with_root_pem(ca_pem.as_bytes());
+    let result = verifier.verify_with_namespace(&digest, &signature, &[ca_pem], "other-ns");
+    assert!(
+        matches!(
+            result,
+            Err(skreg_crypto::error::VerifyError::CnMismatch { .. })
+        ),
+        "expected CnMismatch, got {result:?}"
+    );
 }

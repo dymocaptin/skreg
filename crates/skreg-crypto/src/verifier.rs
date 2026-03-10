@@ -7,10 +7,14 @@ use rsa::signature::Verifier;
 use rsa::RsaPublicKey;
 use sha2::Sha256;
 use skreg_core::types::Sha256Digest;
+use x509_cert::der::asn1::{PrintableStringRef, Utf8StringRef};
 use x509_cert::der::{DecodePem, Encode};
 use x509_cert::Certificate;
 
 use crate::error::VerifyError;
+
+/// OID for Common Name attribute (2.5.4.3).
+const OID_COMMON_NAME: &str = "2.5.4.3";
 
 /// The identity of a verified signer extracted from a certificate chain.
 #[derive(Debug, Clone)]
@@ -39,6 +43,20 @@ pub trait SignatureVerifier: Send + Sync {
         digest: &Sha256Digest,
         signature: &[u8],
         cert_chain_pem: &[String],
+    ) -> Result<VerifiedSigner, VerifyError>;
+
+    /// Verify signature and additionally check that the cert CN matches `namespace`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`VerifyError::CnMismatch`] if the cert's common name does not match
+    /// `namespace`, in addition to all errors from [`verify`](Self::verify).
+    fn verify_with_namespace(
+        &self,
+        digest: &Sha256Digest,
+        signature: &[u8],
+        cert_chain_pem: &[String],
+        namespace: &str,
     ) -> Result<VerifiedSigner, VerifyError>;
 }
 
@@ -85,7 +103,24 @@ impl RsaPssVerifier {
         RsaPublicKey::from_public_key_der(&spki_der).map_err(|e| VerifyError::Der(e.to_string()))
     }
 
+    /// Extract the raw Common Name value from the cert subject DN.
+    ///
+    /// Tries `UTF8String` then `PrintableString` encoding. Falls back to the full
+    /// RFC 4514 subject string if no CN attribute is found.
     fn extract_common_name(cert: &Certificate) -> String {
+        let cn_oid = x509_cert::der::asn1::ObjectIdentifier::new_unwrap(OID_COMMON_NAME);
+        for rdn in &cert.tbs_certificate.subject.0 {
+            for atv in rdn.0.iter() {
+                if atv.oid == cn_oid {
+                    if let Ok(s) = Utf8StringRef::try_from(&atv.value) {
+                        return s.as_str().to_owned();
+                    }
+                    if let Ok(s) = PrintableStringRef::try_from(&atv.value) {
+                        return s.as_str().to_owned();
+                    }
+                }
+            }
+        }
         cert.tbs_certificate.subject.to_string()
     }
 
@@ -194,5 +229,22 @@ impl SignatureVerifier for RsaPssVerifier {
                 cert_chain_pem.len()
             ))),
         }
+    }
+
+    fn verify_with_namespace(
+        &self,
+        digest: &Sha256Digest,
+        signature: &[u8],
+        cert_chain_pem: &[String],
+        namespace: &str,
+    ) -> Result<VerifiedSigner, VerifyError> {
+        let signer = self.verify(digest, signature, cert_chain_pem)?;
+        if signer.common_name != namespace {
+            return Err(VerifyError::CnMismatch {
+                expected: namespace.to_owned(),
+                got: signer.common_name.clone(),
+            });
+        }
+        Ok(signer)
     }
 }
