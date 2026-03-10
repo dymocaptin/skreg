@@ -8,7 +8,7 @@ use anyhow::{Context, Result};
 use skreg_client::client::HttpRegistryClient;
 use skreg_core::config::EnforcementLevel;
 use skreg_core::package_ref::PackageRef;
-use skreg_crypto::verifier::RsaPkcs1Verifier;
+use skreg_crypto::verifier::RsaPssVerifier;
 
 use crate::config::{default_config_path, load_config};
 use crate::installer::Installer;
@@ -84,7 +84,7 @@ pub async fn run_install(
     let enforcement = enforcement_override.unwrap_or_else(|| cfg.policy.enforcement.clone());
 
     let client = Arc::new(HttpRegistryClient::new(cfg.registry()));
-    let verifier = Arc::new(RsaPkcs1Verifier::new());
+    let verifier = Arc::new(RsaPssVerifier::new());
     let install_root = default_install_root()?;
 
     let installer = Installer::new(client, install_root).with_verifier(verifier);
