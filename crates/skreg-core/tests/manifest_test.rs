@@ -15,10 +15,43 @@ fn manifest_serialises_and_roundtrips() {
         )
         .unwrap(),
         cert_chain_pem: vec![],
+        publisher_sig_hex: None,
     };
 
     let json = serde_json::to_string(&manifest).unwrap();
     let roundtripped: Manifest = serde_json::from_str(&json).unwrap();
     assert_eq!(roundtripped.name.as_str(), "deploy-helper");
     assert_eq!(roundtripped.version.to_string(), "1.2.3");
+}
+
+#[test]
+fn manifest_with_publisher_sig_roundtrips() {
+    let json = r#"{
+        "namespace": "acme",
+        "name": "my-skill",
+        "version": "1.0.0",
+        "description": "a test skill that is long enough",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "cert_chain_pem": [],
+        "publisher_sig_hex": "deadbeef"
+    }"#;
+    let m: Manifest = serde_json::from_str(json).unwrap();
+    assert_eq!(m.publisher_sig_hex.as_deref(), Some("deadbeef"));
+    let roundtripped = serde_json::to_string(&m).unwrap();
+    let m2: Manifest = serde_json::from_str(&roundtripped).unwrap();
+    assert_eq!(m2.publisher_sig_hex, m.publisher_sig_hex);
+}
+
+#[test]
+fn manifest_without_publisher_sig_deserializes_as_none() {
+    let json = r#"{
+        "namespace": "acme",
+        "name": "my-skill",
+        "version": "1.0.0",
+        "description": "a test skill that is long enough",
+        "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "cert_chain_pem": []
+    }"#;
+    let m: Manifest = serde_json::from_str(json).unwrap();
+    assert!(m.publisher_sig_hex.is_none());
 }
