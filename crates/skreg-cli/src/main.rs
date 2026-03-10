@@ -19,9 +19,9 @@ enum Commands {
     Search {
         /// Search query string
         query: String,
-        /// Only show skills from trusted publishers
+        /// Only show skills from verified (CA-signed) publishers
         #[arg(long)]
-        trusted: bool,
+        verified: bool,
     },
     /// Download and install a skill
     Install {
@@ -57,8 +57,8 @@ async fn main() -> anyhow::Result<()> {
         Commands::Publish => {
             skreg_cli::commands::publish::run_publish().await?;
         }
-        Commands::Search { query, trusted } => {
-            skreg_cli::commands::search::run_search(&query, trusted).await?;
+        Commands::Search { query, verified } => {
+            skreg_cli::commands::search::run_search(&query, verified).await?;
         }
         Commands::Install {
             package_ref,

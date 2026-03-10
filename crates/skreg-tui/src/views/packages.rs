@@ -233,7 +233,7 @@ impl PackageListView {
                     name: p.name,
                     latest_version: Some(p.version),
                     description,
-                    trusted: false,
+                    verification: "self_signed".to_string(),
                 }
             })
             .collect();
@@ -635,7 +635,7 @@ mod tests {
                 name: (*n).to_string(),
                 description: None,
                 latest_version: Some("1.0.0".into()),
-                trusted: false,
+                verification: "self_signed".to_string(),
             })
             .collect()
     }

@@ -31,12 +31,12 @@ async fn search_without_reachable_db_returns_500() {
 }
 
 #[tokio::test]
-async fn search_with_trusted_filter_returns_500_without_db() {
+async fn search_with_verified_filter_returns_500_without_db() {
     let app = build_router(make_state().await);
     let server = TestServer::new(app).unwrap();
     let response = server
         .get("/v1/search")
-        .add_query_params([("q", "test"), ("trusted", "true")])
+        .add_query_params([("q", "test"), ("verified", "true")])
         .await;
     assert_eq!(response.status_code(), StatusCode::INTERNAL_SERVER_ERROR);
 }
