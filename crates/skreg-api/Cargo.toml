@@ -50,6 +50,8 @@ rcgen                   = { workspace = true }
 rand            = "0.8"
 rsa             = { version = "0.9", features = ["sha2", "pem"] }
 sha2            = { workspace = true }
+x509-cert       = { workspace = true }
+der             = { workspace = true }
 hex             = "0.4"
 
 [dev-dependencies]
