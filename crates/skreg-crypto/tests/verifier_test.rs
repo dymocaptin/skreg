@@ -1,3 +1,4 @@
+use skreg_crypto::error::VerifyError;
 use skreg_crypto::revocation::{InMemoryRevocationStore, RevocationStore};
 
 #[test]
@@ -143,4 +144,19 @@ fn pss_verifier_rejects_signature_from_different_key() {
         ),
         "expected SignatureMismatch, got {result:?}"
     );
+}
+
+#[test]
+fn verify_error_displays_cert_expired() {
+    let e = VerifyError::CertExpired("2025-01-01".to_string());
+    assert!(e.to_string().contains("expired"));
+}
+
+#[test]
+fn verify_error_displays_cn_mismatch() {
+    let e = VerifyError::CnMismatch {
+        expected: "acme".to_string(),
+        got: "other".to_string(),
+    };
+    assert!(e.to_string().contains("acme"));
 }

@@ -20,6 +20,23 @@ pub enum VerifyError {
     /// A DER/ASN.1 parsing error.
     #[error("DER parsing error: {0}")]
     Der(String),
+    /// The certificate's validity period has passed.
+    #[error("certificate expired on {0}")]
+    CertExpired(String),
+    /// The certificate is not yet valid.
+    #[error("certificate not yet valid until {0}")]
+    CertNotYetValid(String),
+    /// The certificate common name does not match the expected namespace.
+    #[error("certificate CN mismatch: expected {expected}, got {got}")]
+    CnMismatch {
+        /// The expected common name (namespace slug).
+        expected: String,
+        /// The actual common name found in the certificate.
+        got: String,
+    },
+    /// The self-signed publisher key has been revoked by the registry.
+    #[error("publisher key has been revoked by the registry")]
+    SelfSignedKeyRevoked,
 }
 
 /// Errors that can occur when checking or refreshing revocation state.
