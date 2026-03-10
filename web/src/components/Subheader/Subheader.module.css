@@ -1,0 +1,25 @@
+.bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.4rem 1.5rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.tagline {
+  flex: 1;
+}
+
+.sourceLink {
+  color: var(--accent);
+  text-decoration: none;
+  margin-left: 1rem;
+  white-space: nowrap;
+}
+
+.sourceLink:hover {
+  text-decoration: underline;
+}
