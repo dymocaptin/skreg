@@ -6,8 +6,7 @@ use axum::extract::{Path, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::Json;
 use log::error;
-use rcgen::{Certificate, CertificateParams, DistinguishedName, DnType, KeyPair, PKCS_RSA_SHA256};
-use rsa::pkcs8::EncodePrivateKey;
+use rcgen::{Certificate, CertificateParams, CertificateSigningRequest, KeyPair};
 use serde::Serialize;
 
 use crate::middleware::{extract_bearer, resolve_namespace};
@@ -37,68 +36,93 @@ pub(crate) fn validate_csr_size(csr_pem: &str) -> Result<(), StatusCode> {
     Ok(())
 }
 
-/// Issue a leaf certificate from the Publisher CA for the given namespace.
+/// Parse a PKCS#10 CSR PEM and validate that its CN matches `expected_namespace`.
 ///
-/// Generates a fresh 2048-bit RSA leaf key, creates a cert with CN set to
-/// `namespace` signed by the Publisher CA, and returns (`leaf_cert_pem`, serial).
+/// Returns the parsed [`CertificateSigningRequest`] on success.
 ///
 /// # Errors
 ///
-/// Returns an error if key generation or signing fails.
-fn issue_leaf_cert(
-    namespace: &str,
+/// Returns `422 Unprocessable Entity` if the CSR cannot be parsed or the CN
+/// does not match the authenticated namespace.
+fn parse_and_validate_csr(
+    csr_pem: &str,
+    expected_namespace: &str,
+) -> Result<CertificateSigningRequest, StatusCode> {
+    let csr = CertificateSigningRequest::from_pem(csr_pem).map_err(|e| {
+        error!("CSR parse error: {e}");
+        StatusCode::UNPROCESSABLE_ENTITY
+    })?;
+
+    // Extract CN from the CSR's distinguished name and verify it matches
+    // the authenticated namespace.
+    let cn = csr
+        .params
+        .distinguished_name
+        .get(&rcgen::DnType::CommonName)
+        .and_then(|v| {
+            if let rcgen::DnValue::Utf8String(s) = v {
+                Some(s.as_str())
+            } else {
+                None
+            }
+        })
+        .ok_or_else(|| {
+            error!("CSR missing CommonName");
+            StatusCode::UNPROCESSABLE_ENTITY
+        })?;
+
+    if cn != expected_namespace {
+        error!("CSR CN {cn:?} does not match namespace {expected_namespace:?}");
+        return Err(StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
+    Ok(csr)
+}
+
+/// Sign a CSR with the Publisher CA and return `(leaf_cert_pem, serial_i64)`.
+///
+/// Builds the CA [`Certificate`] from the CA key + cert PEM, then calls
+/// [`CertificateSigningRequest::serialize_pem_with_signer`] so that the leaf
+/// cert contains the *client's* public key — the server never generates or
+/// sees the client private key.
+///
+/// # Errors
+///
+/// Returns an error if key parsing or signing fails.
+fn sign_csr_with_ca(
+    csr: &CertificateSigningRequest,
     pub_ca_key_pem: &str,
     pub_ca_cert_pem: &str,
 ) -> anyhow::Result<(String, i64)> {
     use anyhow::Context;
 
-    // Parse the CA key
     let ca_key = KeyPair::from_pem(pub_ca_key_pem).context("parsing CA key PEM")?;
-
-    // Build CA cert params from the existing CA certificate
     let ca_params = CertificateParams::from_ca_cert_pem(pub_ca_cert_pem, ca_key)
         .context("parsing CA cert PEM")?;
     let ca_cert = Certificate::from_params(ca_params).context("building CA Certificate")?;
 
-    // Generate a fresh 2048-bit RSA leaf key using the `rsa` crate,
-    // then load it into rcgen via PKCS#8 PEM (ring requires PKCS#8 for RSA).
-    let mut rng = rand::thread_rng();
-    let rsa_key = rsa::RsaPrivateKey::new(&mut rng, 2048).context("generating 2048-bit RSA key")?;
-    let pkcs8_pem = rsa_key
-        .to_pkcs8_pem(rsa::pkcs8::LineEnding::LF)
-        .context("encoding RSA key to PKCS#8 PEM")?;
-    let leaf_key = KeyPair::from_pem(pkcs8_pem.as_str()).context("loading leaf key into rcgen")?;
+    let leaf_pem = csr
+        .serialize_pem_with_signer(&ca_cert)
+        .context("signing CSR with CA")?;
 
-    // Build leaf cert params
-    let mut leaf_params = CertificateParams::default();
-    let mut dn = DistinguishedName::new();
-    dn.push(DnType::CommonName, namespace);
-    leaf_params.distinguished_name = dn;
-    leaf_params.alg = &PKCS_RSA_SHA256;
-    leaf_params.key_pair = Some(leaf_key);
-
-    // Generate a random positive serial using 7 bytes (stays in positive i64 range)
+    // Generate a random positive serial using 7 bytes (stays in positive i64 range).
     let serial_bytes: [u8; 7] = rand::random();
     let mut serial_i64: i64 = 0;
     for b in serial_bytes {
         serial_i64 = (serial_i64 << 8) | i64::from(b);
     }
-    leaf_params.serial_number = Some(rcgen::SerialNumber::from_slice(&serial_bytes));
-
-    let leaf_cert = Certificate::from_params(leaf_params).context("generating leaf certificate")?;
-    let leaf_pem = leaf_cert
-        .serialize_pem_with_signer(&ca_cert)
-        .context("signing leaf certificate with CA")?;
 
     Ok((leaf_pem, serial_i64))
 }
 
 /// Handle `POST /v1/namespaces/:ns/cert`.
 ///
-/// Authenticates the caller via Bearer token, rate-limits to 5 issuances per
-/// namespace per 24 h, checks for an existing active cert, fetches the
-/// Publisher CA key from Secrets Manager, issues a leaf cert, persists it to
-/// `publisher_certs`, writes an audit log entry, and returns the cert + CA PEM.
+/// Authenticates the caller via Bearer token, validates the PKCS#10 CSR
+/// (checking CN matches the authenticated namespace), rate-limits to 5
+/// issuances per namespace per 24 h, checks for an existing active cert,
+/// signs the CSR with the Publisher CA (so the leaf cert contains the
+/// *client's* public key), persists to `publisher_certs`, writes an audit
+/// log entry, and returns the cert + CA PEM.
 ///
 /// # Errors
 ///
@@ -106,7 +130,7 @@ fn issue_leaf_cert(
 /// - `403` — token namespace does not match `:ns`
 /// - `409` — an active certificate already exists for this namespace
 /// - `413` — CSR body exceeds 16 KiB
-/// - `422` — cert issuance failed
+/// - `422` — CSR is malformed or CN does not match namespace
 /// - `429` — rate limit exceeded (5 issuances per 24 h)
 /// - `500` — database or Secrets Manager error
 pub async fn cert_handler(
@@ -128,11 +152,14 @@ pub async fn cert_handler(
         return Err(StatusCode::FORBIDDEN);
     }
 
-    // Parse CSR body (body is the raw CSR PEM)
+    // Parse CSR body
     let csr_pem = std::str::from_utf8(&body).map_err(|_| StatusCode::UNPROCESSABLE_ENTITY)?;
 
     // Validate CSR size
     validate_csr_size(csr_pem)?;
+
+    // Parse and validate CSR — CN must match the authenticated namespace
+    let csr = parse_and_validate_csr(csr_pem, &ns_slug)?;
 
     // Rate limit: max 5 issuances per namespace per 24h
     let issuances_24h = sqlx::query_scalar::<_, i64>(
@@ -176,10 +203,10 @@ pub async fn cert_handler(
     let ca_key_pem = fetch_secret(&state.sm, &state.publisher_ca_key_secret_name).await?;
     let pub_ca_cert_pem = state.publisher_ca_cert_pem.clone();
 
-    // Issue leaf cert
+    // Sign the CSR with the CA — the leaf cert contains the client's public key
     let (leaf_pem, serial) =
-        issue_leaf_cert(&ns_slug, &ca_key_pem, &pub_ca_cert_pem).map_err(|e| {
-            error!("issue_leaf_cert: {e}");
+        sign_csr_with_ca(&csr, &ca_key_pem, &pub_ca_cert_pem).map_err(|e| {
+            error!("sign_csr_with_ca: {e}");
             StatusCode::UNPROCESSABLE_ENTITY
         })?;
 
@@ -245,6 +272,7 @@ async fn fetch_secret(sm: &SmClient, secret_name: &str) -> Result<String, Status
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rcgen::PKCS_RSA_SHA256;
 
     #[test]
     fn rejects_oversized_csr() {
@@ -255,5 +283,33 @@ mod tests {
     #[test]
     fn accepts_normal_csr() {
         assert!(validate_csr_size(&"A".repeat(1_000)).is_ok());
+    }
+
+    #[test]
+    fn parse_and_validate_csr_rejects_cn_mismatch() {
+        // Build a CSR with CN="acme" and check it rejects namespace "other"
+        use rand::rngs::OsRng;
+        use rsa::pkcs8::EncodePrivateKey;
+
+        let rsa_key = rsa::RsaPrivateKey::new(&mut OsRng, 2048).unwrap();
+        let pkcs8_pem = rsa_key
+            .to_pkcs8_pem(rsa::pkcs8::LineEnding::LF)
+            .unwrap()
+            .to_string();
+
+        let key_pair = KeyPair::from_pem(&pkcs8_pem).unwrap();
+        let mut params = rcgen::CertificateParams::new(vec!["acme".to_owned()]);
+        params.alg = &PKCS_RSA_SHA256;
+        params.key_pair = Some(key_pair);
+        let mut dn = rcgen::DistinguishedName::new();
+        dn.push(rcgen::DnType::CommonName, "acme");
+        params.distinguished_name = dn;
+        let cert = rcgen::Certificate::from_params(params).unwrap();
+        let csr_pem = cert.serialize_request_pem().unwrap();
+
+        // Correct namespace succeeds
+        assert!(parse_and_validate_csr(&csr_pem, "acme").is_ok());
+        // Wrong namespace fails
+        assert!(parse_and_validate_csr(&csr_pem, "other").is_err());
     }
 }

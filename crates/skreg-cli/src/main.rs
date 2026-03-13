@@ -50,6 +50,18 @@ enum Commands {
         #[arg(value_name = "PACKAGE")]
         package_ref: String,
     },
+    /// Obtain a CA-issued publisher certificate
+    Certify {
+        /// Path to existing PEM private key (uses ~/.skreg/keys/publisher.key if omitted)
+        #[arg(long, value_name = "FILE")]
+        key: Option<PathBuf>,
+    },
+    /// Rotate the publisher key (requires email confirmation)
+    Rotate {
+        /// Path to new PEM private key (generates a fresh RSA-2048 key if omitted)
+        #[arg(long, value_name = "FILE")]
+        new_key: Option<PathBuf>,
+    },
 }
 
 #[tokio::main]
@@ -96,6 +108,12 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::Uninstall { package_ref } => {
             skreg_cli::commands::uninstall::run_uninstall(&package_ref)?;
+        }
+        Commands::Certify { key } => {
+            skreg_cli::commands::certify::run_certify(key.as_deref()).await?;
+        }
+        Commands::Rotate { new_key } => {
+            skreg_cli::commands::rotate::run_rotate(new_key.as_deref()).await?;
         }
     }
     Ok(())

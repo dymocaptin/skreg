@@ -3400,6 +3400,7 @@ dependencies = [
  "clap",
  "comfy-table",
  "crossterm",
+ "der 0.7.10",
  "env_logger",
  "hex",
  "home",
@@ -3420,6 +3421,7 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "toml",
+ "x509-cert",
 ]
 
 [[package]]

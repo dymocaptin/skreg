@@ -44,6 +44,8 @@ rcgen           = { workspace = true }
 rsa             = { version = "0.9", features = ["sha2", "pem"] }
 rand            = "0.8"
 chrono          = { workspace = true }
+x509-cert       = { workspace = true }
+der             = { workspace = true }
 
 [lib]
 name = "skreg_cli"

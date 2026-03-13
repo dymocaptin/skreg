@@ -22,6 +22,7 @@ use crate::handlers::packages::{
     package_download_handler, package_meta_handler, package_sig_handler,
 };
 use crate::handlers::publish::publish_handler;
+use crate::handlers::rotate::{rotate_confirm_handler, rotate_submit_handler};
 use crate::handlers::search::search_handler;
 
 /// Shared application state injected into every handler.
@@ -74,6 +75,11 @@ pub fn build_router(state: AppState) -> Router {
         .route("/v1/search", get(search_handler))
         .route("/v1/namespaces", post(create_namespace_handler))
         .route("/v1/namespaces/:ns/cert", post(cert_handler))
+        .route("/v1/namespaces/:ns/rotate-key", post(rotate_submit_handler))
+        .route(
+            "/v1/namespaces/:ns/rotate-key/confirm",
+            get(rotate_confirm_handler),
+        )
         .route("/v1/auth/login", post(login_handler))
         .route("/v1/auth/token", post(token_handler))
         .route("/v1/publish", post(publish_handler))
