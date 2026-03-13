@@ -76,6 +76,7 @@ pub async fn run_login(namespace: &str) -> Result<()> {
     let mut config = load_config(&default_config_path()).unwrap_or_else(|_| CliConfig {
         active_context: "default".to_owned(),
         contexts: HashMap::new(),
+        policy: skreg_core::config::PolicyConfig::default(),
     });
     config.contexts.insert(
         "default".to_owned(),

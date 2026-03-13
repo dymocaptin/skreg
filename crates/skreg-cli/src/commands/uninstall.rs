@@ -4,7 +4,10 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 
+use skreg_core::config::{default_config_path, load_config};
 use skreg_core::package_ref::PackageRef;
+
+use crate::linker::Linker;
 
 fn default_install_root() -> Result<PathBuf> {
     let home =
@@ -18,7 +21,8 @@ fn default_install_root() -> Result<PathBuf> {
 /// # Errors
 ///
 /// Returns an error if the package is not installed or removal fails.
-pub fn run_uninstall_with_root(package_ref: &str, install_root: &Path) -> Result<()> {
+#[cfg(test)]
+pub(crate) fn run_uninstall_with_root(package_ref: &str, install_root: &Path) -> Result<()> {
     let pkg_ref = PackageRef::parse(package_ref)
         .with_context(|| format!("invalid package reference: {package_ref:?}"))?;
 
@@ -72,6 +76,107 @@ pub fn run_uninstall_with_root(package_ref: &str, install_root: &Path) -> Result
     Ok(())
 }
 
+/// Remove an installed package, also removing any tracked symlinks.
+///
+/// Takes an explicit install root and links path (used by tests and `run_uninstall`).
+///
+/// # Errors
+///
+/// Returns an error if the package is not installed, symlink removal fails, or directory
+/// removal fails.
+pub fn run_uninstall_with_root_and_links(
+    package_ref: &str,
+    install_root: &Path,
+    links_path: &Path,
+) -> Result<()> {
+    let pkg_ref = PackageRef::parse(package_ref)
+        .with_context(|| format!("invalid package reference: {package_ref:?}"))?;
+
+    if pkg_ref.version.is_some() {
+        anyhow::bail!("version suffix not supported for uninstall — use 'namespace/name'");
+    }
+
+    let name_dir = install_root
+        .join(pkg_ref.namespace.as_str())
+        .join(pkg_ref.name.as_str());
+
+    if !name_dir.exists() {
+        anyhow::bail!("{pkg_ref} is not installed");
+    }
+
+    // Collect all version directories
+    let version_dirs: Vec<_> = std::fs::read_dir(&name_dir)
+        .with_context(|| format!("failed to read {}", name_dir.display()))?
+        .filter_map(std::result::Result::ok)
+        .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
+        .collect();
+
+    if version_dirs.is_empty() {
+        anyhow::bail!("{pkg_ref} is not installed");
+    }
+
+    // Use the first (and normally only) version for the success message and pkg_key
+    let version = version_dirs[0].file_name().to_string_lossy().into_owned();
+    let pkg_key = format!("{pkg_ref}@{version}");
+
+    // Remove tracked symlinks before deleting the package directory
+    let mut linker = Linker::new(links_path.to_path_buf());
+    let removed_links = linker.remove_symlinks(&pkg_key)?;
+
+    // Update ~/.claude/CLAUDE.md if ~/.claude/ exists (best-effort)
+    let home_opt = home::home_dir();
+    if let Some(ref home) = home_opt {
+        let claude_md = home.join(".claude").join("CLAUDE.md");
+        if claude_md.parent().is_some_and(std::path::Path::exists) {
+            let enforcement = {
+                let cfg_path = default_config_path();
+                load_config(&cfg_path)
+                    .map(|c| c.policy.enforcement)
+                    .unwrap_or_default()
+            };
+            let entries: Vec<crate::linker::ClaudeMdEntry> = {
+                let mut seen = std::collections::HashSet::new();
+                linker
+                    .links()
+                    .iter()
+                    .filter(|r| seen.insert(r.package.clone()))
+                    .map(|r| crate::linker::ClaudeMdEntry {
+                        package: r.package.clone(),
+                        verified_date: String::new(),
+                    })
+                    .collect()
+            };
+            let _ = linker.write_claude_md(&claude_md, &entries, &enforcement);
+        }
+    }
+
+    for entry in &version_dirs {
+        std::fs::remove_dir_all(entry.path())
+            .with_context(|| format!("failed to remove {}", entry.path().display()))?;
+    }
+
+    // Best-effort cleanup of empty parent dirs
+    if std::fs::read_dir(&name_dir)
+        .map(|mut d| d.next().is_none())
+        .unwrap_or(false)
+    {
+        let _ = std::fs::remove_dir(&name_dir);
+        let ns_dir = install_root.join(pkg_ref.namespace.as_str());
+        if std::fs::read_dir(&ns_dir)
+            .map(|mut d| d.next().is_none())
+            .unwrap_or(false)
+        {
+            let _ = std::fs::remove_dir(&ns_dir);
+        }
+    }
+
+    println!("✓ Removed {}", name_dir.display());
+    if removed_links > 0 {
+        println!("✓ Removed {removed_links} symlink(s)");
+    }
+    Ok(())
+}
+
 /// Run `skreg uninstall <package_ref>`.
 ///
 /// # Errors
@@ -79,7 +184,10 @@ pub fn run_uninstall_with_root(package_ref: &str, install_root: &Path) -> Result
 /// Returns an error if the package is not installed or removal fails.
 pub fn run_uninstall(package_ref: &str) -> Result<()> {
     let install_root = default_install_root()?;
-    run_uninstall_with_root(package_ref, &install_root)
+    let home =
+        home::home_dir().ok_or_else(|| anyhow::anyhow!("cannot determine home directory"))?;
+    let links_path = home.join(".skreg").join("links.toml");
+    run_uninstall_with_root_and_links(package_ref, &install_root, &links_path)
 }
 
 #[cfg(test)]
@@ -149,5 +257,35 @@ mod tests {
         assert!(result.is_err());
         let msg = result.unwrap_err().to_string();
         assert!(msg.contains("not installed"), "error was: {msg}");
+    }
+
+    #[test]
+    fn uninstall_removes_symlinks_via_linker() {
+        use crate::linker::Linker;
+
+        let tmp = TempDir::new().unwrap();
+        let version_dir = make_installed(tmp.path(), "acme", "my-skill", "1.0.0");
+
+        let skills_dir = tmp.path().join("skills");
+        std::fs::create_dir_all(&skills_dir).unwrap();
+
+        let links_path = tmp.path().join("links.toml");
+        let mut linker = Linker::new(links_path.clone());
+        linker
+            .create_symlinks(
+                "acme",
+                "my-skill",
+                "1.0.0",
+                &version_dir,
+                std::slice::from_ref(&skills_dir),
+                true,
+            )
+            .unwrap();
+
+        assert!(skills_dir.join("my-skill").is_symlink());
+
+        run_uninstall_with_root_and_links("acme/my-skill", tmp.path(), &links_path).unwrap();
+
+        assert!(!skills_dir.join("my-skill").exists());
     }
 }

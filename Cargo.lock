@@ -3298,6 +3298,7 @@ name = "skreg-cli"
 version = "0.1.2"
 dependencies = [
  "anyhow",
+ "chrono",
  "clap",
  "comfy-table",
  "crossterm",

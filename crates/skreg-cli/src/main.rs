@@ -25,10 +25,14 @@ enum Commands {
     },
     /// Download and install a skill
     Install {
-        /// Package reference (namespace/name or namespace/name@version)
         #[arg(value_name = "PACKAGE")]
         package_ref: String,
+        /// Trust policy enforcement level (hint | confirm | strict)
+        #[arg(long, value_name = "LEVEL")]
+        enforcement: Option<String>,
     },
+    /// List all tracked skill symlinks
+    Links,
     /// Launch the interactive terminal UI
     Tui,
     /// Remove an installed skill
@@ -56,8 +60,23 @@ async fn main() -> anyhow::Result<()> {
         Commands::Search { query, trusted } => {
             skreg_cli::commands::search::run_search(&query, trusted).await?;
         }
-        Commands::Install { package_ref } => {
-            skreg_cli::commands::install::run_install(&package_ref).await?;
+        Commands::Install {
+            package_ref,
+            enforcement,
+        } => {
+            let level = match enforcement.as_deref() {
+                None => None,
+                Some("hint") => Some(skreg_core::config::EnforcementLevel::Hint),
+                Some("confirm") => Some(skreg_core::config::EnforcementLevel::Confirm),
+                Some("strict") => Some(skreg_core::config::EnforcementLevel::Strict),
+                Some(other) => anyhow::bail!(
+                    "unknown enforcement level {other:?} — expected hint, confirm, or strict"
+                ),
+            };
+            skreg_cli::commands::install::run_install(&package_ref, level).await?;
+        }
+        Commands::Links => {
+            skreg_cli::commands::links::run_links()?;
         }
         Commands::Tui => {
             skreg_cli::commands::tui::run_tui()?;
