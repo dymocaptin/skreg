@@ -38,7 +38,8 @@ npm install -g skreg-cli
 Requires Rust ([rustup.rs](https://rustup.rs)).
 
 ```bash
-cargo install skreg-cli
+git clone https://github.com/dymocaptin/skreg.git
+cargo install --path skreg/crates/skreg-cli
 ```
 
 After installing with any method, verify with:
