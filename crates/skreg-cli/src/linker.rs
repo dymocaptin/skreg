@@ -128,7 +128,11 @@ impl Linker {
                 })?;
             }
 
+            #[cfg(unix)]
             std::os::unix::fs::symlink(version_dir, &link_path)
+                .with_context(|| format!("failed to create symlink {}", link_path.display()))?;
+            #[cfg(windows)]
+            std::os::windows::fs::symlink_dir(version_dir, &link_path)
                 .with_context(|| format!("failed to create symlink {}", link_path.display()))?;
 
             self.file.links.push(LinkRecord {
@@ -569,7 +573,10 @@ mod tests {
         // Manually create a dangling symlink at the expected location.
         let link_path = skills_dir.join("color-analysis");
         let nonexistent = tmp.path().join("does-not-exist");
+        #[cfg(unix)]
         std::os::unix::fs::symlink(&nonexistent, &link_path).unwrap();
+        #[cfg(windows)]
+        std::os::windows::fs::symlink_dir(&nonexistent, &link_path).unwrap();
         assert!(
             link_path.is_symlink(),
             "pre-condition: dangling symlink exists"
