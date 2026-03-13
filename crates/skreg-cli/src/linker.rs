@@ -119,11 +119,7 @@ impl Linker {
                 continue;
             }
 
-            let ns_dir = tool_dir.join(ns);
-            fs::create_dir_all(&ns_dir)
-                .with_context(|| format!("failed to create namespace dir {}", ns_dir.display()))?;
-
-            let link_path = ns_dir.join(name);
+            let link_path = tool_dir.join(name);
 
             // Remove stale link/file if present.
             if link_path.exists() || link_path.is_symlink() {
@@ -343,7 +339,7 @@ mod tests {
     fn link_record_roundtrips_toml() {
         let record = LinkRecord {
             package: "dymo/color-analysis@1.0.0".to_string(),
-            path: "/home/dymo/.claude/skills/dymo/color-analysis".to_string(),
+            path: "/home/dymo/.claude/skills/color-analysis".to_string(),
         };
         let s = toml::to_string(&LinksFile {
             links: vec![record.clone()],
@@ -386,12 +382,11 @@ mod tests {
             )
             .unwrap();
 
-        assert!(agents_skills.join("dymo").join("color-analysis").exists());
-        assert!(claude_skills.join("dymo").join("color-analysis").exists());
+        assert!(agents_skills.join("color-analysis").exists());
+        assert!(claude_skills.join("color-analysis").exists());
         assert!(!tmp
             .path()
             .join("cursor_skills")
-            .join("dymo")
             .join("color-analysis")
             .exists());
 
@@ -421,11 +416,11 @@ mod tests {
                 true,
             )
             .unwrap();
-        assert!(skills_dir.join("dymo").join("color-analysis").is_symlink());
+        assert!(skills_dir.join("color-analysis").is_symlink());
 
         linker.remove_symlinks("dymo/color-analysis@1.0.0").unwrap();
 
-        assert!(!skills_dir.join("dymo").join("color-analysis").exists());
+        assert!(!skills_dir.join("color-analysis").exists());
         let file: LinksFile = toml::from_str(&fs::read_to_string(&links_path).unwrap()).unwrap();
         assert!(file.links.is_empty());
     }
@@ -474,7 +469,7 @@ mod tests {
             )
             .unwrap();
 
-        let link_path = skills_dir.join("dymo").join("color-analysis");
+        let link_path = skills_dir.join("color-analysis");
         assert!(
             link_path.is_symlink(),
             "symlink should exist after reinstall"
@@ -569,11 +564,10 @@ mod tests {
         let version_dir = make_version_dir(&tmp, "dymo", "color-analysis", "1.0.0");
 
         let skills_dir = tmp.path().join("skills");
-        let ns_dir = skills_dir.join("dymo");
-        fs::create_dir_all(&ns_dir).unwrap();
+        fs::create_dir_all(&skills_dir).unwrap();
 
         // Manually create a dangling symlink at the expected location.
-        let link_path = ns_dir.join("color-analysis");
+        let link_path = skills_dir.join("color-analysis");
         let nonexistent = tmp.path().join("does-not-exist");
         std::os::unix::fs::symlink(&nonexistent, &link_path).unwrap();
         assert!(

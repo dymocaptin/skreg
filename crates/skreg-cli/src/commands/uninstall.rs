@@ -282,10 +282,10 @@ mod tests {
             )
             .unwrap();
 
-        assert!(skills_dir.join("acme").join("my-skill").is_symlink());
+        assert!(skills_dir.join("my-skill").is_symlink());
 
         run_uninstall_with_root_and_links("acme/my-skill", tmp.path(), &links_path).unwrap();
 
-        assert!(!skills_dir.join("acme").join("my-skill").exists());
+        assert!(!skills_dir.join("my-skill").exists());
     }
 }
