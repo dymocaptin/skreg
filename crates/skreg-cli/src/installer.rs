@@ -9,6 +9,7 @@ use thiserror::Error;
 
 use skreg_client::client::RegistryClient;
 use skreg_core::installed::{InstalledPackage, SignerKind};
+use skreg_core::manifest::Manifest;
 use skreg_core::package_ref::PackageRef;
 use skreg_core::types::Sha256Digest;
 use skreg_crypto::verifier::SignatureVerifier;
@@ -94,13 +95,16 @@ impl Installer {
 
     /// Download, verify, and extract a package.
     ///
-    /// Returns the installed package descriptor on success.
+    /// Returns the installed package descriptor and manifest on success.
     ///
     /// # Errors
     ///
     /// Returns [`InstallError`] if any step fails. On extraction failure, the
     /// partially-created installation directory may remain on disk.
-    pub async fn install(&self, pkg_ref: &PackageRef) -> Result<InstalledPackage, InstallError> {
+    pub async fn install(
+        &self,
+        pkg_ref: &PackageRef,
+    ) -> Result<(InstalledPackage, Manifest), InstallError> {
         info!("installing {pkg_ref}");
 
         let resolved = self.client.resolve(pkg_ref).await?;
@@ -150,12 +154,16 @@ impl Installer {
 
         info!("installed {} to {}", pkg_ref, install_path.display());
 
-        Ok(InstalledPackage {
-            pkg_ref: pkg_ref.clone(),
-            sha256: digest,
-            signer: SignerKind::Registry,
-            install_path,
-        })
+        let manifest = resolved.manifest;
+        Ok((
+            InstalledPackage {
+                pkg_ref: pkg_ref.clone(),
+                sha256: digest,
+                signer: SignerKind::Registry,
+                install_path,
+            },
+            manifest,
+        ))
     }
 }
 

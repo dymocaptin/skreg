@@ -9,6 +9,15 @@ use skreg_client::client::{HttpRegistryClient, RegistryClient};
 
 use crate::config::{default_config_path, load_config};
 
+/// Map a raw verification string to a human-readable label with icon.
+#[must_use]
+pub fn verification_label(v: &str) -> &'static str {
+    match v {
+        "publisher" => "✦ publisher",
+        _ => "◈ self-signed",
+    }
+}
+
 /// Run `skreg search <query>`.
 ///
 /// # Errors
@@ -39,7 +48,12 @@ pub async fn run_search(query: &str, verified_only: bool) -> Result<()> {
         let package = format!("{}/{}", r.namespace, r.name);
         let version = r.latest_version.as_deref().unwrap_or("?");
         let desc = r.description.as_deref().unwrap_or("");
-        table.add_row([package.as_str(), version, r.verification.as_str(), desc]);
+        table.add_row([
+            package.as_str(),
+            version,
+            verification_label(&r.verification),
+            desc,
+        ]);
     }
 
     println!("{table}");
@@ -48,6 +62,18 @@ pub async fn run_search(query: &str, verified_only: bool) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+
     #[test]
     fn search_module_compiles() {}
+
+    #[test]
+    fn verification_label_for_publisher() {
+        assert_eq!(verification_label("publisher"), "✦ publisher");
+    }
+
+    #[test]
+    fn verification_label_for_self_signed() {
+        assert_eq!(verification_label("self_signed"), "◈ self-signed");
+    }
 }
