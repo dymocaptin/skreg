@@ -24,7 +24,7 @@ curl --proto '=https' --tlsv1.2 -LsSf https://github.com/dymocaptin/skreg/releas
 
 ```bash
 brew tap dymocaptin/tap
-brew install skreg
+brew install skreg-cli
 ```
 
 ### npm
