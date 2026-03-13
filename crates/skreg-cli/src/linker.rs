@@ -188,6 +188,11 @@ impl Linker {
     /// content between them is replaced in-place.  Otherwise the managed block is appended to the
     /// file (separated by a blank line), or the file is created when it does not yet exist.
     ///
+    /// When `entries` is empty:
+    /// - If the file contains markers, removes the entire managed section.
+    /// - If no markers are present, does nothing.
+    /// - If the file doesn't exist, does nothing.
+    ///
     /// # Errors
     ///
     /// Returns an error if the file cannot be read or written.
@@ -204,13 +209,30 @@ impl Linker {
             String::new()
         };
 
+        // When no skills remain, remove the managed section entirely.
+        if entries.is_empty() {
+            if let Some(start_idx) = existing.find(SKREG_START) {
+                let before = &existing[..start_idx];
+                let after_start = &existing[start_idx..];
+                let after = if let Some(end_offset) = after_start.find(SKREG_END) {
+                    &after_start[end_offset + SKREG_END.len()..]
+                } else {
+                    ""
+                };
+                let new_content = format!("{before}{after}");
+                fs::write(claude_md_path, new_content)
+                    .with_context(|| format!("failed to write {}", claude_md_path.display()))?;
+            }
+            // If no markers present (or file does not exist), nothing to remove.
+            return Ok(());
+        }
+
         let managed = Self::render_managed_section(entries, enforcement);
 
         let new_content = if let Some(start_idx) = existing.find(SKREG_START) {
             let before = &existing[..start_idx];
             let after_start = &existing[start_idx..];
             let after = if let Some(end_offset) = after_start.find(SKREG_END) {
-                // Skip past the SKREG_END marker itself.
                 &after_start[end_offset + SKREG_END.len()..]
             } else {
                 ""
@@ -508,9 +530,10 @@ mod tests {
             .unwrap();
 
         let content = fs::read_to_string(&claude_md).unwrap();
+        // When entries is empty and no markers exist, the file should be left unchanged.
         assert!(content.contains("# My Project"));
         assert!(content.contains("Some existing content."));
-        assert!(content.contains("<!-- skreg:start -->"));
+        assert!(!content.contains("<!-- skreg:start -->"));
     }
 
     #[test]
@@ -584,6 +607,40 @@ mod tests {
             fs::read_link(&link_path).unwrap(),
             version_dir,
             "symlink should point to correct target"
+        );
+    }
+
+    #[test]
+    fn write_claude_md_removes_section_when_entries_empty() {
+        let tmp = TempDir::new().unwrap();
+        let claude_md = tmp.path().join("CLAUDE.md");
+
+        let initial = "# My Config\n\nSome existing content.\n\n<!-- skreg:start -->\n## Installed Skills (managed by skreg)\n\nVerified skills:\n- acme/my-skill@1.0.0 (verified 2026-03-12)\n<!-- skreg:end -->\n\nTrailing content.\n";
+        fs::write(&claude_md, initial).unwrap();
+
+        let links_path = tmp.path().join("links.toml");
+        let linker = Linker::new(links_path);
+
+        linker
+            .write_claude_md(&claude_md, &[], &EnforcementLevel::Confirm)
+            .unwrap();
+
+        let result = fs::read_to_string(&claude_md).unwrap();
+        assert!(
+            !result.contains("skreg:start"),
+            "skreg:start marker should be gone"
+        );
+        assert!(
+            !result.contains("skreg:end"),
+            "skreg:end marker should be gone"
+        );
+        assert!(
+            result.contains("Some existing content."),
+            "non-skreg content should be preserved"
+        );
+        assert!(
+            result.contains("Trailing content."),
+            "trailing content should be preserved"
         );
     }
 }
