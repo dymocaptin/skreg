@@ -40,6 +40,9 @@ crossterm       = { version = "0.28", default-features = false }
 tempfile        = "3"
 thiserror       = { workspace = true }
 home            = "0.5"
+rcgen           = { workspace = true }
+rsa             = { version = "0.9", features = ["sha2", "pem"] }
+rand            = "0.8"
 chrono          = { workspace = true }
 
 [lib]

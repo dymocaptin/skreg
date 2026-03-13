@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
@@ -10,7 +12,14 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Pack the current directory into a .skill tarball
-    Pack,
+    Pack {
+        /// Path to PEM private key (overrides auto-generated key)
+        #[arg(long, value_name = "FILE")]
+        key: Option<PathBuf>,
+        /// Path to PEM certificate (overrides auto-generated cert)
+        #[arg(long, value_name = "FILE")]
+        cert: Option<PathBuf>,
+    },
     /// Register a namespace or re-authenticate
     Login { namespace: String },
     /// Publish a skill to the registry
@@ -48,8 +57,12 @@ async fn main() -> anyhow::Result<()> {
     env_logger::init();
     let cli = Cli::parse();
     match cli.command {
-        Commands::Pack => {
-            skreg_cli::commands::pack::run_pack(std::env::current_dir()?.as_path())?;
+        Commands::Pack { key, cert } => {
+            skreg_cli::commands::pack::run_pack(
+                std::env::current_dir()?.as_path(),
+                key.as_deref(),
+                cert.as_deref(),
+            )?;
         }
         Commands::Login { namespace } => {
             skreg_cli::commands::login::run_login(&namespace).await?;
