@@ -182,6 +182,23 @@ impl Linker {
         &self.file.links
     }
 
+    /// Split `content` around the skreg managed block.
+    ///
+    /// Returns `Some((before, after))` where `before` is everything before
+    /// `<!-- skreg:start -->` and `after` is everything after `<!-- skreg:end -->`.
+    /// Returns `None` if `<!-- skreg:start -->` is not present.
+    fn split_around_managed_block(content: &str) -> Option<(&str, &str)> {
+        let start_idx = content.find(SKREG_START)?;
+        let before = &content[..start_idx];
+        let after_start = &content[start_idx..];
+        let after = if let Some(end_offset) = after_start.find(SKREG_END) {
+            &after_start[end_offset + SKREG_END.len()..]
+        } else {
+            ""
+        };
+        Some((before, after))
+    }
+
     /// Write (or update) the skreg-managed section in `claude_md_path`.
     ///
     /// If the file already contains `<!-- skreg:start -->` / `<!-- skreg:end -->` markers the
@@ -211,16 +228,8 @@ impl Linker {
 
         // When no skills remain, remove the managed section entirely.
         if entries.is_empty() {
-            if let Some(start_idx) = existing.find(SKREG_START) {
-                let before = &existing[..start_idx];
-                let after_start = &existing[start_idx..];
-                let after = if let Some(end_offset) = after_start.find(SKREG_END) {
-                    &after_start[end_offset + SKREG_END.len()..]
-                } else {
-                    ""
-                };
-                let new_content = format!("{before}{after}");
-                fs::write(claude_md_path, new_content)
+            if let Some((before, after)) = Self::split_around_managed_block(&existing) {
+                fs::write(claude_md_path, format!("{before}{after}"))
                     .with_context(|| format!("failed to write {}", claude_md_path.display()))?;
             }
             // If no markers present (or file does not exist), nothing to remove.
@@ -229,14 +238,8 @@ impl Linker {
 
         let managed = Self::render_managed_section(entries, enforcement);
 
-        let new_content = if let Some(start_idx) = existing.find(SKREG_START) {
-            let before = &existing[..start_idx];
-            let after_start = &existing[start_idx..];
-            let after = if let Some(end_offset) = after_start.find(SKREG_END) {
-                &after_start[end_offset + SKREG_END.len()..]
-            } else {
-                ""
-            };
+        let new_content = if let Some((before, after)) = Self::split_around_managed_block(&existing)
+        {
             format!("{before}{managed}{after}")
         } else if existing.is_empty() {
             managed
@@ -257,15 +260,11 @@ impl Linker {
 
     /// Render the full managed block (including start/end markers).
     fn render_managed_section(entries: &[ClaudeMdEntry], enforcement: &EnforcementLevel) -> String {
-        let skill_list = if entries.is_empty() {
-            "- (none)".to_string()
-        } else {
-            entries
-                .iter()
-                .map(|e| format!("- {} (verified {})", e.package, e.verified_date))
-                .collect::<Vec<_>>()
-                .join("\n")
-        };
+        let skill_list = entries
+            .iter()
+            .map(|e| format!("- {} (verified {})", e.package, e.verified_date))
+            .collect::<Vec<_>>()
+            .join("\n");
 
         let body = match enforcement {
             EnforcementLevel::Hint => format!(
@@ -642,5 +641,40 @@ mod tests {
             result.contains("Trailing content."),
             "trailing content should be preserved"
         );
+    }
+
+    #[test]
+    fn write_claude_md_does_nothing_when_entries_empty_and_no_markers() {
+        let tmp = TempDir::new().unwrap();
+        let claude_md = tmp.path().join("CLAUDE.md");
+
+        let initial = "# My Config\n\nNo skreg section here.\n";
+        fs::write(&claude_md, initial).unwrap();
+
+        let links_path = tmp.path().join("links.toml");
+        let linker = Linker::new(links_path);
+
+        linker
+            .write_claude_md(&claude_md, &[], &EnforcementLevel::Confirm)
+            .unwrap();
+
+        let result = fs::read_to_string(&claude_md).unwrap();
+        assert_eq!(result, initial, "file should be unchanged");
+    }
+
+    #[test]
+    fn write_claude_md_does_nothing_when_entries_empty_and_file_absent() {
+        let tmp = TempDir::new().unwrap();
+        let claude_md = tmp.path().join("CLAUDE.md");
+        // Do NOT create the file
+
+        let links_path = tmp.path().join("links.toml");
+        let linker = Linker::new(links_path);
+
+        linker
+            .write_claude_md(&claude_md, &[], &EnforcementLevel::Confirm)
+            .unwrap();
+
+        assert!(!claude_md.exists(), "file should not have been created");
     }
 }
