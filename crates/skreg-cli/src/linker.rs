@@ -677,4 +677,35 @@ mod tests {
 
         assert!(!claude_md.exists(), "file should not have been created");
     }
+
+    #[test]
+    fn write_claude_md_handles_unclosed_start_marker() {
+        let tmp = TempDir::new().unwrap();
+        let claude_md = tmp.path().join("CLAUDE.md");
+
+        // File has skreg:start but no skreg:end (corrupt/hand-edited)
+        let initial = "Before.\n<!-- skreg:start -->\nORPHAN CONTENT\n";
+        fs::write(&claude_md, initial).unwrap();
+
+        let links_path = tmp.path().join("links.toml");
+        let linker = Linker::new(links_path);
+
+        linker
+            .write_claude_md(&claude_md, &[], &EnforcementLevel::Confirm)
+            .unwrap();
+
+        let result = fs::read_to_string(&claude_md).unwrap();
+        assert!(
+            result.contains("Before."),
+            "content before the start marker should be preserved"
+        );
+        assert!(
+            !result.contains("skreg:start"),
+            "start marker should be gone"
+        );
+        assert!(
+            !result.contains("ORPHAN CONTENT"),
+            "orphaned content after unclosed marker should be removed"
+        );
+    }
 }
