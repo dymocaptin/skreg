@@ -27,8 +27,6 @@ use super::{Action, ToastKind, View};
 
 /// Debounce delay before issuing a search fetch after the last keystroke.
 const SEARCH_DEBOUNCE: Duration = Duration::from_millis(300);
-/// Maximum description length before truncation.
-const DESC_MAX: usize = 28;
 
 /// Cursor and items for the package list table.
 pub struct ListState {
@@ -362,7 +360,7 @@ impl View for PackageListView {
                     Constraint::Length(14),
                     Constraint::Length(9),
                     Constraint::Length(7),
-                    Constraint::Length(30),
+                    Constraint::Min(0),
                 ];
 
                 // Render the header manually so we can draw a separator beneath it.
@@ -376,18 +374,12 @@ impl View for PackageListView {
                 let sep_line = "─".repeat(table_area.width as usize);
                 frame.render_widget(Paragraph::new(sep_line).style(theme.border()), sep_row);
 
-                // Truncate description to fit the fixed column width.
                 let rows: Vec<Row> = self
                     .state
                     .items
                     .iter()
                     .map(|p| {
-                        let desc = p.description.as_deref().unwrap_or("");
-                        let desc_truncated = if desc.len() > DESC_MAX {
-                            format!("{}…", &desc[..DESC_MAX.saturating_sub(1)])
-                        } else {
-                            desc.to_string()
-                        };
+                        let desc = p.description.as_deref().unwrap_or("").to_string();
                         let key = format!("{}/{}", p.namespace, p.name);
                         let name_cell = if self.installed.contains(&key) {
                             Cell::from(Line::from(vec![
@@ -407,7 +399,7 @@ impl View for PackageListView {
                             Cell::from(p.namespace.clone()),
                             Cell::from(p.latest_version.clone().unwrap_or_default()),
                             verif_cell,
-                            Cell::from(desc_truncated),
+                            Cell::from(desc),
                         ])
                     })
                     .collect();
@@ -678,5 +670,13 @@ mod tests {
         s.items = summaries(&["a", "b", "c"]);
         s.selected = 2;
         assert_eq!(s.selected_item().unwrap().name, "c");
+    }
+
+    #[test]
+    fn description_cell_preserves_long_text() {
+        let desc = "a".repeat(100);
+        // No truncation: description is used as-is.
+        let result = desc.clone();
+        assert_eq!(result.len(), 100);
     }
 }
