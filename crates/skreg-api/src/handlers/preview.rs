@@ -35,7 +35,8 @@ pub(crate) fn collect_files(base: &Path, dir: &Path, files: &mut Vec<String>) ->
     entries.sort_by_key(std::fs::DirEntry::file_name);
     for entry in entries {
         let path = entry.path();
-        // strip_prefix is infallible here: every path under dir is under base.
+        // Defensive: strip_prefix should always succeed since paths come from read_dir(dir),
+        // but skip any entry that cannot be relativized rather than failing the whole walk.
         let Ok(rel) = path.strip_prefix(base) else {
             continue;
         };
