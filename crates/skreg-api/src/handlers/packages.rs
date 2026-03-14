@@ -14,13 +14,13 @@ use crate::router::{AppState, SharedState};
 
 /// A row from the `versions` + `packages` join used to resolve a version.
 #[derive(sqlx::FromRow)]
-struct VersionRow {
-    version: String,
-    sha256: String,
-    storage_path: String,
-    sig_path: String,
-    description: String,
-    category: Option<String>,
+pub(crate) struct VersionRow {
+    pub(crate) version: String,
+    pub(crate) sha256: String,
+    pub(crate) storage_path: String,
+    pub(crate) sig_path: String,
+    pub(crate) description: String,
+    pub(crate) category: Option<String>,
 }
 
 /// Response body for the package metadata endpoint.
@@ -44,7 +44,7 @@ pub struct ManifestResponse {
 }
 
 /// Validate a version segment: "latest" or alphanumeric + `.`, `-`, `+`, max 32 chars.
-fn validate_version(v: &str) -> bool {
+pub(crate) fn validate_version(v: &str) -> bool {
     if v == "latest" {
         return true;
     }
@@ -57,7 +57,7 @@ fn validate_version(v: &str) -> bool {
 
 /// Resolve a version row from the DB given validated namespace, name, and version.
 /// If version is "latest", returns the most recently published version.
-async fn resolve_version_row(
+pub(crate) async fn resolve_version_row(
     state: &AppState,
     ns: &str,
     name: &str,

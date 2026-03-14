@@ -21,6 +21,7 @@ use crate::handlers::namespaces::create_namespace_handler;
 use crate::handlers::packages::{
     package_download_handler, package_meta_handler, package_sig_handler,
 };
+use crate::handlers::preview::package_preview_handler;
 use crate::handlers::publish::publish_handler;
 use crate::handlers::rotate::{rotate_confirm_handler, rotate_submit_handler};
 use crate::handlers::search::search_handler;
@@ -85,6 +86,10 @@ pub fn build_router(state: AppState) -> Router {
         .route("/v1/publish", post(publish_handler))
         .route("/v1/jobs/:id", get(job_status_handler))
         .route("/v1/packages/:ns/:name/:version", get(package_meta_handler))
+        .route(
+            "/v1/packages/:ns/:name/:version/preview",
+            get(package_preview_handler),
+        )
         .route(
             "/v1/download/:ns/:name/:version",
             get(package_download_handler),
