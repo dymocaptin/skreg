@@ -157,8 +157,8 @@ impl RsaPssVerifier {
         digest: &Sha256Digest,
         sig_bytes: &[u8],
     ) -> Result<(), VerifyError> {
-        let digest_bytes =
-            hex::decode(digest.as_hex()).expect("Sha256Digest always contains valid hex");
+        let digest_bytes = hex::decode(digest.as_hex())
+            .map_err(|e| VerifyError::InvalidCertChain(format!("invalid digest hex: {e}")))?;
         let sig = PssSignature::try_from(sig_bytes).map_err(|_| VerifyError::SignatureMismatch)?;
         let verifying_key = PssVerifyingKey::<Sha256>::new(public_key.clone());
         verifying_key
