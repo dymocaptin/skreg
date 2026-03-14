@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import Header from './components/Header/Header.jsx'
+import Subheader from './components/Subheader/Subheader.jsx'
 import PackageGrid from './components/PackageGrid/PackageGrid.jsx'
 import styles from './App.module.css'
 
@@ -18,6 +19,7 @@ export default function App() {
   return (
     <div className={styles.app}>
       <Header theme={theme} onThemeToggle={handleThemeToggle} />
+      <Subheader />
       <PackageGrid />
     </div>
   )

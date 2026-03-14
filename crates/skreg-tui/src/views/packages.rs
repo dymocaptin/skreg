@@ -162,7 +162,7 @@ impl PackageListView {
             let result = installer
                 .install(&pkg_ref)
                 .await
-                .map(|p| {
+                .map(|(p, _manifest)| {
                     format!(
                         "{} v{}",
                         p.pkg_ref.name,
@@ -233,7 +233,7 @@ impl PackageListView {
                     name: p.name,
                     latest_version: Some(p.version),
                     description,
-                    trusted: false,
+                    verification: "self_signed".to_string(),
                 }
             })
             .collect();
@@ -361,12 +361,13 @@ impl View for PackageListView {
                     Constraint::Min(18),
                     Constraint::Length(14),
                     Constraint::Length(9),
+                    Constraint::Length(7),
                     Constraint::Length(30),
                 ];
 
                 // Render the header manually so we can draw a separator beneath it.
-                let header_cols = Layout::horizontal(widths).spacing(1).areas::<4>(header_row);
-                let labels = ["NAME", "NAMESPACE", "VERSION", "DESCRIPTION"];
+                let header_cols = Layout::horizontal(widths).spacing(1).areas::<5>(header_row);
+                let labels = ["NAME", "NAMESPACE", "VERSION", "VERIF", "DESCRIPTION"];
                 for (area, label) in header_cols.iter().zip(labels.iter()) {
                     frame.render_widget(Paragraph::new(*label).style(theme.header()), *area);
                 }
@@ -396,10 +397,16 @@ impl View for PackageListView {
                         } else {
                             Cell::from(p.name.clone())
                         };
+                        let verif_cell = if p.verification.as_str() == "publisher" {
+                            Cell::from(Line::from(Span::styled("✦ pub ", theme.accent())))
+                        } else {
+                            Cell::from(Line::from(Span::styled("◈ self ", theme.muted())))
+                        };
                         Row::new(vec![
                             name_cell,
                             Cell::from(p.namespace.clone()),
                             Cell::from(p.latest_version.clone().unwrap_or_default()),
+                            verif_cell,
                             Cell::from(desc_truncated),
                         ])
                     })
@@ -627,6 +634,13 @@ impl PackageListView {
 mod tests {
     use super::*;
 
+    #[test]
+    fn verif_column_label_fits_7_chars() {
+        use skreg_core::VerificationKind;
+        assert!(VerificationKind::SelfSigned.short_label().chars().count() <= 7);
+        assert!(VerificationKind::Publisher.short_label().chars().count() <= 7);
+    }
+
     fn summaries(names: &[&str]) -> Vec<SearchResult> {
         names
             .iter()
@@ -635,7 +649,7 @@ mod tests {
                 name: (*n).to_string(),
                 description: None,
                 latest_version: Some("1.0.0".into()),
-                trusted: false,
+                verification: "self_signed".to_string(),
             })
             .collect()
     }

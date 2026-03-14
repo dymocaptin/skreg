@@ -36,6 +36,13 @@ export default function PackageDetail({ pkg }) {
       {pkg.category && (
         <span className={styles.category}>{pkg.category}</span>
       )}
+      {pkg.verification && (
+        <span className={pkg.verification === 'publisher'
+          ? styles.badgePublisher
+          : styles.badgeSelf}>
+          {pkg.verification === 'publisher' ? '✦ publisher verified' : '◈ self-signed'}
+        </span>
+      )}
       <p className={styles.description}>{pkg.description}</p>
       <div className={styles.installBlock}>
         <code className={styles.installCmd}>$ {installCmd}</code>

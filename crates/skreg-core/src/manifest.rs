@@ -23,4 +23,8 @@ pub struct Manifest {
     /// PEM-encoded certificate chain used to verify the package signature.
     /// Empty for registry-signed packages (cert chain is implicit).
     pub cert_chain_pem: Vec<String>,
+    /// RSA-PSS signature (hex) over the tarball SHA-256 digest, made by the publisher.
+    /// Present for all newly published packages; absent on legacy registry-signed packages.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub publisher_sig_hex: Option<String>,
 }

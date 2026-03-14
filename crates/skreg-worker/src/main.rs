@@ -9,6 +9,7 @@ async fn main() -> anyhow::Result<()> {
     let aws_cfg = aws_config::load_from_env().await;
     let s3 = aws_sdk_s3::Client::new(&aws_cfg);
     let sm = aws_sdk_secretsmanager::Client::new(&aws_cfg);
+    let ses = aws_sdk_sesv2::Client::new(&aws_cfg);
 
-    skreg_worker::runner::run(pool, s3, sm, bucket, ca_secret_arn).await
+    skreg_worker::runner::run(pool, s3, sm, ses, bucket, ca_secret_arn).await
 }

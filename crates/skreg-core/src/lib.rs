@@ -7,3 +7,5 @@ pub mod installed;
 pub mod manifest;
 pub mod package_ref;
 pub mod types;
+pub mod verification;
+pub use verification::VerificationKind;

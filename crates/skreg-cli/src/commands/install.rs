@@ -8,7 +8,7 @@ use anyhow::{Context, Result};
 use skreg_client::client::HttpRegistryClient;
 use skreg_core::config::EnforcementLevel;
 use skreg_core::package_ref::PackageRef;
-use skreg_crypto::verifier::RsaPkcs1Verifier;
+use skreg_crypto::verifier::RsaPssVerifier;
 
 use crate::config::{default_config_path, load_config};
 use crate::installer::Installer;
@@ -84,11 +84,11 @@ pub async fn run_install(
     let enforcement = enforcement_override.unwrap_or_else(|| cfg.policy.enforcement.clone());
 
     let client = Arc::new(HttpRegistryClient::new(cfg.registry()));
-    let verifier = Arc::new(RsaPkcs1Verifier::new());
+    let verifier = Arc::new(RsaPssVerifier::new());
     let install_root = default_install_root()?;
 
     let installer = Installer::new(client, install_root).with_verifier(verifier);
-    let result = installer.install(&pkg_ref).await?;
+    let (result, manifest) = installer.install(&pkg_ref).await?;
 
     let ns = result.pkg_ref.namespace.as_str();
     let name = result.pkg_ref.name.as_str();
@@ -124,6 +124,21 @@ pub async fn run_install(
         linker.write_claude_md(&claude_md, &entries, &enforcement)?;
         println!("\nUpdated {}", claude_md.display());
     }
+
+    let tier = if manifest.cert_chain_pem.len() >= 2 {
+        "publisher"
+    } else {
+        "self-signed"
+    };
+    let ca_note = if manifest.cert_chain_pem.len() >= 2 {
+        ", verified by skreg CA"
+    } else {
+        ", key not CA-verified"
+    };
+    println!(
+        "  Verification: {tier} (signed by {}{ca_note})",
+        manifest.namespace
+    );
 
     Ok(())
 }

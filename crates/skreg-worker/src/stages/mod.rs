@@ -4,6 +4,7 @@ pub mod content;
 pub mod safety;
 pub mod signing;
 pub mod structure;
+pub mod verify_publisher;
 
 use anyhow::Result;
 use aws_sdk_s3::Client as S3Client;
@@ -22,23 +23,24 @@ pub async fn run_pipeline(
     job_id: Uuid,
     pool: &PgPool,
     s3: &S3Client,
-    sm: &SmClient,
+    _sm: &SmClient,
     bucket: &str,
-    ca_secret_arn: &str,
+    _ca_secret_arn: &str,
 ) -> Result<()> {
-    // Load job + version info
-    let row = sqlx::query_as::<_, (Uuid, String, String, String, String)>(
-        "SELECT v.id, v.sha256, v.storage_path, p.name, v.version
+    // Load job + version info (including namespace slug for Stage 4)
+    let row = sqlx::query_as::<_, (Uuid, String, String, String, String, String)>(
+        "SELECT v.id, v.sha256, v.storage_path, p.name, v.version, n.slug
          FROM vetting_jobs j
          JOIN versions v ON v.id = j.version_id
          JOIN packages p ON p.id = v.package_id
+         JOIN namespaces n ON n.id = p.namespace_id
          WHERE j.id = $1",
     )
     .bind(job_id)
     .fetch_one(pool)
     .await?;
 
-    let (version_id, sha256, storage_path, pkg_name, version) = row;
+    let (version_id, sha256, storage_path, pkg_name, version, namespace_slug) = row;
 
     // Download tarball from S3 to tempdir
     let obj = s3
@@ -71,17 +73,18 @@ pub async fn run_pipeline(
     safety::check_safety(&pkg_name, &version, &existing_names, &yanked)
         .map_err(|e| anyhow::anyhow!("Stage 3 failed: {e}"))?;
 
-    // Stage 4 — sign
-    let sig_path = signing::run_signing(&sha256, &storage_path, s3, sm, bucket, ca_secret_arn)
-        .await
-        .map_err(|e| anyhow::anyhow!("Stage 4 failed: {e}"))?;
-
-    // Update version with sig_path and mark job passed
-    sqlx::query("UPDATE versions SET sig_path = $1 WHERE id = $2")
-        .bind(&sig_path)
-        .bind(version_id)
-        .execute(pool)
-        .await?;
+    // Stage 4 — verify publisher signature
+    verify_publisher::run_verify_publisher(
+        version_id,
+        &sha256,
+        &storage_path,
+        &namespace_slug,
+        pool,
+        s3,
+        bucket,
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!("Stage 4 failed: {e}"))?;
 
     sqlx::query(
         "UPDATE vetting_jobs SET status = 'pass', completed_at = now(),

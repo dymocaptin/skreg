@@ -3,6 +3,7 @@
 use std::sync::Arc;
 
 use aws_sdk_s3::Client as S3Client;
+use aws_sdk_secretsmanager::Client as SmClient;
 use aws_sdk_sesv2::Client as SesClient;
 use axum::{
     http::HeaderValue,
@@ -14,12 +15,14 @@ use sqlx::PgPool;
 use tower_http::cors::{AllowHeaders, AllowMethods, CorsLayer};
 
 use crate::handlers::auth::{login_handler, token_handler};
+use crate::handlers::cert::cert_handler;
 use crate::handlers::jobs::job_status_handler;
 use crate::handlers::namespaces::create_namespace_handler;
 use crate::handlers::packages::{
     package_download_handler, package_meta_handler, package_sig_handler,
 };
 use crate::handlers::publish::publish_handler;
+use crate::handlers::rotate::{rotate_confirm_handler, rotate_submit_handler};
 use crate::handlers::search::search_handler;
 
 /// Shared application state injected into every handler.
@@ -31,10 +34,16 @@ pub struct AppState {
     pub s3: S3Client,
     /// AWS SES v2 client.
     pub ses: SesClient,
+    /// AWS Secrets Manager client.
+    pub sm: SmClient,
     /// S3 bucket name for package artifacts.
     pub s3_bucket: String,
     /// Sender address for transactional email.
     pub from_email: String,
+    /// Secrets Manager secret name holding the Publisher CA private key PEM.
+    pub publisher_ca_key_secret_name: String,
+    /// PEM-encoded Publisher CA certificate.
+    pub publisher_ca_cert_pem: String,
 }
 
 /// Arc-wrapped [`AppState`] used as the Axum router state.
@@ -65,6 +74,12 @@ pub fn build_router(state: AppState) -> Router {
         .route("/healthz", get(health_handler))
         .route("/v1/search", get(search_handler))
         .route("/v1/namespaces", post(create_namespace_handler))
+        .route("/v1/namespaces/:ns/cert", post(cert_handler))
+        .route("/v1/namespaces/:ns/rotate-key", post(rotate_submit_handler))
+        .route(
+            "/v1/namespaces/:ns/rotate-key/confirm",
+            get(rotate_confirm_handler),
+        )
         .route("/v1/auth/login", post(login_handler))
         .route("/v1/auth/token", post(token_handler))
         .route("/v1/publish", post(publish_handler))

@@ -21,8 +21,8 @@ pub struct PackageSummary {
     pub created_at: DateTime<Utc>,
     /// Latest published version string (most recent by `published_at`), if any.
     pub latest_version: Option<String>,
-    /// Whether the package's namespace holds a valid publisher cert.
-    pub trusted: bool,
+    /// Verification tier of the latest published version (e.g. `"self_signed"`, `"publisher"`).
+    pub verification: String,
 }
 
 /// Paginated search response.
@@ -45,6 +45,6 @@ pub struct SearchQuery {
     pub category: Option<String>,
     /// Page number (default 1).
     pub page: Option<i64>,
-    /// When `true`, restrict results to packages from trusted publishers.
-    pub trusted: Option<bool>,
+    /// When `true`, restrict results to packages from verified (CA-signed) publishers.
+    pub verified: Option<bool>,
 }

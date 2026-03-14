@@ -161,7 +161,7 @@ impl PackageDetailView {
             let result = installer
                 .install(&pkg_ref)
                 .await
-                .map(|p| {
+                .map(|(p, _manifest)| {
                     format!(
                         "{} v{}",
                         p.pkg_ref.name,
@@ -229,6 +229,7 @@ impl View for PackageDetailView {
         None
     }
 
+    #[allow(clippy::too_many_lines)]
     fn render(&mut self, frame: &mut Frame, area: Rect, theme: &Theme) {
         let [header_area, main_area, footer_area] = Layout::vertical([
             Constraint::Length(1),
@@ -299,9 +300,19 @@ impl View for PackageDetailView {
         frame.render_widget(right_block, right);
 
         if let Some(data) = &self.data {
+            let tier = if data.manifest.cert_chain_pem.len() >= 2 {
+                "✦ Publisher Verified"
+            } else {
+                "◈ Self-signed"
+            };
+            let ca_note = if data.manifest.cert_chain_pem.len() >= 2 {
+                ", verified by skreg CA".to_string()
+            } else {
+                ", key not CA-verified".to_string()
+            };
             let content = format!(
-                "# {}\n\nv{}\n\n{}\n",
-                data.manifest.name, data.manifest.version, data.manifest.description,
+                "# {}\n\nv{}\n\n{}{}\n\n{}\n",
+                data.manifest.name, data.manifest.version, tier, ca_note, data.manifest.description,
             );
             #[allow(clippy::cast_possible_truncation)]
             let lines = content.lines().count() as u16;

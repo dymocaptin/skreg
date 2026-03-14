@@ -1,3 +1,5 @@
+use std::path::PathBuf;
+
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
@@ -10,7 +12,14 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Pack the current directory into a .skill tarball
-    Pack,
+    Pack {
+        /// Path to PEM private key (overrides auto-generated key)
+        #[arg(long, value_name = "FILE")]
+        key: Option<PathBuf>,
+        /// Path to PEM certificate (overrides auto-generated cert)
+        #[arg(long, value_name = "FILE")]
+        cert: Option<PathBuf>,
+    },
     /// Register a namespace or re-authenticate
     Login { namespace: String },
     /// Publish a skill to the registry
@@ -19,9 +28,9 @@ enum Commands {
     Search {
         /// Search query string
         query: String,
-        /// Only show skills from trusted publishers
+        /// Only show skills from verified (CA-signed) publishers
         #[arg(long)]
-        trusted: bool,
+        verified: bool,
     },
     /// Download and install a skill
     Install {
@@ -41,6 +50,18 @@ enum Commands {
         #[arg(value_name = "PACKAGE")]
         package_ref: String,
     },
+    /// Obtain a CA-issued publisher certificate
+    Certify {
+        /// Path to existing PEM private key (uses ~/.skreg/keys/publisher.key if omitted)
+        #[arg(long, value_name = "FILE")]
+        key: Option<PathBuf>,
+    },
+    /// Rotate the publisher key (requires email confirmation)
+    Rotate {
+        /// Path to new PEM private key (generates a fresh RSA-2048 key if omitted)
+        #[arg(long, value_name = "FILE")]
+        new_key: Option<PathBuf>,
+    },
 }
 
 #[tokio::main]
@@ -48,8 +69,12 @@ async fn main() -> anyhow::Result<()> {
     env_logger::init();
     let cli = Cli::parse();
     match cli.command {
-        Commands::Pack => {
-            skreg_cli::commands::pack::run_pack(std::env::current_dir()?.as_path())?;
+        Commands::Pack { key, cert } => {
+            skreg_cli::commands::pack::run_pack(
+                std::env::current_dir()?.as_path(),
+                key.as_deref(),
+                cert.as_deref(),
+            )?;
         }
         Commands::Login { namespace } => {
             skreg_cli::commands::login::run_login(&namespace).await?;
@@ -57,8 +82,8 @@ async fn main() -> anyhow::Result<()> {
         Commands::Publish => {
             skreg_cli::commands::publish::run_publish().await?;
         }
-        Commands::Search { query, trusted } => {
-            skreg_cli::commands::search::run_search(&query, trusted).await?;
+        Commands::Search { query, verified } => {
+            skreg_cli::commands::search::run_search(&query, verified).await?;
         }
         Commands::Install {
             package_ref,
@@ -83,6 +108,12 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::Uninstall { package_ref } => {
             skreg_cli::commands::uninstall::run_uninstall(&package_ref)?;
+        }
+        Commands::Certify { key } => {
+            skreg_cli::commands::certify::run_certify(key.as_deref()).await?;
+        }
+        Commands::Rotate { new_key } => {
+            skreg_cli::commands::rotate::run_rotate(new_key.as_deref()).await?;
         }
     }
     Ok(())
