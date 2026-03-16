@@ -22,14 +22,24 @@ pub const LIMIT_SKILL_MD_LINES: usize = 1000;
 /// Maximum size of `manifest.json` in bytes (64 KB).
 pub const LIMIT_MANIFEST_SIZE: u64 = 64 * 1024;
 
-const _: () = {
-    const _: () = assert!(LIMIT_SCRIPT_FILE_SIZE < LIMIT_FILE_SIZE);
-    const _: () = assert!(LIMIT_MANIFEST_SIZE <= LIMIT_FILE_SIZE);
-};
+const _: () = assert!(LIMIT_SCRIPT_FILE_SIZE < LIMIT_FILE_SIZE);
+const _: () = assert!(LIMIT_MANIFEST_SIZE <= LIMIT_FILE_SIZE);
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[allow(clippy::assertions_on_constants)]
+    fn script_size_tighter_than_file_size() {
+        assert!(LIMIT_SCRIPT_FILE_SIZE < LIMIT_FILE_SIZE);
+    }
+
+    #[test]
+    #[allow(clippy::assertions_on_constants)]
+    fn manifest_size_within_file_limit() {
+        assert!(LIMIT_MANIFEST_SIZE <= LIMIT_FILE_SIZE);
+    }
 
     #[test]
     fn package_size_sanity() {
