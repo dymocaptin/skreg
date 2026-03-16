@@ -567,6 +567,7 @@ impl View for PackageListView {
                             p.namespace.clone(),
                             p.name.clone(),
                             p.latest_version.clone().unwrap_or_default(),
+                            p.verification == "publisher",
                         )))
                     } else {
                         Action::None

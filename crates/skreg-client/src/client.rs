@@ -112,32 +112,6 @@ impl HttpRegistryClient {
     }
 }
 
-impl HttpRegistryClient {
-    /// Fetch the [`Manifest`] for a specific package version without downloading the tarball.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`ClientError`] on network or parse failure.
-    pub async fn fetch_manifest(
-        &self,
-        namespace: &str,
-        name: &str,
-        version: &str,
-    ) -> Result<Manifest, ClientError> {
-        let url = format!("{}/v1/packages/{namespace}/{name}/{version}", self.base_url,);
-        debug!("fetching manifest from {url}");
-        self.http
-            .get(&url)
-            .send()
-            .await?
-            .error_for_status()
-            .map_err(ClientError::Http)?
-            .json::<Manifest>()
-            .await
-            .map_err(|e| ClientError::Parse(e.to_string()))
-    }
-}
-
 impl RegistryClient for HttpRegistryClient {
     fn resolve<'a>(
         &'a self,
