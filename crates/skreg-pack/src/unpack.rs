@@ -2,7 +2,7 @@
 
 use std::fs::File;
 use std::io::Cursor;
-use std::path::Path;
+use std::path::{Component, Path, PathBuf};
 
 use flate2::read::GzDecoder;
 use log::debug;
@@ -11,6 +11,30 @@ use tempfile::TempDir;
 use skreg_core::manifest::Manifest;
 
 use crate::error::PackError;
+
+/// Validate a single tar entry: reject symlinks and path-traversal components.
+///
+/// Returns the entry's path on success.
+fn validate_entry<R: std::io::Read>(entry: &tar::Entry<R>) -> Result<PathBuf, PackError> {
+    // Reject symlinks.
+    if entry.header().entry_type().is_symlink() {
+        let path = entry.path()?.display().to_string();
+        return Err(PackError::Symlink(path));
+    }
+
+    // Reject path traversal.
+    let path = entry.path()?.to_path_buf();
+    for component in path.components() {
+        match component {
+            Component::ParentDir | Component::RootDir | Component::Prefix(_) => {
+                return Err(PackError::PathTraversal(path.display().to_string()));
+            }
+            _ => {}
+        }
+    }
+
+    Ok(path)
+}
 
 /// Unpack a `.skill` tarball into `dest_dir`.
 ///
@@ -23,8 +47,6 @@ use crate::error::PackError;
 /// Returns [`PackError::PathTraversal`] if any entry path contains `..` or an absolute component.
 /// Returns [`PackError::Io`] on any other I/O or decompression failure.
 pub fn unpack_tarball(tarball_path: &Path, dest_dir: &Path) -> Result<(), PackError> {
-    use std::path::Component;
-
     std::fs::create_dir_all(dest_dir)?;
     let file = File::open(tarball_path)?;
     let decoder = GzDecoder::new(file);
@@ -32,27 +54,7 @@ pub fn unpack_tarball(tarball_path: &Path, dest_dir: &Path) -> Result<(), PackEr
 
     for entry in archive.entries()? {
         let mut entry = entry?;
-
-        // Reject symlinks before extracting.
-        if entry.header().entry_type().is_symlink() {
-            let path = entry
-                .path()
-                .map(|p| p.display().to_string())
-                .unwrap_or_default();
-            return Err(PackError::Symlink(path));
-        }
-
-        // Reject path traversal.
-        let path = entry.path()?.to_path_buf();
-        for component in path.components() {
-            match component {
-                Component::ParentDir | Component::RootDir | Component::Prefix(_) => {
-                    return Err(PackError::PathTraversal(path.display().to_string()));
-                }
-                _ => {}
-            }
-        }
-
+        let path = validate_entry(&entry)?;
         debug!("unpacking: {}", path.display());
         entry.unpack_in(dest_dir)?;
     }
@@ -71,35 +73,13 @@ pub fn unpack_tarball(tarball_path: &Path, dest_dir: &Path) -> Result<(), PackEr
 /// Returns [`PackError::PathTraversal`] if any entry path contains `..` or an absolute component.
 /// Returns [`PackError::Io`] on any other I/O or decompression failure.
 pub fn unpack_to_tempdir(bytes: &[u8]) -> Result<TempDir, PackError> {
-    use std::path::Component;
-
     let tmp = TempDir::new()?;
     let decoder = GzDecoder::new(Cursor::new(bytes));
     let mut archive = tar::Archive::new(decoder);
 
     for entry in archive.entries()? {
         let mut entry = entry?;
-
-        // Reject symlinks before extracting.
-        if entry.header().entry_type().is_symlink() {
-            let path = entry
-                .path()
-                .map(|p| p.display().to_string())
-                .unwrap_or_default();
-            return Err(PackError::Symlink(path));
-        }
-
-        // Reject path traversal.
-        let path = entry.path()?.to_path_buf();
-        for component in path.components() {
-            match component {
-                Component::ParentDir | Component::RootDir | Component::Prefix(_) => {
-                    return Err(PackError::PathTraversal(path.display().to_string()));
-                }
-                _ => {}
-            }
-        }
-
+        let path = validate_entry(&entry)?;
         debug!("unpacking: {}", path.display());
         entry.unpack_in(tmp.path())?;
     }
