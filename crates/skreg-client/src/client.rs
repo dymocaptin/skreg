@@ -44,6 +44,17 @@ fn default_verification() -> String {
     "self_signed".to_string()
 }
 
+/// File listing and SKILL.md content for a package version, returned by the preview endpoint.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct PackagePreview {
+    /// All file paths in the package, relative to the package root.
+    pub files: Vec<String>,
+    /// Content of `SKILL.md`, capped at 16 KB server-side.
+    pub skill_md: String,
+    /// True when `SKILL.md` was cut at the 16 KB limit.
+    pub truncated: bool,
+}
+
 /// Communicates with a skreg-compatible registry.
 pub trait RegistryClient: Send + Sync {
     /// Resolve a package reference to its latest (or pinned) version metadata.
@@ -68,6 +79,20 @@ pub trait RegistryClient: Send + Sync {
         query: &'a str,
         verified_only: bool,
     ) -> BoxFuture<'a, Result<Vec<SearchResult>, ClientError>>;
+
+    /// Fetch a preview of a specific package version: file list and SKILL.md content.
+    ///
+    /// Calls `GET /v1/packages/{ns}/{name}/{version}/preview`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ClientError`] on network or parse failure.
+    fn preview_package<'a>(
+        &'a self,
+        ns: &'a str,
+        name: &'a str,
+        version: &'a str,
+    ) -> BoxFuture<'a, Result<PackagePreview, ClientError>>;
 }
 
 /// `reqwest`-backed implementation of [`RegistryClient`].
@@ -84,32 +109,6 @@ impl HttpRegistryClient {
             base_url: base_url.into(),
             http: Arc::new(reqwest::Client::new()),
         }
-    }
-}
-
-impl HttpRegistryClient {
-    /// Fetch the [`Manifest`] for a specific package version without downloading the tarball.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`ClientError`] on network or parse failure.
-    pub async fn fetch_manifest(
-        &self,
-        namespace: &str,
-        name: &str,
-        version: &str,
-    ) -> Result<Manifest, ClientError> {
-        let url = format!("{}/v1/packages/{namespace}/{name}/{version}", self.base_url,);
-        debug!("fetching manifest from {url}");
-        self.http
-            .get(&url)
-            .send()
-            .await?
-            .error_for_status()
-            .map_err(ClientError::Http)?
-            .json::<Manifest>()
-            .await
-            .map_err(|e| ClientError::Parse(e.to_string()))
     }
 }
 
@@ -207,5 +206,54 @@ impl RegistryClient for HttpRegistryClient {
 
             Ok(resp.packages)
         })
+    }
+
+    fn preview_package<'a>(
+        &'a self,
+        ns: &'a str,
+        name: &'a str,
+        version: &'a str,
+    ) -> BoxFuture<'a, Result<PackagePreview, ClientError>> {
+        Box::pin(async move {
+            let url = format!(
+                "{}/v1/packages/{ns}/{name}/{version}/preview",
+                self.base_url
+            );
+            debug!("fetching preview from {url}");
+            self.http
+                .get(&url)
+                .send()
+                .await?
+                .error_for_status()
+                .map_err(ClientError::Http)?
+                .json::<PackagePreview>()
+                .await
+                .map_err(|e| ClientError::Parse(e.to_string()))
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn package_preview_deserializes_from_json() {
+        let json = r#"{
+            "files": ["SKILL.md", "manifest.json", "references/codex-tools.md"],
+            "skill_md": "---\nname: foo\n---\n",
+            "truncated": false
+        }"#;
+        let preview: PackagePreview = serde_json::from_str(json).unwrap();
+        assert_eq!(preview.files.len(), 3);
+        assert!(preview.skill_md.contains("name: foo"));
+        assert!(!preview.truncated);
+    }
+
+    #[test]
+    fn package_preview_deserializes_truncated_flag() {
+        let json = r#"{"files": [], "skill_md": "...", "truncated": true}"#;
+        let preview: PackagePreview = serde_json::from_str(json).unwrap();
+        assert!(preview.truncated);
     }
 }

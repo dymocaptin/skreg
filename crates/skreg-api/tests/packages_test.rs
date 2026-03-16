@@ -70,3 +70,30 @@ async fn packages_sig_rejects_invalid_namespace() {
     let response = server.get("/v1/download/ACME/my-skill/1.0.0/sig").await;
     assert_eq!(response.status_code(), StatusCode::BAD_REQUEST);
 }
+
+#[tokio::test]
+async fn preview_endpoint_exists() {
+    let app = build_router(make_state().await);
+    let server = TestServer::new(app).unwrap();
+    let response = server.get("/v1/packages/acme/my-skill/1.0.0/preview").await;
+    assert_ne!(response.status_code(), StatusCode::NOT_FOUND);
+    assert_ne!(response.status_code(), StatusCode::METHOD_NOT_ALLOWED);
+}
+
+#[tokio::test]
+async fn preview_rejects_invalid_namespace() {
+    let app = build_router(make_state().await);
+    let server = TestServer::new(app).unwrap();
+    let response = server.get("/v1/packages/ACME/my-skill/1.0.0/preview").await;
+    assert_eq!(response.status_code(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn preview_rejects_invalid_version() {
+    let app = build_router(make_state().await);
+    let server = TestServer::new(app).unwrap();
+    let response = server
+        .get("/v1/packages/acme/my-skill/1.0@bad/preview")
+        .await;
+    assert_eq!(response.status_code(), StatusCode::BAD_REQUEST);
+}
