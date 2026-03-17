@@ -157,7 +157,7 @@ pub async fn run_verify_publisher(
         let fingerprint = hex::encode(sha2::Sha256::digest(&spki_der));
 
         let revoked: bool = sqlx::query_scalar(
-            "SELECT EXISTS(SELECT 1 FROM revoked_self_signed_keys WHERE spki_fingerprint = $1)",
+            "SELECT EXISTS(SELECT 1 FROM revoked_self_signed_keys WHERE fingerprint = $1)",
         )
         .bind(&fingerprint)
         .fetch_one(pool)
