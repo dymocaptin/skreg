@@ -54,4 +54,7 @@ tempfile                = "3"
 yara-x = "0.12"
 infer = "0.16"
 
+[features]
+integration = []
+
 [dev-dependencies]
