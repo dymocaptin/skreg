@@ -70,8 +70,10 @@ pub(crate) async fn resolve_version_row(
              FROM versions v
              JOIN packages p ON p.id = v.package_id
              JOIN namespaces n ON n.id = p.namespace_id
+             JOIN vetting_jobs j ON j.version_id = v.id
              WHERE n.slug = $1
                AND p.name = $2
+               AND j.status = 'pass'
                AND v.yanked_at IS NULL
                AND n.banned_at IS NULL
              ORDER BY v.published_at DESC, v.id DESC

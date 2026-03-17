@@ -23,9 +23,9 @@ pub async fn run_pipeline(
     job_id: Uuid,
     pool: &PgPool,
     s3: &S3Client,
-    _sm: &SmClient,
+    sm: &SmClient,
     bucket: &str,
-    _ca_secret_arn: &str,
+    ca_secret_arn: &str,
 ) -> Result<()> {
     // Load job + version info (including namespace slug for Stage 4)
     let row = sqlx::query_as::<_, (Uuid, String, String, String, String, String)>(
@@ -85,6 +85,17 @@ pub async fn run_pipeline(
     )
     .await
     .map_err(|e| anyhow::anyhow!("Stage 4 failed: {e}"))?;
+
+    // Stage 5 — sign with registry CA and store .sig in S3
+    let sig_path = signing::run_signing(&sha256, &storage_path, s3, sm, bucket, ca_secret_arn)
+        .await
+        .map_err(|e| anyhow::anyhow!("Stage 5 failed: {e}"))?;
+
+    sqlx::query("UPDATE versions SET sig_path = $1 WHERE id = $2")
+        .bind(&sig_path)
+        .bind(version_id)
+        .execute(pool)
+        .await?;
 
     sqlx::query(
         "UPDATE vetting_jobs SET status = 'pass', completed_at = now(),
