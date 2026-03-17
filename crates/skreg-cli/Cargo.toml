@@ -1,6 +1,6 @@
 [package]
 name    = "skreg-cli"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 repository = "https://github.com/dymocaptin/skreg"
 description = "A command line tool for manging AI skills which are verified and trusted"
