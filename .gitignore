@@ -1,5 +1,6 @@
 .worktrees/
+.superpowers/
 target/
-docs/plans/
+docs/
 infra/Pulumi.*.yaml
 web/node_modules/

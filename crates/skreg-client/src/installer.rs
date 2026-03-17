@@ -111,14 +111,19 @@ impl Installer {
         let digest = Sha256Digest::from_hex(&actual_hex)?;
 
         if let Some(ref verifier) = self.verifier {
+            let tarball_manifest = skreg_pack::unpack::read_manifest_from_bytes(&resolved.tarball)?;
+            let sig_hex = tarball_manifest
+                .publisher_sig_hex
+                .as_deref()
+                .ok_or_else(|| {
+                    InstallError::Crypto("package is missing publisher_sig_hex".to_owned())
+                })?;
+            let sig_bytes = hex::decode(sig_hex)
+                .map_err(|e| InstallError::Crypto(format!("invalid publisher_sig_hex: {e}")))?;
             verifier
-                .verify(
-                    &digest,
-                    &resolved.signature,
-                    &resolved.manifest.cert_chain_pem,
-                )
+                .verify(&digest, &sig_bytes, &tarball_manifest.cert_chain_pem)
                 .map_err(|e| InstallError::Crypto(e.to_string()))?;
-            debug!("signature verified for {pkg_ref}");
+            debug!("publisher signature verified for {pkg_ref}");
         }
 
         let install_path = self

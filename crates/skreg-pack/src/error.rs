@@ -11,4 +11,7 @@ pub enum PackError {
     /// The source directory does not contain a required file.
     #[error("required file '{0}' not found in source directory")]
     MissingFile(String),
+    /// `manifest.json` could not be parsed.
+    #[error("manifest.json parse error: {0}")]
+    ManifestParse(String),
 }

@@ -1,6 +1,6 @@
 [package]
 name    = "skreg-client"
-version = "0.1.2"
+version = "0.2.0"
 edition = "2021"
 
 [dependencies]
@@ -14,4 +14,5 @@ log             = { workspace = true }
 reqwest         = { workspace = true }
 tokio           = { workspace = true }
 sha2            = { workspace = true }
+hex             = "0.4"
 tempfile        = "3"
