@@ -83,7 +83,7 @@ pub(crate) fn failure_message(kind: FailureKind) -> String {
 /// revocation lookup, or signature verification fails.
 pub async fn run_verify_publisher(
     version_id: Uuid,
-    sha256: &str,
+    _sha256: &str,
     storage_path: &str,
     namespace: &str,
     pool: &PgPool,
@@ -170,8 +170,14 @@ pub async fn run_verify_publisher(
     }
 
     // 7. Verify signature
-    let digest =
-        Sha256Digest::from_hex(sha256).map_err(|e| anyhow::anyhow!("invalid sha256 in DB: {e}"))?;
+    // Use the sha256 embedded in the manifest (= hash of the unsigned tarball_1),
+    // which is what publisher_sig_hex was actually signed over.  The `sha256`
+    // parameter comes from the DB and equals hash(tarball_2) — wrong for this check.
+    let content_sha256 = manifest["sha256"]
+        .as_str()
+        .ok_or_else(|| anyhow::anyhow!("manifest.json missing sha256 field"))?;
+    let digest = Sha256Digest::from_hex(content_sha256)
+        .map_err(|e| anyhow::anyhow!("invalid sha256 in manifest: {e}"))?;
 
     let verifier = RsaPssVerifier::new();
     let signer = verifier
