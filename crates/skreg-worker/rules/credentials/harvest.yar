@@ -20,7 +20,7 @@ rule ssh_key_harvest {
         $ssh_id_ed   = "~/.ssh/id_ed25519" nocase
         $ssh_dir     = "~/.ssh/" nocase
     condition:
-        $ssh_id_rsa or $ssh_id_ed
+        $ssh_id_rsa or $ssh_id_ed or $ssh_dir
 }
 
 rule crypto_miner {
