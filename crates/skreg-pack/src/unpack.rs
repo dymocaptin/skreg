@@ -8,6 +8,8 @@ use flate2::read::GzDecoder;
 use log::debug;
 use tempfile::TempDir;
 
+use skreg_core::manifest::Manifest;
+
 use crate::error::PackError;
 
 /// Unpack a `.skill` tarball into `dest_dir`.
@@ -54,4 +56,31 @@ pub fn unpack_to_tempdir(bytes: &[u8]) -> Result<TempDir, PackError> {
     }
 
     Ok(tmp)
+}
+
+/// Read and deserialize `manifest.json` from an in-memory `.skill` tarball.
+///
+/// # Errors
+///
+/// Returns [`PackError::MissingFile`] if `manifest.json` is absent,
+/// [`PackError::Io`] on decompression failure, or [`PackError::ManifestParse`]
+/// if the JSON is malformed.
+pub fn read_manifest_from_bytes(bytes: &[u8]) -> Result<Manifest, PackError> {
+    use std::io::Read as _;
+
+    let decoder = GzDecoder::new(Cursor::new(bytes));
+    let mut archive = tar::Archive::new(decoder);
+
+    for entry in archive.entries()? {
+        let mut entry = entry?;
+        let path = entry.path()?.to_path_buf();
+        if path == Path::new("manifest.json") {
+            let mut contents = String::new();
+            entry.read_to_string(&mut contents)?;
+            return serde_json::from_str(&contents)
+                .map_err(|e| PackError::ManifestParse(e.to_string()));
+        }
+    }
+
+    Err(PackError::MissingFile("manifest.json".to_owned()))
 }
