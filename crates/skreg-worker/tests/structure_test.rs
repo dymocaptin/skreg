@@ -38,8 +38,9 @@ fn missing_manifest_fails() {
 fn oversized_tarball_fails() {
     let dir = TempDir::new().unwrap();
     make_valid_dir(&dir);
-    // Write a 6MB file to exceed the 5MB limit
+    // Write a 6MB file in assets/ (a valid location) to exceed the 5MB package limit
+    fs::create_dir(dir.path().join("assets")).unwrap();
     let big = vec![0u8; 6 * 1024 * 1024];
-    fs::write(dir.path().join("big.md"), big).unwrap();
+    fs::write(dir.path().join("assets/big.md"), big).unwrap();
     assert!(check_structure(dir.path()).is_err());
 }
