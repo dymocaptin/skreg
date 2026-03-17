@@ -5,7 +5,7 @@ use std::time::Duration;
 use anyhow::{bail, Context, Result};
 use serde::Deserialize;
 
-use crate::commands::pack::pack_directory_with_sha;
+use crate::commands::pack::run_pack;
 use crate::config::{default_config_path, load_config};
 
 /// Seconds between job status polls.
@@ -43,8 +43,7 @@ pub async fn run_publish() -> Result<()> {
     let version = manifest["version"].as_str().unwrap_or("0.0.0");
 
     let skill_file = cwd.join(format!("{name}-{version}.skill"));
-    pack_directory_with_sha(&cwd, &skill_file)?;
-    println!("packed {}", skill_file.display());
+    run_pack(&cwd, None, None)?;
 
     let bytes = std::fs::read(&skill_file)?;
     let client = reqwest::Client::new();

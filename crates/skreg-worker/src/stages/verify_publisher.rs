@@ -120,7 +120,7 @@ pub async fn run_verify_publisher(
     let sig_bytes = hex::decode(sig_hex).context("decoding publisher_sig_hex")?;
 
     // 4. cert_chain must be 1 or 2 entries
-    let cert_chain: Vec<String> = manifest["cert_chain"]
+    let cert_chain: Vec<String> = manifest["cert_chain_pem"]
         .as_array()
         .ok_or_else(|| anyhow::anyhow!("{}", failure_message(FailureKind::InvalidChainLength)))?
         .iter()
