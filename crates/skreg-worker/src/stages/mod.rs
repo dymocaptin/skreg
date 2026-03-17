@@ -3,6 +3,7 @@
 pub mod content;
 pub mod safety;
 pub mod signing;
+pub mod static_analysis;
 pub mod structure;
 pub mod verify_publisher;
 
