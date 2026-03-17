@@ -267,6 +267,16 @@ fn validate_file_location(rel: &Path) -> Result<(), StructureError> {
 }
 
 fn validate_skill_md(path: &Path) -> Result<(), StructureError> {
+    // Pre-read size guard: reject oversized SKILL.md before loading into memory.
+    let file_size = std::fs::metadata(path)?.len();
+    if file_size > limits::LIMIT_FILE_SIZE {
+        return Err(StructureError::FileTooLarge {
+            path: "SKILL.md".to_owned(),
+            size: file_size,
+            max: limits::LIMIT_FILE_SIZE,
+        });
+    }
+
     let content = std::fs::read_to_string(path)?;
 
     // Line count check
@@ -283,10 +293,11 @@ fn validate_skill_md(path: &Path) -> Result<(), StructureError> {
         return Err(StructureError::FrontmatterMissing);
     }
 
-    // Find closing ---
+    // Find closing "---" on its own line: must be "\n---\n" or "\n---" at EOF
     let after_open = &content[3..];
     let close_pos = after_open
-        .find("\n---")
+        .find("\n---\n")
+        .or_else(|| after_open.strip_suffix("\n---").map(str::len))
         .ok_or(StructureError::FrontmatterMissing)?;
 
     let yaml_block = &after_open[..close_pos];
@@ -304,7 +315,7 @@ fn validate_skill_md(path: &Path) -> Result<(), StructureError> {
             });
         }
         Some(name) => {
-            if name.len() > 64 {
+            if name.len() > limits::LIMIT_NAME_LEN {
                 return Err(StructureError::FrontmatterFieldInvalid {
                     field: "name".to_owned(),
                     reason: "must be 64 characters or fewer".to_owned(),
@@ -343,7 +354,7 @@ fn validate_skill_md(path: &Path) -> Result<(), StructureError> {
             });
         }
         Some(desc) => {
-            if desc.len() > 1024 {
+            if desc.len() > limits::LIMIT_DESCRIPTION_LEN {
                 return Err(StructureError::FrontmatterFieldInvalid {
                     field: "description".to_owned(),
                     reason: "must be 1024 characters or fewer".to_owned(),
@@ -354,7 +365,7 @@ fn validate_skill_md(path: &Path) -> Result<(), StructureError> {
 
     // Optionally validate compatibility if present
     if let Some(compat) = frontmatter.compatibility.as_deref() {
-        if compat.is_empty() || compat.len() > 500 {
+        if compat.is_empty() || compat.len() > limits::LIMIT_COMPATIBILITY_LEN {
             return Err(StructureError::FrontmatterFieldInvalid {
                 field: "compatibility".to_owned(),
                 reason: "must be 1–500 characters".to_owned(),

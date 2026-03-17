@@ -22,6 +22,15 @@ pub const LIMIT_SKILL_MD_LINES: usize = 1000;
 /// Maximum size of `manifest.json` in bytes (64 KB).
 pub const LIMIT_MANIFEST_SIZE: u64 = 64 * 1024;
 
+/// Maximum length of the `name` field in SKILL.md frontmatter.
+pub const LIMIT_NAME_LEN: usize = 64;
+
+/// Maximum length of the `description` field in SKILL.md frontmatter (bytes).
+pub const LIMIT_DESCRIPTION_LEN: usize = 1024;
+
+/// Maximum length of the `compatibility` field in SKILL.md frontmatter (bytes).
+pub const LIMIT_COMPATIBILITY_LEN: usize = 500;
+
 const _: () = assert!(LIMIT_SCRIPT_FILE_SIZE < LIMIT_FILE_SIZE);
 const _: () = assert!(LIMIT_MANIFEST_SIZE <= LIMIT_FILE_SIZE);
 
