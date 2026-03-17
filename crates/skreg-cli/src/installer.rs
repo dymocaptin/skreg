@@ -136,8 +136,14 @@ impl Installer {
             })?;
             let sig_bytes = hex::decode(sig_hex)
                 .map_err(|e| InstallError::Crypto(format!("invalid publisher_sig_hex: {e}")))?;
+            // publisher_sig_hex was signed over hash(tarball_1) = tarball_manifest.sha256,
+            // not over hash(tarball_2) which is what `digest` holds.
             verifier
-                .verify(&digest, &sig_bytes, &tarball_manifest.cert_chain_pem)
+                .verify(
+                    &tarball_manifest.sha256,
+                    &sig_bytes,
+                    &tarball_manifest.cert_chain_pem,
+                )
                 .map_err(|e| InstallError::Crypto(e.to_string()))?;
             debug!("publisher signature verified for {pkg_ref}");
         }
