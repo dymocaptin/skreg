@@ -356,7 +356,7 @@ impl View for PackageListView {
 
                 // Column widths (shared between header and data table).
                 let widths = [
-                    Constraint::Min(18),
+                    Constraint::Length(20),
                     Constraint::Length(14),
                     Constraint::Length(9),
                     Constraint::Length(7),
@@ -390,7 +390,7 @@ impl View for PackageListView {
                             Cell::from(p.name.clone())
                         };
                         let verif_cell = if p.verification.as_str() == "publisher" {
-                            Cell::from(Line::from(Span::styled("✦ pub ", theme.accent())))
+                            Cell::from(Line::from(Span::styled("✦ pub ", theme.success())))
                         } else {
                             Cell::from(Line::from(Span::styled("◈ self ", theme.muted())))
                         };
