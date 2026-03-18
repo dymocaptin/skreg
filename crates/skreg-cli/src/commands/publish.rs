@@ -29,10 +29,11 @@ struct JobStatus {
 ///
 /// Returns an error if the config file is missing, the upload fails,
 /// or vetting rejects the package.
-pub async fn run_publish() -> Result<()> {
+pub async fn run_publish(context: Option<&str>) -> Result<()> {
     let cfg_path = default_config_path();
     let cfg =
         load_config(&cfg_path).context("not logged in — run `skreg login <namespace>` first")?;
+    let cfg = crate::config::apply_context(cfg, context)?;
 
     let cwd = std::env::current_dir()?;
 

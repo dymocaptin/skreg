@@ -5,6 +5,9 @@ use clap::{Parser, Subcommand};
 #[derive(Parser)]
 #[command(name = "skreg", about = "skreg skill package manager", version)]
 struct Cli {
+    /// Named context from ~/.skreg/config.toml to use for this invocation.
+    #[arg(long, global = true, value_name = "NAME")]
+    context: Option<String>,
     #[command(subcommand)]
     command: Commands,
 }
@@ -85,10 +88,11 @@ async fn main() -> anyhow::Result<()> {
             skreg_cli::commands::login::run_login(&namespace).await?;
         }
         Commands::Publish => {
-            skreg_cli::commands::publish::run_publish().await?;
+            skreg_cli::commands::publish::run_publish(cli.context.as_deref()).await?;
         }
         Commands::Search { query, verified } => {
-            skreg_cli::commands::search::run_search(&query, verified).await?;
+            skreg_cli::commands::search::run_search(&query, verified, cli.context.as_deref())
+                .await?;
         }
         Commands::Install {
             package_ref,
@@ -103,7 +107,8 @@ async fn main() -> anyhow::Result<()> {
                     "unknown enforcement level {other:?} — expected hint, confirm, or strict"
                 ),
             };
-            skreg_cli::commands::install::run_install(&package_ref, level).await?;
+            skreg_cli::commands::install::run_install(&package_ref, level, cli.context.as_deref())
+                .await?;
         }
         Commands::Links => {
             skreg_cli::commands::links::run_links()?;
@@ -115,10 +120,12 @@ async fn main() -> anyhow::Result<()> {
             skreg_cli::commands::uninstall::run_uninstall(&package_ref)?;
         }
         Commands::Certify { key } => {
-            skreg_cli::commands::certify::run_certify(key.as_deref()).await?;
+            skreg_cli::commands::certify::run_certify(key.as_deref(), cli.context.as_deref())
+                .await?;
         }
         Commands::Rotate { new_key } => {
-            skreg_cli::commands::rotate::run_rotate(new_key.as_deref()).await?;
+            skreg_cli::commands::rotate::run_rotate(new_key.as_deref(), cli.context.as_deref())
+                .await?;
         }
         Commands::Context { command } => {
             skreg_cli::commands::context::handle(command)?;

@@ -34,6 +34,7 @@ fn default_install_root() -> Result<PathBuf> {
 pub async fn run_install(
     package_ref: &str,
     enforcement_override: Option<EnforcementLevel>,
+    context: Option<&str>,
 ) -> Result<()> {
     let pkg_ref = PackageRef::parse(package_ref)
         .with_context(|| format!("invalid package reference: {package_ref:?}"))?;
@@ -41,16 +42,35 @@ pub async fn run_install(
     let cfg_path = default_config_path();
     let cfg =
         load_config(&cfg_path).context("not logged in — run `skreg login <namespace>` first")?;
+    let cfg = crate::config::apply_context(cfg, context)?;
 
     // Resolve enforcement level: override > config > default
     let enforcement = enforcement_override.unwrap_or_else(|| cfg.policy.enforcement.clone());
 
     let client = Arc::new(HttpRegistryClient::new(cfg.registry()));
-    let verifier: Arc<dyn SignatureVerifier> =
-        match cfg.active_context_config().root_ca_pem.as_deref() {
-            Some(pem) => Arc::new(RsaPssVerifier::new_with_root_pem(pem.as_bytes())),
-            None => Arc::new(RsaPssVerifier::new()),
-        };
+
+    // Use custom root CA if the active context specifies one.
+    let verifier: Arc<dyn skreg_crypto::verifier::SignatureVerifier> = {
+        let ctx_cfg = cfg.active_context_config();
+        if let Some(ref ca_path) = ctx_cfg.root_ca_pem {
+            // Expand leading ~ manually since std::fs doesn't do tilde expansion.
+            let expanded = if ca_path.starts_with("~") {
+                let home = home::home_dir()
+                    .ok_or_else(|| anyhow::anyhow!("cannot determine home directory"))?;
+                let suffix = ca_path
+                    .strip_prefix("~")
+                    .map_err(|_| anyhow::anyhow!("failed to strip ~ prefix from path"))?;
+                home.join(suffix)
+            } else {
+                ca_path.clone()
+            };
+            let pem = std::fs::read(&expanded)
+                .with_context(|| format!("reading root CA from {}", expanded.display()))?;
+            Arc::new(RsaPssVerifier::new_with_root_pem(&pem))
+        } else {
+            Arc::new(RsaPssVerifier::new())
+        }
+    };
     let install_root = default_install_root()?;
 
     let installer = Installer::new(client, install_root).with_verifier(verifier);

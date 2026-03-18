@@ -29,10 +29,11 @@ struct CertResponse {
 ///
 /// Returns an error if the config is missing, the registry is unreachable,
 /// or the cert response cannot be written to disk.
-pub async fn run_certify(key: Option<&Path>) -> Result<()> {
+pub async fn run_certify(key: Option<&Path>, context: Option<&str>) -> Result<()> {
     let cfg_path = default_config_path();
     let cfg =
         load_config(&cfg_path).context("not logged in — run `skreg login <namespace>` first")?;
+    let cfg = crate::config::apply_context(cfg, context)?;
 
     let namespace = cfg.namespace().to_owned();
     let api_key = cfg.api_key().to_owned();
