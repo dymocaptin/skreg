@@ -103,4 +103,9 @@ describe('PackageCard', () => {
     render(<PackageCard pkg={{ ...PKG, verification: 'publisher' }} hideDesc />, { wrapper })
     expect(screen.getByText('✦ pub')).toBeInTheDocument()
   })
+
+  it('renders ◈ self for unknown verification value', () => {
+    render(<PackageCard pkg={{ ...PKG, verification: 'unknown_value' }} />, { wrapper })
+    expect(screen.getByText('◈ self')).toBeInTheDocument()
+  })
 })
