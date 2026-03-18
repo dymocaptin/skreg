@@ -1,8 +1,7 @@
-//! Stage 4: load CA key from Secrets Manager, sign tarball sha256, write .sig to S3.
+//! Stage 5: sign tarball sha256 using the provided CA private key PEM, write .sig to S3.
 
 use anyhow::{Context, Result};
 use aws_sdk_s3::Client as S3Client;
-use aws_sdk_secretsmanager::Client as SmClient;
 use rsa::pkcs1::DecodeRsaPrivateKey;
 use rsa::pkcs1v15::SigningKey;
 use rsa::signature::hazmat::PrehashSigner;
@@ -27,42 +26,29 @@ pub fn sign_bytes(signing_key: &SigningKey<Sha256>, data: &[u8]) -> Vec<u8> {
         .to_vec()
 }
 
-/// Load the CA private key from Secrets Manager, sign the tarball sha256,
+/// Sign the tarball sha256 using the provided CA private key PEM,
 /// upload the `.sig` file to S3, and return the S3 key of the signature.
 ///
 /// # Errors
 ///
-/// Returns an error if the secret cannot be fetched, the key cannot be parsed,
-/// or the S3 upload fails.
+/// Returns an error if the key cannot be parsed or the S3 upload fails.
 pub async fn run_signing(
     tarball_sha256: &str,
     storage_path: &str,
     s3: &S3Client,
-    sm: &SmClient,
     bucket: &str,
-    ca_secret_arn: &str,
+    registry_ca_key_pem: &str,
 ) -> Result<String> {
-    // 1. Load CA private key from Secrets Manager
-    let secret = sm
-        .get_secret_value()
-        .secret_id(ca_secret_arn)
-        .send()
-        .await
-        .context("fetching CA private key from Secrets Manager")?;
-
-    let pem = secret
-        .secret_string()
-        .context("CA secret has no string value")?;
-
-    // 2. Parse RSA private key (PKCS#1 PEM stored by PKI component)
-    let private_key = RsaPrivateKey::from_pkcs1_pem(pem).context("parsing RSA private key PEM")?;
+    // 1. Parse RSA private key (PKCS#1 PEM)
+    let private_key = RsaPrivateKey::from_pkcs1_pem(registry_ca_key_pem)
+        .context("parsing RSA private key PEM")?;
     let signing_key = SigningKey::<Sha256>::new(private_key);
 
-    // 3. Sign the sha256 digest bytes
+    // 2. Sign the sha256 digest bytes
     let digest_bytes = hex::decode(tarball_sha256).context("decoding sha256 hex")?;
     let signature = sign_bytes(&signing_key, &digest_bytes);
 
-    // 4. Write .sig to S3
+    // 3. Write .sig to S3
     let sig_path = storage_path.replace(".skill", ".sig");
     s3.put_object()
         .bucket(bucket)

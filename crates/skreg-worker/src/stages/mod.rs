@@ -9,7 +9,6 @@ pub mod verify_publisher;
 
 use anyhow::Result;
 use aws_sdk_s3::Client as S3Client;
-use aws_sdk_secretsmanager::Client as SmClient;
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -24,9 +23,8 @@ pub async fn run_pipeline(
     job_id: Uuid,
     pool: &PgPool,
     s3: &S3Client,
-    sm: &SmClient,
     bucket: &str,
-    ca_secret_arn: &str,
+    registry_ca_key_pem: &str,
 ) -> Result<()> {
     // Load job + version info (including namespace slug for Stage 4)
     let row = sqlx::query_as::<_, (Uuid, String, String, String, String, String)>(
@@ -128,7 +126,7 @@ pub async fn run_pipeline(
     .map_err(|e| anyhow::anyhow!("Stage 4 failed: {e}"))?;
 
     // Stage 5 — sign with registry CA and store .sig in S3
-    let sig_path = signing::run_signing(&sha256, &storage_path, s3, sm, bucket, ca_secret_arn)
+    let sig_path = signing::run_signing(&sha256, &storage_path, s3, bucket, registry_ca_key_pem)
         .await
         .map_err(|e| anyhow::anyhow!("Stage 5 failed: {e}"))?;
 

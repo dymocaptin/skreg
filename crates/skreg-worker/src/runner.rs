@@ -2,7 +2,6 @@
 
 use anyhow::Result;
 use aws_sdk_s3::Client as S3Client;
-use aws_sdk_secretsmanager::Client as SmClient;
 use aws_sdk_sesv2::types::{Body, Content, Destination, EmailContent, Message};
 use aws_sdk_sesv2::Client as SesClient;
 use log::{error, info};
@@ -20,10 +19,9 @@ use crate::stages::run_pipeline;
 pub async fn run(
     pool: PgPool,
     s3: S3Client,
-    sm: SmClient,
     ses: SesClient,
     bucket: String,
-    ca_secret_arn: String,
+    registry_ca_key_pem: String,
 ) -> Result<()> {
     let mut listener = PgListener::connect_with(&pool).await?;
     listener.listen("vetting_jobs").await?;
@@ -36,13 +34,11 @@ pub async fn run(
             Ok(job_id) => {
                 let pool2 = pool.clone();
                 let s3_2 = s3.clone();
-                let sm2 = sm.clone();
                 let ses2 = ses.clone();
                 let bucket2 = bucket.clone();
-                let ca_arn2 = ca_secret_arn.clone();
+                let pem2 = registry_ca_key_pem.clone();
                 tokio::spawn(async move {
-                    if let Err(e) =
-                        process_job(job_id, &pool2, &s3_2, &sm2, &ses2, &bucket2, &ca_arn2).await
+                    if let Err(e) = process_job(job_id, &pool2, &s3_2, &ses2, &bucket2, &pem2).await
                     {
                         error!("job {job_id} failed: {e}");
                     }
@@ -57,10 +53,9 @@ async fn process_job(
     job_id: Uuid,
     pool: &PgPool,
     s3: &S3Client,
-    sm: &SmClient,
     ses: &SesClient,
     bucket: &str,
-    ca_secret_arn: &str,
+    registry_ca_key_pem: &str,
 ) -> Result<()> {
     // Acquire advisory lock so only one worker processes this job
     let locked: bool = sqlx::query_scalar("SELECT pg_try_advisory_lock($1)")
@@ -75,7 +70,7 @@ async fn process_job(
 
     info!("processing job {job_id}");
 
-    match run_pipeline(job_id, pool, s3, sm, bucket, ca_secret_arn).await {
+    match run_pipeline(job_id, pool, s3, bucket, registry_ca_key_pem).await {
         Ok(()) => {
             info!("job {job_id} completed successfully");
         }
