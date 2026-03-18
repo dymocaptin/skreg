@@ -1,6 +1,7 @@
 //! CLI subcommand implementations.
 
 pub mod certify;
+pub mod context;
 pub mod install;
 pub mod links;
 pub mod login;
