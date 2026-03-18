@@ -36,9 +36,12 @@ pub struct ContextConfig {
     pub namespace: String,
     /// Plaintext API key for this namespace.
     pub api_key: String,
-    /// Optional PEM-encoded root CA certificate for the registry.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub root_ca_pem: Option<String>,
+    /// Optional path to a PEM root CA file.
+    ///
+    /// When set, overrides the compiled-in production root CA for all
+    /// signature verification in this context.
+    #[serde(default)]
+    pub root_ca_pem: Option<std::path::PathBuf>,
 }
 
 /// Persisted CLI configuration — supports multiple named contexts.
@@ -262,7 +265,7 @@ api_key = "skreg_abc123"
                 registry: "https://example.com".to_owned(),
                 namespace: "acme".to_owned(),
                 api_key: "skreg_abc".to_owned(),
-                root_ca_pem: Some("---BEGIN CERT---".to_owned()),
+                root_ca_pem: None,
             },
         );
         let cfg = CliConfig {
@@ -501,6 +504,38 @@ enforcement = "confirm"
 "#;
         let cfg: CliConfig = toml::from_str(toml).unwrap();
         assert_eq!(cfg.policy.enforcement, EnforcementLevel::Confirm);
+    }
+
+    #[test]
+    fn context_config_root_ca_pem_defaults_to_none() {
+        let toml = r#"
+active_context = "default"
+
+[contexts.default]
+registry = "https://api.skreg.ai"
+namespace = "testuser"
+api_key = "skreg_abc123"
+"#;
+        let cfg: CliConfig = toml::from_str(toml).unwrap();
+        assert!(cfg.contexts["default"].root_ca_pem.is_none());
+    }
+
+    #[test]
+    fn context_config_root_ca_pem_parses_when_present() {
+        let toml = r#"
+active_context = "default"
+
+[contexts.default]
+registry = "https://api.skreg.ai"
+namespace = "testuser"
+api_key = "skreg_abc123"
+root_ca_pem = "/home/user/.skreg/dev/root-ca.pem"
+"#;
+        let cfg: CliConfig = toml::from_str(toml).unwrap();
+        assert_eq!(
+            cfg.contexts["default"].root_ca_pem.as_deref(),
+            Some(std::path::Path::new("/home/user/.skreg/dev/root-ca.pem"))
+        );
     }
 
     #[test]
