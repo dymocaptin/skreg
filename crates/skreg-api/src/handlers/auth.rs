@@ -94,42 +94,46 @@ pub async fn login_handler(
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
 
-    // Send via SES
-    state.ses
-        .send_email()
-        .from_email_address(&state.from_email)
-        .destination(
-            aws_sdk_sesv2::types::Destination::builder()
-                .to_addresses(&body.email)
-                .build(),
-        )
-        .content(
-            aws_sdk_sesv2::types::EmailContent::builder()
-                .simple(
-                    aws_sdk_sesv2::types::Message::builder()
-                        .subject(
-                            aws_sdk_sesv2::types::Content::builder()
-                                .data("Your skreg login code")
-                                .build()
-                                .map_err(|e| { error!("ses build error: {e}"); StatusCode::INTERNAL_SERVER_ERROR })?,
-                        )
-                        .body(
-                            aws_sdk_sesv2::types::Body::builder()
-                                .text(
-                                    aws_sdk_sesv2::types::Content::builder()
-                                        .data(format!("Your skreg one-time code is: {otp}\n\nExpires in 10 minutes."))
-                                        .build()
-                                        .map_err(|e| { error!("ses build error: {e}"); StatusCode::INTERNAL_SERVER_ERROR })?,
-                                )
-                                .build(),
-                        )
-                        .build(),
-                )
-                .build(),
-        )
-        .send()
-        .await
-        .map_err(|e| { error!("SES error: {e}"); StatusCode::SERVICE_UNAVAILABLE })?;
+    if state.ses_disabled {
+        log::info!("[DEV] OTP for namespace '{}': {}", body.namespace, otp);
+    } else {
+        // Send via SES
+        state.ses
+            .send_email()
+            .from_email_address(&state.from_email)
+            .destination(
+                aws_sdk_sesv2::types::Destination::builder()
+                    .to_addresses(&body.email)
+                    .build(),
+            )
+            .content(
+                aws_sdk_sesv2::types::EmailContent::builder()
+                    .simple(
+                        aws_sdk_sesv2::types::Message::builder()
+                            .subject(
+                                aws_sdk_sesv2::types::Content::builder()
+                                    .data("Your skreg login code")
+                                    .build()
+                                    .map_err(|e| { error!("ses build error: {e}"); StatusCode::INTERNAL_SERVER_ERROR })?,
+                            )
+                            .body(
+                                aws_sdk_sesv2::types::Body::builder()
+                                    .text(
+                                        aws_sdk_sesv2::types::Content::builder()
+                                            .data(format!("Your skreg one-time code is: {otp}\n\nExpires in 10 minutes."))
+                                            .build()
+                                            .map_err(|e| { error!("ses build error: {e}"); StatusCode::INTERNAL_SERVER_ERROR })?,
+                                    )
+                                    .build(),
+                            )
+                            .build(),
+                    )
+                    .build(),
+            )
+            .send()
+            .await
+            .map_err(|e| { error!("SES error: {e}"); StatusCode::SERVICE_UNAVAILABLE })?;
+    }
 
     Ok(StatusCode::ACCEPTED)
 }

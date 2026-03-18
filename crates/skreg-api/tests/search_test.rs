@@ -12,11 +12,11 @@ async fn make_state() -> AppState {
         pool,
         s3: aws_sdk_s3::Client::new(&aws_cfg),
         ses: aws_sdk_sesv2::Client::new(&aws_cfg),
-        sm: aws_sdk_secretsmanager::Client::new(&aws_cfg),
         s3_bucket: "test-bucket".to_owned(),
         from_email: "test@example.com".to_owned(),
-        publisher_ca_key_secret_name: "skreg/publisher-ca-key".to_owned(),
+        publisher_ca_key_pem: String::new(),
         publisher_ca_cert_pem: String::new(),
+        ses_disabled: true,
     }
 }
 

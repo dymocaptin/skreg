@@ -1,6 +1,5 @@
 //! POST /v1/namespaces/:ns/cert — issue a Publisher CA-signed leaf certificate.
 
-use aws_sdk_secretsmanager::Client as SmClient;
 use axum::body::Bytes;
 use axum::extract::{Path, State};
 use axum::http::{HeaderMap, StatusCode};
@@ -132,7 +131,7 @@ fn sign_csr_with_ca(
 /// - `413` — CSR body exceeds 16 KiB
 /// - `422` — CSR is malformed or CN does not match namespace
 /// - `429` — rate limit exceeded (5 issuances per 24 h)
-/// - `500` — database or Secrets Manager error
+/// - `500` — database error
 pub async fn cert_handler(
     State(state): State<SharedState>,
     Path(ns): Path<String>,
@@ -199,8 +198,7 @@ pub async fn cert_handler(
         return Err(StatusCode::CONFLICT);
     }
 
-    // Fetch Publisher CA key from Secrets Manager
-    let ca_key_pem = fetch_secret(&state.sm, &state.publisher_ca_key_secret_name).await?;
+    let ca_key_pem = state.publisher_ca_key_pem.clone();
     let pub_ca_cert_pem = state.publisher_ca_cert_pem.clone();
 
     // Sign the CSR with the CA — the leaf cert contains the client's public key
@@ -247,26 +245,6 @@ pub async fn cert_handler(
         cert: leaf_pem,
         ca_cert: pub_ca_cert_pem,
     }))
-}
-
-/// Fetch a secret string from AWS Secrets Manager.
-async fn fetch_secret(sm: &SmClient, secret_name: &str) -> Result<String, StatusCode> {
-    let resp = sm
-        .get_secret_value()
-        .secret_id(secret_name)
-        .send()
-        .await
-        .map_err(|e| {
-            error!("secrets manager: {e}");
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-
-    resp.secret_string()
-        .map(std::borrow::ToOwned::to_owned)
-        .ok_or_else(|| {
-            error!("secrets manager: secret has no string value");
-            StatusCode::INTERNAL_SERVER_ERROR
-        })
 }
 
 #[cfg(test)]

@@ -3,7 +3,6 @@
 use std::sync::Arc;
 
 use aws_sdk_s3::Client as S3Client;
-use aws_sdk_secretsmanager::Client as SmClient;
 use aws_sdk_sesv2::Client as SesClient;
 use axum::{
     http::HeaderValue,
@@ -35,16 +34,16 @@ pub struct AppState {
     pub s3: S3Client,
     /// AWS SES v2 client.
     pub ses: SesClient,
-    /// AWS Secrets Manager client.
-    pub sm: SmClient,
     /// S3 bucket name for package artifacts.
     pub s3_bucket: String,
     /// Sender address for transactional email.
     pub from_email: String,
-    /// Secrets Manager secret name holding the Publisher CA private key PEM.
-    pub publisher_ca_key_secret_name: String,
+    /// PEM-encoded Publisher CA private key, resolved once at startup.
+    pub publisher_ca_key_pem: String,
     /// PEM-encoded Publisher CA certificate.
     pub publisher_ca_cert_pem: String,
+    /// When `true`, OTPs are logged at INFO level instead of sent via SES.
+    pub ses_disabled: bool,
 }
 
 /// Arc-wrapped [`AppState`] used as the Axum router state.
