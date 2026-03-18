@@ -27,6 +27,9 @@ export default function PackageCard({ pkg, selected, onClick, hideDesc = false }
       </td>
       <td className={styles.namespace}>{pkg.namespace}</td>
       <td className={styles.version}>v{pkg.latest_version}</td>
+      <td className={`${styles.verif} ${pkg.verification === 'publisher' ? styles.verifPublisher : styles.verifSelf}`}>
+        {pkg.verification === 'publisher' ? '✦ pub' : '◈ self'}
+      </td>
       {!hideDesc && <td className={styles.desc}>{pkg.description}</td>}
       <td className={styles.actions}>
         <button
