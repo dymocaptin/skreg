@@ -1,7 +1,14 @@
 //! `skreg context` — manage registry contexts.
 
+use std::collections::HashMap;
+use std::path::PathBuf;
+
 use anyhow::Result;
 use clap::Subcommand;
+
+use crate::config::{
+    default_config_path, load_config, save_config, CliConfig, ContextConfig, PolicyConfig,
+};
 
 /// Commands for registry context management.
 #[derive(Subcommand, Debug)]
@@ -11,7 +18,11 @@ pub enum ContextCommands {
         /// Context name
         name: String,
         /// Registry URL
-        url: String,
+        #[arg(long)]
+        registry: String,
+        /// Optional PEM-encoded root CA certificate for the registry.
+        #[arg(long, value_name = "FILE")]
+        root_ca: Option<PathBuf>,
     },
     /// Set the active registry context
     Use {
@@ -29,15 +40,51 @@ pub enum ContextCommands {
 /// Returns an error if the context operation fails.
 pub fn handle(command: ContextCommands) -> Result<()> {
     match command {
-        ContextCommands::Add { name, url } => add(name, url),
+        ContextCommands::Add {
+            name,
+            registry,
+            root_ca,
+        } => add(&name, registry, root_ca),
         ContextCommands::Use { name } => set_active(name),
         ContextCommands::List => list(),
     }
 }
 
-#[allow(clippy::unnecessary_wraps)]
-fn add(_name: String, _url: String) -> Result<()> {
-    // Placeholder implementation for adding a context.
+fn add(name: &str, registry: String, root_ca: Option<PathBuf>) -> Result<()> {
+    let root_ca_pem = if let Some(path) = root_ca {
+        let pem = std::fs::read_to_string(&path)?;
+        if !pem.contains("BEGIN CERTIFICATE") {
+            anyhow::bail!("file does not look like a PEM certificate");
+        }
+        Some(pem)
+    } else {
+        None
+    };
+
+    let path = default_config_path();
+    let mut cfg = load_config(&path).unwrap_or_else(|_| CliConfig {
+        active_context: name.to_owned(),
+        contexts: HashMap::new(),
+        policy: PolicyConfig::default(),
+    });
+
+    if cfg.contexts.contains_key(name) {
+        log::warn!("Overwriting existing context '{name}'.");
+    }
+
+    cfg.add_context(
+        name.to_owned(),
+        ContextConfig {
+            registry,
+            namespace: String::new(),
+            api_key: String::new(),
+            root_ca_pem,
+        },
+        true,
+    );
+
+    save_config(&cfg, &path)?;
+    println!("Context '{name}' added and activated.");
     Ok(())
 }
 
