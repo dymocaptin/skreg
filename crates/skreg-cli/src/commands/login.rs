@@ -84,6 +84,7 @@ pub async fn run_login(namespace: &str) -> Result<()> {
             registry,
             namespace: namespace.to_owned(),
             api_key,
+            root_ca_pem: None,
         },
     );
     "default".clone_into(&mut config.active_context);
