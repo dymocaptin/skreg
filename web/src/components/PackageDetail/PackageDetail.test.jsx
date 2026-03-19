@@ -9,6 +9,8 @@ vi.mock('../../api.js', () => ({
 
 import { previewPackage } from '../../api.js'
 
+const mockPreviewPackage = previewPackage
+
 const PKG = {
   id: '1',
   namespace: 'acme',
@@ -17,6 +19,11 @@ const PKG = {
   category: 'tools',
   latest_version: '1.2.3',
   verification: 'self_signed',
+}
+
+const PKG_PUBLISHER = {
+  ...PKG,
+  verification: 'publisher',
 }
 
 const PREVIEW = {
@@ -95,13 +102,17 @@ describe('PackageDetail', () => {
   it('shows error state when preview fetch fails', async () => {
     previewPackage.mockRejectedValue(new Error('Preview failed: 404'))
     render(<PackageDetail pkg={PKG} />)
-    await waitFor(() => expect(screen.getByText('Preview failed: 404')).toBeInTheDocument())
+    await waitFor(() => {
+      const errors = screen.getAllByText('Preview failed: 404')
+      expect(errors.length).toBeGreaterThan(0)
+    })
   })
 
   it('shows failed state when latest_version is null', () => {
     previewPackage.mockReturnValue(new Promise(() => {}))
     render(<PackageDetail pkg={{ ...PKG, latest_version: null }} />)
-    expect(screen.getByText('No version available')).toBeInTheDocument()
+    const errors = screen.getAllByText('No version available')
+    expect(errors.length).toBeGreaterThan(0)
   })
 
   it('does not call previewPackage when latest_version is null', () => {
@@ -141,5 +152,35 @@ describe('PackageDetail', () => {
       expect(screen.getByRole('button', { name: /copy install command/i }).textContent).not.toContain('copied!')
     )
     vi.useRealTimers()
+  })
+
+  it('shows ▶ unknown when latest_version is null', async () => {
+    const nullVersionPkg = { ...PKG_PUBLISHER, latest_version: null }
+    render(<PackageDetail pkg={nullVersionPkg} />)
+    expect(screen.getByText('▶ unknown')).toBeInTheDocument()
+  })
+
+  it('does not show [truncated] when truncated is false', async () => {
+    previewPackage.mockResolvedValue(PREVIEW)
+    render(<PackageDetail pkg={PKG} />)
+    await waitFor(() => expect(screen.getByText(/# My Skill/)).toBeInTheDocument())
+    expect(screen.queryByText('[truncated]')).not.toBeInTheDocument()
+  })
+
+  it('passes AbortController signal to previewPackage', async () => {
+    mockPreviewPackage.mockReturnValue(new Promise(() => {}))
+    render(<PackageDetail pkg={PKG_PUBLISHER} />)
+    await waitFor(() => expect(mockPreviewPackage).toHaveBeenCalled())
+    const signal = mockPreviewPackage.mock.calls[0][3]
+    expect(signal).toBeInstanceOf(AbortSignal)
+  })
+
+  it('shows error state in files pane', async () => {
+    mockPreviewPackage.mockRejectedValue(new Error('Preview failed: 500'))
+    render(<PackageDetail pkg={PKG_PUBLISHER} />)
+    await waitFor(() => {
+      const errors = screen.getAllByText('Preview failed: 500')
+      expect(errors).toHaveLength(2)
+    })
   })
 })

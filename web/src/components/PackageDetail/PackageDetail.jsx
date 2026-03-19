@@ -74,6 +74,9 @@ export default function PackageDetail({ pkg }) {
           {preview.status === 'loading' && (
             <p className={styles.loading}>⠙ Loading…</p>
           )}
+          {preview.status === 'failed' && (
+            <p className={styles.error}>{preview.message}</p>
+          )}
           {preview.status === 'loaded' && (
             <>
               <span className={styles.fileRoot}>

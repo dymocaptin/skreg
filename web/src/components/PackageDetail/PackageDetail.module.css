@@ -137,12 +137,12 @@
   font-family: var(--font-mono);
   font-size: 0.875rem;
   color: var(--text-muted);
-  padding: 1rem 0;
+  padding: 1rem;
 }
 
 .error {
   font-family: var(--font-mono);
   font-size: 0.875rem;
   color: var(--text-muted);
-  padding: 1rem 0;
+  padding: 1rem;
 }
