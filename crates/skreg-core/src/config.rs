@@ -71,6 +71,22 @@ impl CliConfig {
         }
     }
 
+    /// Remove a context by name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the context does not exist or is currently active.
+    pub fn remove_context(&mut self, name: &str) -> Result<()> {
+        if !self.contexts.contains_key(name) {
+            anyhow::bail!("context '{name}' not found");
+        }
+        if name == self.active_context {
+            anyhow::bail!("cannot remove active context '{name}'; switch to another context first");
+        }
+        self.contexts.remove(name);
+        Ok(())
+    }
+
     /// Switches the active context.
     ///
     /// # Errors
@@ -346,6 +362,67 @@ api_key = "skreg_abc123"
             policy: PolicyConfig::default(),
         };
         assert!(config.switch_context("nonexistent").is_err());
+    }
+
+    #[test]
+    fn remove_context_succeeds() {
+        let mut contexts = HashMap::new();
+        contexts.insert(
+            "active".into(),
+            ContextConfig {
+                registry: "r1".into(),
+                namespace: "n1".into(),
+                api_key: "k1".into(),
+                root_ca_pem: None,
+            },
+        );
+        contexts.insert(
+            "other".into(),
+            ContextConfig {
+                registry: "r2".into(),
+                namespace: "n2".into(),
+                api_key: "k2".into(),
+                root_ca_pem: None,
+            },
+        );
+        let mut config = CliConfig {
+            active_context: "active".into(),
+            contexts,
+            policy: PolicyConfig::default(),
+        };
+        config.remove_context("other").unwrap();
+        assert!(!config.contexts.contains_key("other"));
+        assert_eq!(config.active_context, "active");
+    }
+
+    #[test]
+    fn remove_active_context_fails() {
+        let mut contexts = HashMap::new();
+        contexts.insert(
+            "active".into(),
+            ContextConfig {
+                registry: "r1".into(),
+                namespace: "n1".into(),
+                api_key: "k1".into(),
+                root_ca_pem: None,
+            },
+        );
+        let mut config = CliConfig {
+            active_context: "active".into(),
+            contexts,
+            policy: PolicyConfig::default(),
+        };
+        assert!(config.remove_context("active").is_err());
+    }
+
+    #[test]
+    fn remove_nonexistent_context_fails() {
+        let mut config = CliConfig {
+            active_context: "default".into(),
+            contexts: HashMap::new(),
+            policy: PolicyConfig::default(),
+        };
+        assert!(config.remove_context("ghost").is_err());
     }
 
     #[test]
