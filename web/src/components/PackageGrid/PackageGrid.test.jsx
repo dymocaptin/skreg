@@ -4,8 +4,8 @@ import userEvent from '@testing-library/user-event'
 import PackageGrid from './PackageGrid.jsx'
 
 const PKGS = [
-  { id: '1', namespace: 'ns', name: 'alpha', description: 'desc a', category: 'tools', latest_version: '1.0.0', created_at: '2026-01-01T00:00:00Z' },
-  { id: '2', namespace: 'ns', name: 'beta', description: 'desc b', category: 'agents', latest_version: '2.0.0', created_at: '2026-01-02T00:00:00Z' },
+  { id: '1', namespace: 'ns', name: 'alpha', description: 'desc a', category: 'tools', latest_version: '1.0.0', created_at: '2026-01-01T00:00:00Z', verification: 'self_signed' },
+  { id: '2', namespace: 'ns', name: 'beta', description: 'desc b', category: 'agents', latest_version: '2.0.0', created_at: '2026-01-02T00:00:00Z', verification: 'publisher' },
 ]
 
 describe('PackageGrid', () => {
