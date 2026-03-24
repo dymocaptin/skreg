@@ -131,6 +131,7 @@ mod tests {
                     registry: format!("https://{n}.example.com"),
                     namespace: (*n).to_string(),
                     api_key: "k".to_string(),
+                    root_ca_pem: None,
                 },
             );
         }

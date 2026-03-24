@@ -5,7 +5,9 @@ use serde::Deserialize;
 
 use std::collections::HashMap;
 
-use crate::config::{default_config_path, load_config, save_config, CliConfig, ContextConfig};
+use crate::config::{
+    default_config_path, load_config, save_config, CliConfig, ContextConfig, PolicyConfig,
+};
 
 #[derive(Deserialize)]
 struct ApiKeyResponse {
@@ -19,8 +21,26 @@ struct ApiKeyResponse {
 /// Returns an error if the registry is unreachable, the namespace is unknown,
 /// or the OTP is invalid.
 pub async fn run_login(namespace: &str) -> Result<()> {
-    let registry =
-        std::env::var("SKILLPKG_REGISTRY").unwrap_or_else(|_| "https://api.skreg.ai".to_owned());
+    let cfg_path = default_config_path();
+    let mut config = load_config(&cfg_path).unwrap_or_else(|_| {
+        let mut contexts = HashMap::new();
+        contexts.insert(
+            "default".to_owned(),
+            ContextConfig {
+                registry: "https://api.skreg.ai".to_owned(),
+                namespace: String::new(),
+                api_key: String::new(),
+                root_ca_pem: None,
+            },
+        );
+        CliConfig {
+            active_context: "default".to_owned(),
+            contexts,
+            policy: PolicyConfig::default(),
+        }
+    });
+
+    let registry = config.active_context_config().registry.clone();
 
     print!("Email: ");
     std::io::Write::flush(&mut std::io::stdout())?;
@@ -73,24 +93,19 @@ pub async fn run_login(namespace: &str) -> Result<()> {
         bail!("failed to register namespace: {}", create_resp.status());
     };
 
-    let mut config = load_config(&default_config_path()).unwrap_or_else(|_| CliConfig {
-        active_context: "default".to_owned(),
-        contexts: HashMap::new(),
-        policy: skreg_core::config::PolicyConfig::default(),
-    });
-    config.contexts.insert(
-        "default".to_owned(),
-        ContextConfig {
-            registry,
-            namespace: namespace.to_owned(),
-            api_key,
-        },
-    );
-    "default".clone_into(&mut config.active_context);
-    save_config(&config, &default_config_path())?;
+    {
+        let ctx = config
+            .contexts
+            .get_mut(&config.active_context)
+            .ok_or_else(|| anyhow::anyhow!("active context {} not found", config.active_context))?;
+        namespace.clone_into(&mut ctx.namespace);
+        ctx.api_key = api_key;
+    }
+
+    save_config(&config, &cfg_path)?;
     println!(
         "Logged in as {namespace}. Config saved to {}",
-        default_config_path().display()
+        cfg_path.display()
     );
     Ok(())
 }

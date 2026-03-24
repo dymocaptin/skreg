@@ -62,6 +62,11 @@ enum Commands {
         #[arg(long, value_name = "FILE")]
         new_key: Option<PathBuf>,
     },
+    /// Manage registry contexts
+    Context {
+        #[command(subcommand)]
+        command: skreg_cli::commands::context::ContextCommands,
+    },
 }
 
 #[tokio::main]
@@ -114,6 +119,9 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::Rotate { new_key } => {
             skreg_cli::commands::rotate::run_rotate(new_key.as_deref()).await?;
+        }
+        Commands::Context { command } => {
+            skreg_cli::commands::context::handle(command)?;
         }
     }
     Ok(())
