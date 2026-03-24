@@ -150,7 +150,7 @@ export default function PackageGrid() {
                   <th className={styles.th}>NAME</th>
                   <th className={styles.th}>NAMESPACE</th>
                   <th className={styles.th}>VERSION</th>
-                  <th className={styles.th}>VERIFICATION</th>
+                  <th className={styles.th}>VERIF</th>
                   {selectedIndex < 0 && <th className={styles.th}>DESCRIPTION</th>}
                   <th className={styles.th}></th>
                 </tr>
