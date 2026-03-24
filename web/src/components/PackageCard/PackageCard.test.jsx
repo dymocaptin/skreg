@@ -11,6 +11,7 @@ const PKG = {
   category: 'tools',
   latest_version: '1.0.1',
   created_at: '2026-02-20T00:00:00Z',
+  verification: 'self_signed',
 }
 
 // PackageCard renders a <tr> so it needs a table context
@@ -86,5 +87,25 @@ describe('PackageCard', () => {
   it('shows description cell when hideDesc is false (default)', () => {
     render(<PackageCard pkg={PKG} />, { wrapper })
     expect(screen.getByText('Analyzes dominant colors in images.')).toBeInTheDocument()
+  })
+
+  it('renders ◈ self for self_signed verification', () => {
+    render(<PackageCard pkg={PKG} />, { wrapper })
+    expect(screen.getByText('◈ self')).toBeInTheDocument()
+  })
+
+  it('renders ✦ pub for publisher verification', () => {
+    render(<PackageCard pkg={{ ...PKG, verification: 'publisher' }} />, { wrapper })
+    expect(screen.getByText('✦ pub')).toBeInTheDocument()
+  })
+
+  it('VERIF column is visible even when hideDesc is true', () => {
+    render(<PackageCard pkg={{ ...PKG, verification: 'publisher' }} hideDesc />, { wrapper })
+    expect(screen.getByText('✦ pub')).toBeInTheDocument()
+  })
+
+  it('renders ◈ self for unknown verification value', () => {
+    render(<PackageCard pkg={{ ...PKG, verification: 'unknown_value' }} />, { wrapper })
+    expect(screen.getByText('◈ self')).toBeInTheDocument()
   })
 })

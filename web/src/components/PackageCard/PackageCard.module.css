@@ -46,7 +46,6 @@
   font-family: var(--font-mono);
   font-size: 0.875rem;
   color: var(--text-muted);
-  max-width: 420px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -79,4 +78,19 @@
   outline: none;
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent);
   border-color: var(--accent);
+}
+
+.verif {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  white-space: nowrap;
+  padding: 0.45rem 1rem;
+}
+
+.verifPublisher {
+  color: var(--green);
+}
+
+.verifSelf {
+  color: var(--text-muted);
 }

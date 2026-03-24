@@ -11,3 +11,9 @@ export async function searchPackages({ query = '', category = '', page = 1 } = {
   if (!res.ok) throw new Error(`Search failed: ${res.status}`)
   return res.json()
 }
+
+export async function previewPackage(ns, name, version, signal) {
+  const res = await fetch(`${BASE_URL}/v1/packages/${ns}/${name}/${version}/preview`, { signal })
+  if (!res.ok) throw new Error(`Preview failed: ${res.status}`)
+  return res.json()
+}

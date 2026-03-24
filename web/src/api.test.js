@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { searchPackages } from './api.js'
+import { searchPackages, previewPackage } from './api.js'
 
 describe('searchPackages', () => {
   beforeEach(() => {
@@ -70,5 +70,56 @@ describe('searchPackages', () => {
     vi.spyOn(global, 'fetch').mockRejectedValue(new TypeError('Failed to fetch'))
 
     await expect(searchPackages({})).rejects.toThrow('Failed to fetch')
+  })
+})
+
+describe('previewPackage', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('fetches the preview endpoint with correct URL', async () => {
+    const mockData = { files: ['SKILL.md'], skill_md: '# Hello', truncated: false }
+    vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve(mockData),
+    })
+
+    const result = await previewPackage('acme', 'my-skill', '1.2.3', undefined)
+
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('/v1/packages/acme/my-skill/1.2.3/preview'),
+      expect.objectContaining({ signal: undefined })
+    )
+    expect(result).toEqual(mockData)
+  })
+
+  it('passes signal to fetch', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ files: [], skill_md: '', truncated: false }),
+    })
+    const controller = new AbortController()
+
+    await previewPackage('acme', 'my-skill', '1.2.3', controller.signal)
+
+    expect(fetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ signal: controller.signal })
+    )
+  })
+
+  it('throws on non-ok response', async () => {
+    vi.spyOn(global, 'fetch').mockResolvedValue({ ok: false, status: 404 })
+
+    await expect(previewPackage('acme', 'my-skill', '1.2.3', undefined))
+      .rejects.toThrow('Preview failed: 404')
+  })
+
+  it('throws when fetch rejects (network error)', async () => {
+    vi.spyOn(global, 'fetch').mockRejectedValue(new TypeError('Failed to fetch'))
+
+    await expect(previewPackage('acme', 'my-skill', '1.2.3', undefined))
+      .rejects.toThrow('Failed to fetch')
   })
 })
