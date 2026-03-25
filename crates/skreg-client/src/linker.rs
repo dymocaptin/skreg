@@ -13,8 +13,8 @@ use std::path::{Path, PathBuf};
 const SKREG_START: &str = "<!-- skreg:start -->";
 const SKREG_END: &str = "<!-- skreg:end -->";
 
-/// An entry representing an installed skill to be written into `CLAUDE.md`.
-pub struct ClaudeMdEntry {
+/// An entry representing an installed skill to be written into `SKREG.md`.
+pub struct SkillEntry {
     /// Package identifier, e.g. `"dymo/color-analysis@1.0.0"`.
     pub package: String,
     /// ISO date when the package was verified, e.g. `"2026-03-07"`.
@@ -199,7 +199,7 @@ impl Linker {
         Some((before, after))
     }
 
-    /// Write (or update) the skreg-managed section in `claude_md_path`.
+    /// Write (or update) the skreg-managed section in `rules_path` (`~/.claude/rules/SKREG.md`).
     ///
     /// If the file already contains `<!-- skreg:start -->` / `<!-- skreg:end -->` markers the
     /// content between them is replaced in-place.  Otherwise the managed block is appended to the
@@ -213,15 +213,15 @@ impl Linker {
     /// # Errors
     ///
     /// Returns an error if the file cannot be read or written.
-    pub fn write_claude_md(
+    pub fn write_skreg_rules(
         &self,
-        claude_md_path: &Path,
-        entries: &[ClaudeMdEntry],
+        rules_path: &Path,
+        entries: &[SkillEntry],
         enforcement: &EnforcementLevel,
     ) -> Result<()> {
-        let existing = if claude_md_path.exists() {
-            fs::read_to_string(claude_md_path)
-                .with_context(|| format!("failed to read {}", claude_md_path.display()))?
+        let existing = if rules_path.exists() {
+            fs::read_to_string(rules_path)
+                .with_context(|| format!("failed to read {}", rules_path.display()))?
         } else {
             String::new()
         };
@@ -229,8 +229,8 @@ impl Linker {
         // When no skills remain, remove the managed section entirely.
         if entries.is_empty() {
             if let Some((before, after)) = Self::split_around_managed_block(&existing) {
-                fs::write(claude_md_path, format!("{before}{after}"))
-                    .with_context(|| format!("failed to write {}", claude_md_path.display()))?;
+                fs::write(rules_path, format!("{before}{after}"))
+                    .with_context(|| format!("failed to write {}", rules_path.display()))?;
             }
             // If no markers present (or file does not exist), nothing to remove.
             return Ok(());
@@ -247,6 +247,69 @@ impl Linker {
             format!("{}\n\n{managed}", existing.trim_end())
         };
 
+        if let Some(parent) = rules_path.parent() {
+            fs::create_dir_all(parent)
+                .with_context(|| format!("failed to create parent dir {}", parent.display()))?;
+        }
+
+        fs::write(rules_path, new_content)
+            .with_context(|| format!("failed to write {}", rules_path.display()))?;
+
+        Ok(())
+    }
+
+    /// Render the static CLAUDE.md pointer block.
+    fn render_pointer_section() -> String {
+        let body = "## Required behavior\n\
+            \n\
+            - `.claude/rules/SKREG.md` rules MUST be followed in addition to these rules.\n\
+            - `.claude/rules/SKREG.md` rules MUST be refreshed at session start.\n\
+            - `.claude/rules/SKREG.md` rules MUST be refreshed following context compaction.\n";
+        format!("{SKREG_START}\n{body}{SKREG_END}\n")
+    }
+
+    /// Write (or update) the skreg-managed pointer section in `claude_md_path`.
+    ///
+    /// The pointer block is static — it does not vary by enforcement level. It instructs
+    /// the AI to load and follow `~/.claude/rules/SKREG.md`.
+    ///
+    /// When `entries` is empty, removes the pointer block. When non-empty, adds or
+    /// replaces it in-place using skreg markers.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be read or written.
+    pub fn write_claude_md_pointer(
+        &self,
+        claude_md_path: &Path,
+        entries: &[SkillEntry],
+    ) -> Result<()> {
+        let existing = if claude_md_path.exists() {
+            fs::read_to_string(claude_md_path)
+                .with_context(|| format!("failed to read {}", claude_md_path.display()))?
+        } else {
+            String::new()
+        };
+
+        if entries.is_empty() {
+            if let Some((before, after)) = Self::split_around_managed_block(&existing) {
+                fs::write(claude_md_path, format!("{before}{after}"))
+                    .with_context(|| format!("failed to write {}", claude_md_path.display()))?;
+            }
+            return Ok(());
+        }
+
+        let pointer = Self::render_pointer_section();
+
+        let new_content = if let Some((before, after)) = Self::split_around_managed_block(&existing)
+        {
+            format!("{before}{pointer}{after}")
+        } else if existing.is_empty() {
+            pointer
+        } else {
+            format!("{}\n\n{pointer}", existing.trim_end())
+        };
+
         if let Some(parent) = claude_md_path.parent() {
             fs::create_dir_all(parent)
                 .with_context(|| format!("failed to create parent dir {}", parent.display()))?;
@@ -259,7 +322,7 @@ impl Linker {
     }
 
     /// Render the full managed block (including start/end markers).
-    fn render_managed_section(entries: &[ClaudeMdEntry], enforcement: &EnforcementLevel) -> String {
+    fn render_managed_section(entries: &[SkillEntry], enforcement: &EnforcementLevel) -> String {
         let skill_list = entries
             .iter()
             .map(|e| format!("- {} (verified {})", e.package, e.verified_date))
@@ -341,6 +404,12 @@ pub fn default_claude_md_path() -> Option<PathBuf> {
     dirs::home_dir().map(|h| h.join(".claude").join("CLAUDE.md"))
 }
 
+/// Default path for `~/.claude/rules/SKREG.md`.
+#[must_use]
+pub fn default_skreg_rules_path() -> Option<PathBuf> {
+    dirs::home_dir().map(|h| h.join(".claude").join("rules").join("SKREG.md"))
+}
+
 /// Candidate tool skill directories, in probe order.
 ///
 /// Index 0 (`~/.agents/skills`) is always created if absent when passed to
@@ -357,14 +426,14 @@ pub fn default_tool_skill_dirs() -> Option<Vec<PathBuf>> {
     ])
 }
 
-/// Build a deduplicated [`ClaudeMdEntry`] list from linker records.
+/// Build a deduplicated [`SkillEntry`] list from linker records.
 #[must_use]
-pub fn build_claude_md_entries(links: &[LinkRecord], today: &str) -> Vec<ClaudeMdEntry> {
+pub fn build_skill_entries(links: &[LinkRecord], today: &str) -> Vec<SkillEntry> {
     let mut seen = std::collections::HashSet::new();
     links
         .iter()
         .filter(|r| seen.insert(r.package.clone()))
-        .map(|r| ClaudeMdEntry {
+        .map(|r| SkillEntry {
             package: r.package.clone(),
             verified_date: today.to_string(),
         })
@@ -537,19 +606,19 @@ mod tests {
     }
 
     #[test]
-    fn write_claude_md_creates_file_with_managed_section() {
+    fn write_skreg_rules_creates_file_with_managed_section() {
         let tmp = TempDir::new().unwrap();
         let claude_md = tmp.path().join("CLAUDE.md");
         let links_path = tmp.path().join("links.toml");
         let linker = Linker::new(links_path);
 
-        let entries = vec![ClaudeMdEntry {
+        let entries = vec![SkillEntry {
             package: "dymo/color-analysis@1.0.0".to_string(),
             verified_date: "2026-03-07".to_string(),
         }];
 
         linker
-            .write_claude_md(&claude_md, &entries, &EnforcementLevel::Confirm)
+            .write_skreg_rules(&claude_md, &entries, &EnforcementLevel::Confirm)
             .unwrap();
 
         let content = fs::read_to_string(&claude_md).unwrap();
@@ -560,7 +629,7 @@ mod tests {
     }
 
     #[test]
-    fn write_claude_md_preserves_content_outside_markers() {
+    fn write_skreg_rules_preserves_content_outside_markers() {
         let tmp = TempDir::new().unwrap();
         let claude_md = tmp.path().join("CLAUDE.md");
         fs::write(&claude_md, "# My Project\n\nSome existing content.\n").unwrap();
@@ -568,7 +637,7 @@ mod tests {
         let links_path = tmp.path().join("links.toml");
         let linker = Linker::new(links_path);
         linker
-            .write_claude_md(&claude_md, &[], &EnforcementLevel::Hint)
+            .write_skreg_rules(&claude_md, &[], &EnforcementLevel::Hint)
             .unwrap();
 
         let content = fs::read_to_string(&claude_md).unwrap();
@@ -579,7 +648,7 @@ mod tests {
     }
 
     #[test]
-    fn write_claude_md_replaces_existing_managed_section() {
+    fn write_skreg_rules_replaces_existing_managed_section() {
         let tmp = TempDir::new().unwrap();
         let claude_md = tmp.path().join("CLAUDE.md");
         fs::write(
@@ -590,12 +659,12 @@ mod tests {
 
         let links_path = tmp.path().join("links.toml");
         let linker = Linker::new(links_path);
-        let entries = vec![ClaudeMdEntry {
+        let entries = vec![SkillEntry {
             package: "dymo/color-analysis@1.0.0".to_string(),
             verified_date: "2026-03-07".to_string(),
         }];
         linker
-            .write_claude_md(&claude_md, &entries, &EnforcementLevel::Strict)
+            .write_skreg_rules(&claude_md, &entries, &EnforcementLevel::Strict)
             .unwrap();
 
         let content = fs::read_to_string(&claude_md).unwrap();
@@ -655,7 +724,7 @@ mod tests {
     }
 
     #[test]
-    fn write_claude_md_removes_section_when_entries_empty() {
+    fn write_skreg_rules_removes_section_when_entries_empty() {
         let tmp = TempDir::new().unwrap();
         let claude_md = tmp.path().join("CLAUDE.md");
 
@@ -666,7 +735,7 @@ mod tests {
         let linker = Linker::new(links_path);
 
         linker
-            .write_claude_md(&claude_md, &[], &EnforcementLevel::Confirm)
+            .write_skreg_rules(&claude_md, &[], &EnforcementLevel::Confirm)
             .unwrap();
 
         let result = fs::read_to_string(&claude_md).unwrap();
@@ -689,7 +758,7 @@ mod tests {
     }
 
     #[test]
-    fn write_claude_md_does_nothing_when_entries_empty_and_no_markers() {
+    fn write_skreg_rules_does_nothing_when_entries_empty_and_no_markers() {
         let tmp = TempDir::new().unwrap();
         let claude_md = tmp.path().join("CLAUDE.md");
 
@@ -700,7 +769,7 @@ mod tests {
         let linker = Linker::new(links_path);
 
         linker
-            .write_claude_md(&claude_md, &[], &EnforcementLevel::Confirm)
+            .write_skreg_rules(&claude_md, &[], &EnforcementLevel::Confirm)
             .unwrap();
 
         let result = fs::read_to_string(&claude_md).unwrap();
@@ -708,7 +777,7 @@ mod tests {
     }
 
     #[test]
-    fn write_claude_md_does_nothing_when_entries_empty_and_file_absent() {
+    fn write_skreg_rules_does_nothing_when_entries_empty_and_file_absent() {
         let tmp = TempDir::new().unwrap();
         let claude_md = tmp.path().join("CLAUDE.md");
         // Do NOT create the file
@@ -717,14 +786,14 @@ mod tests {
         let linker = Linker::new(links_path);
 
         linker
-            .write_claude_md(&claude_md, &[], &EnforcementLevel::Confirm)
+            .write_skreg_rules(&claude_md, &[], &EnforcementLevel::Confirm)
             .unwrap();
 
         assert!(!claude_md.exists(), "file should not have been created");
     }
 
     #[test]
-    fn write_claude_md_handles_unclosed_start_marker() {
+    fn write_skreg_rules_handles_unclosed_start_marker() {
         let tmp = TempDir::new().unwrap();
         let claude_md = tmp.path().join("CLAUDE.md");
 
@@ -736,7 +805,7 @@ mod tests {
         let linker = Linker::new(links_path);
 
         linker
-            .write_claude_md(&claude_md, &[], &EnforcementLevel::Confirm)
+            .write_skreg_rules(&claude_md, &[], &EnforcementLevel::Confirm)
             .unwrap();
 
         let result = fs::read_to_string(&claude_md).unwrap();
@@ -752,5 +821,153 @@ mod tests {
             !result.contains("ORPHAN CONTENT"),
             "orphaned content after unclosed marker should be removed"
         );
+    }
+
+    #[test]
+    fn default_skreg_rules_path_has_expected_suffix() {
+        if let Some(p) = default_skreg_rules_path() {
+            assert!(
+                p.ends_with(".claude/rules/SKREG.md"),
+                "unexpected path: {}",
+                p.display()
+            );
+        }
+    }
+
+    #[test]
+    fn write_claude_md_pointer_creates_file_with_pointer_block() {
+        let tmp = TempDir::new().unwrap();
+        let claude_md = tmp.path().join("CLAUDE.md");
+        let links_path = tmp.path().join("links.toml");
+        let linker = Linker::new(links_path);
+
+        let entries = vec![SkillEntry {
+            package: "dymo/color-analysis@1.0.0".to_string(),
+            verified_date: "2026-03-24".to_string(),
+        }];
+
+        linker
+            .write_claude_md_pointer(&claude_md, &entries)
+            .unwrap();
+
+        let content = fs::read_to_string(&claude_md).unwrap();
+        assert!(content.contains("<!-- skreg:start -->"));
+        assert!(content.contains("<!-- skreg:end -->"));
+        assert!(content.contains("SKREG.md"));
+        assert!(content.contains("MUST be followed"));
+        assert!(content.contains("MUST be refreshed at session start"));
+        assert!(content.contains("MUST be refreshed following context compaction"));
+        // Skill list must NOT appear in the pointer block
+        assert!(!content.contains("dymo/color-analysis"));
+    }
+
+    #[test]
+    fn write_claude_md_pointer_removes_block_when_entries_empty() {
+        let tmp = TempDir::new().unwrap();
+        let claude_md = tmp.path().join("CLAUDE.md");
+        let initial = "Before.\n<!-- skreg:start -->\n## Required behavior\n\nsome pointer\n<!-- skreg:end -->\nAfter.\n";
+        fs::write(&claude_md, initial).unwrap();
+
+        let links_path = tmp.path().join("links.toml");
+        let linker = Linker::new(links_path);
+
+        linker.write_claude_md_pointer(&claude_md, &[]).unwrap();
+
+        let result = fs::read_to_string(&claude_md).unwrap();
+        assert!(!result.contains("skreg:start"));
+        assert!(!result.contains("skreg:end"));
+        assert!(result.contains("Before."));
+        assert!(result.contains("After."));
+    }
+
+    #[test]
+    fn write_claude_md_pointer_noop_when_entries_empty_and_no_markers() {
+        let tmp = TempDir::new().unwrap();
+        let claude_md = tmp.path().join("CLAUDE.md");
+        let initial = "# My Config\n\nNo skreg section here.\n";
+        fs::write(&claude_md, initial).unwrap();
+
+        let links_path = tmp.path().join("links.toml");
+        let linker = Linker::new(links_path);
+
+        linker.write_claude_md_pointer(&claude_md, &[]).unwrap();
+
+        let result = fs::read_to_string(&claude_md).unwrap();
+        assert_eq!(result, initial);
+    }
+
+    #[test]
+    fn write_claude_md_pointer_noop_when_entries_empty_and_file_absent() {
+        let tmp = TempDir::new().unwrap();
+        let claude_md = tmp.path().join("CLAUDE.md");
+
+        let links_path = tmp.path().join("links.toml");
+        let linker = Linker::new(links_path);
+
+        linker.write_claude_md_pointer(&claude_md, &[]).unwrap();
+
+        assert!(!claude_md.exists());
+    }
+
+    #[test]
+    fn write_claude_md_pointer_preserves_content_outside_markers() {
+        let tmp = TempDir::new().unwrap();
+        let claude_md = tmp.path().join("CLAUDE.md");
+        fs::write(
+            &claude_md,
+            "# My Config\n\nExisting content.\n\n<!-- skreg:start -->\nOLD\n<!-- skreg:end -->\n\nTrailing.\n",
+        ).unwrap();
+
+        let links_path = tmp.path().join("links.toml");
+        let linker = Linker::new(links_path);
+
+        let entries = vec![SkillEntry {
+            package: "dymo/color-analysis@1.0.0".to_string(),
+            verified_date: "2026-03-24".to_string(),
+        }];
+
+        linker
+            .write_claude_md_pointer(&claude_md, &entries)
+            .unwrap();
+
+        let result = fs::read_to_string(&claude_md).unwrap();
+        assert!(result.contains("Existing content."));
+        assert!(result.contains("Trailing."));
+        assert!(!result.contains("OLD"));
+        assert!(result.contains("SKREG.md"));
+    }
+
+    #[test]
+    fn write_claude_md_pointer_content_is_static_across_enforcement_levels() {
+        // The pointer block must not vary by enforcement level — it is purely a pointer.
+        // This test verifies by calling write_claude_md_pointer twice with different entries
+        // (simulating different installs) and confirming the pointer content is the same.
+        let tmp = TempDir::new().unwrap();
+        let links_path = tmp.path().join("links.toml");
+        let linker = Linker::new(links_path);
+
+        let entries_a = vec![SkillEntry {
+            package: "dymo/color-analysis@1.0.0".to_string(),
+            verified_date: "2026-03-24".to_string(),
+        }];
+        let entries_b = vec![SkillEntry {
+            package: "dymo/other@2.0.0".to_string(),
+            verified_date: "2026-03-24".to_string(),
+        }];
+
+        let path_a = tmp.path().join("A.md");
+        let path_b = tmp.path().join("B.md");
+
+        linker.write_claude_md_pointer(&path_a, &entries_a).unwrap();
+        linker.write_claude_md_pointer(&path_b, &entries_b).unwrap();
+
+        let content_a = fs::read_to_string(&path_a).unwrap();
+        let content_b = fs::read_to_string(&path_b).unwrap();
+
+        // Content must be identical regardless of which skills are installed
+        assert_eq!(content_a, content_b);
+        // And must not contain any skill names
+        assert!(!content_a.contains("color-analysis"));
+        assert!(!content_a.contains("other"));
     }
 }
