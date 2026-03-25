@@ -249,7 +249,7 @@ impl Linker {
 
         if let Some(parent) = rules_path.parent() {
             fs::create_dir_all(parent)
-                .with_context(|| format!("failed to create parent dir {}", rules_path.display()))?;
+                .with_context(|| format!("failed to create parent dir {}", parent.display()))?;
         }
 
         fs::write(rules_path, new_content)
