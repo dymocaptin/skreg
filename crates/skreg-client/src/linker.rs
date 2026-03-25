@@ -341,6 +341,12 @@ pub fn default_claude_md_path() -> Option<PathBuf> {
     dirs::home_dir().map(|h| h.join(".claude").join("CLAUDE.md"))
 }
 
+/// Default path for `~/.claude/rules/SKREG.md`.
+#[must_use]
+pub fn default_skreg_rules_path() -> Option<PathBuf> {
+    dirs::home_dir().map(|h| h.join(".claude").join("rules").join("SKREG.md"))
+}
+
 /// Candidate tool skill directories, in probe order.
 ///
 /// Index 0 (`~/.agents/skills`) is always created if absent when passed to
@@ -752,5 +758,16 @@ mod tests {
             !result.contains("ORPHAN CONTENT"),
             "orphaned content after unclosed marker should be removed"
         );
+    }
+
+    #[test]
+    fn default_skreg_rules_path_has_expected_suffix() {
+        if let Some(p) = default_skreg_rules_path() {
+            assert!(
+                p.ends_with(".claude/rules/SKREG.md"),
+                "unexpected path: {}",
+                p.display()
+            );
+        }
     }
 }
