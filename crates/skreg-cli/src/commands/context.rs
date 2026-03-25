@@ -69,15 +69,7 @@ fn add(
     root_ca: Option<PathBuf>,
     activate: bool,
 ) -> Result<()> {
-    let root_ca_pem = if let Some(p) = root_ca {
-        let pem = std::fs::read_to_string(&p)?;
-        if !pem.contains("BEGIN CERTIFICATE") {
-            anyhow::bail!("file does not look like a PEM certificate");
-        }
-        Some(pem)
-    } else {
-        None
-    };
+    let root_ca_pem = root_ca;
 
     let mut cfg = load_config(path).unwrap_or_else(|_| CliConfig {
         active_context: name.to_owned(),
@@ -182,7 +174,10 @@ mod tests {
         .unwrap();
 
         let cfg = load_config(path).unwrap();
-        assert_eq!(cfg.contexts["with-ca"].root_ca_pem, Some(ca_pem.to_owned()));
+        assert_eq!(
+            cfg.contexts["with-ca"].root_ca_pem,
+            Some(ca_file.path().to_owned())
+        );
     }
 
     #[test]

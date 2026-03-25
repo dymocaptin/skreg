@@ -8,7 +8,7 @@ use anyhow::{Context, Result};
 use skreg_client::client::HttpRegistryClient;
 use skreg_core::config::EnforcementLevel;
 use skreg_core::package_ref::PackageRef;
-use skreg_crypto::verifier::{RsaPssVerifier, SignatureVerifier};
+use skreg_crypto::verifier::RsaPssVerifier;
 
 use crate::config::{default_config_path, load_config};
 use crate::installer::Installer;

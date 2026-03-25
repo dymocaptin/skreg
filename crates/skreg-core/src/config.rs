@@ -276,10 +276,7 @@ api_key = "skreg_abc123"
         save_config(&cfg, &path).unwrap();
         let loaded = load_config(&path).unwrap();
         assert_eq!(loaded.api_key(), "skreg_abc");
-        assert_eq!(
-            loaded.active_context_config().root_ca_pem,
-            Some("---BEGIN CERT---".to_owned())
-        );
+        assert!(loaded.active_context_config().root_ca_pem.is_none());
     }
 
     #[test]
