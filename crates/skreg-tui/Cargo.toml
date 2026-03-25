@@ -12,6 +12,8 @@ anyhow = { workspace = true }
 serde = { workspace = true }
 dirs = "5"
 serde_json = { workspace = true }
+chrono = { workspace = true }
+log = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3"

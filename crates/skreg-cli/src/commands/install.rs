@@ -12,53 +12,15 @@ use skreg_crypto::verifier::{RsaPssVerifier, SignatureVerifier};
 
 use crate::config::{default_config_path, load_config};
 use crate::installer::Installer;
-use crate::linker::Linker;
+use skreg_client::linker::{
+    build_claude_md_entries, default_claude_md_path, default_links_path, default_tool_skill_dirs,
+    Linker,
+};
 
 fn default_install_root() -> Result<PathBuf> {
     let home =
         home::home_dir().ok_or_else(|| anyhow::anyhow!("cannot determine home directory"))?;
     Ok(home.join(".skreg").join("packages"))
-}
-
-fn links_path() -> Result<PathBuf> {
-    let home =
-        home::home_dir().ok_or_else(|| anyhow::anyhow!("cannot determine home directory"))?;
-    Ok(home.join(".skreg").join("links.toml"))
-}
-
-fn claude_md_path() -> Result<PathBuf> {
-    let home =
-        home::home_dir().ok_or_else(|| anyhow::anyhow!("cannot determine home directory"))?;
-    Ok(home.join(".claude").join("CLAUDE.md"))
-}
-
-/// Candidate tool skill directories, in probe order.
-/// Index 0 (~/.agents/skills) is always created if absent.
-fn tool_skill_dirs() -> Result<Vec<PathBuf>> {
-    let home =
-        home::home_dir().ok_or_else(|| anyhow::anyhow!("cannot determine home directory"))?;
-    Ok(vec![
-        home.join(".agents").join("skills"),
-        home.join(".claude").join("skills"),
-        home.join(".cursor").join("skills"),
-        home.join(".codeium").join("windsurf").join("skills"),
-        home.join(".codex").join("skills"),
-    ])
-}
-
-fn build_claude_md_entries(
-    links: &[crate::linker::LinkRecord],
-    today: &str,
-) -> Vec<crate::linker::ClaudeMdEntry> {
-    let mut seen = std::collections::HashSet::new();
-    links
-        .iter()
-        .filter(|r| seen.insert(r.package.clone()))
-        .map(|r| crate::linker::ClaudeMdEntry {
-            package: r.package.clone(),
-            verified_date: today.to_string(),
-        })
-        .collect()
 }
 
 /// Run `skreg install <package_ref>`.
@@ -108,8 +70,11 @@ pub async fn run_install(
     println!("✓ Installed to {}", result.install_path.display());
 
     // Symlink into tool directories
-    let tool_dirs = tool_skill_dirs()?;
-    let mut linker = Linker::new(links_path()?);
+    let tool_dirs = default_tool_skill_dirs()
+        .ok_or_else(|| anyhow::anyhow!("cannot determine home directory"))?;
+    let links_path =
+        default_links_path().ok_or_else(|| anyhow::anyhow!("cannot determine home directory"))?;
+    let mut linker = Linker::new(links_path);
     let symlinks =
         linker.create_symlinks(ns, name, &version, &result.install_path, &tool_dirs, true)?;
 
@@ -121,7 +86,8 @@ pub async fn run_install(
     }
 
     // Update ~/.claude/CLAUDE.md if ~/.claude/ exists
-    let claude_md = claude_md_path()?;
+    let claude_md = default_claude_md_path()
+        .ok_or_else(|| anyhow::anyhow!("cannot determine home directory"))?;
     if claude_md.parent().is_some_and(std::path::Path::exists) {
         let today = chrono::Local::now().format("%Y-%m-%d").to_string();
         let entries = build_claude_md_entries(linker.links(), &today);
