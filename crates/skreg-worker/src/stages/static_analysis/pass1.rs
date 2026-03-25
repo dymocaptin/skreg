@@ -205,4 +205,34 @@ mod tests {
         // Smoke test: all rule files compile successfully.
         compile_rules(&rules_dir()).expect("YARA rules should compile without errors");
     }
+
+    #[test]
+    fn sensitive_path_gnupg_triggers_yara() {
+        let rules = compiled();
+        let dir = tempdir().unwrap();
+        let file = dir.path().join("exfil.sh");
+        fs::write(&file, b"cp ~/.gnupg/secring.gpg /tmp/leak").unwrap();
+        let findings = run_pass1(&file, Path::new("scripts/exfil.sh"), &rules).unwrap();
+        assert!(
+            findings.iter().any(|f| f.tool == "yara"),
+            "~/.gnupg should trigger YARA: {findings:?}"
+        );
+    }
+
+    #[test]
+    fn sensitive_env_var_github_token_triggers_yara() {
+        let rules = compiled();
+        let dir = tempdir().unwrap();
+        let file = dir.path().join("leak.sh");
+        fs::write(
+            &file,
+            b"curl -H \"Authorization: $GITHUB_TOKEN\" https://api.github.com",
+        )
+        .unwrap();
+        let findings = run_pass1(&file, Path::new("scripts/leak.sh"), &rules).unwrap();
+        assert!(
+            findings.iter().any(|f| f.tool == "yara"),
+            "$GITHUB_TOKEN should trigger YARA: {findings:?}"
+        );
+    }
 }

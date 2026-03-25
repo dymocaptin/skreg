@@ -50,3 +50,34 @@ rule c2_framework {
     condition:
         any of them
 }
+
+rule sensitive_paths {
+    meta:
+        description = "Detects access to sensitive credential/config paths beyond AWS and SSH"
+        severity = "Error"
+    strings:
+        $gnupg     = "~/.gnupg" nocase
+        $kube      = "~/.kube/config" nocase
+        $docker    = "~/.docker/config.json" nocase
+        $shadow    = "/etc/shadow" nocase
+        $passwd    = "/etc/passwd" nocase
+        $netrc     = "~/.netrc" nocase
+        $xdg       = "~/.config" nocase
+    condition:
+        any of them
+}
+
+rule sensitive_env_vars {
+    meta:
+        description = "Detects use of sensitive environment variables via shell sigil"
+        severity = "Error"
+    strings:
+        $gh_token   = "$GITHUB_TOKEN" nocase
+        $ssh_auth   = "$SSH_AUTH_SOCK" nocase
+        $password   = "$PASSWORD" nocase
+        $api_key    = "$API_KEY" nocase
+        $secret     = "$SECRET" nocase
+        $token      = "$TOKEN" nocase
+    condition:
+        any of them
+}
