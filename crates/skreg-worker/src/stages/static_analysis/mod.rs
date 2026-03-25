@@ -106,10 +106,7 @@ pub fn run_static_analysis(
             .strip_prefix(path)
             .map_err(|e| std::io::Error::other(e.to_string()))?;
 
-        // Pass 1 — all files except SKILL.md (which is handled by hook scanner)
-        if rel.to_string_lossy() == "SKILL.md" {
-            continue;
-        }
+        // Pass 1 — all files
         let pass1_findings = pass1::run_pass1(abs, rel, rules)?;
         let has_blocking = pass1_findings.iter().any(|f| f.severity.is_blocking());
         all_findings.extend(pass1_findings);
@@ -239,7 +236,7 @@ mod tests {
         assert!(
             findings
                 .iter()
-                .any(|f| f.file == "SKILL.md#hooks" && f.severity.is_blocking()),
+                .any(|f| f.file.contains("SKILL.md") && f.severity.is_blocking()),
             "malicious hook command should produce a blocking finding: {findings:?}"
         );
     }
