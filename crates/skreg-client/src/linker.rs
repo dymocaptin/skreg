@@ -258,6 +258,69 @@ impl Linker {
         Ok(())
     }
 
+    /// Render the static CLAUDE.md pointer block.
+    fn render_pointer_section() -> String {
+        let body = "## Required behavior\n\
+            \n\
+            - `.claude/rules/SKREG.md` rules MUST be followed in addition to these rules.\n\
+            - `.claude/rules/SKREG.md` rules MUST be refreshed at session start.\n\
+            - `.claude/rules/SKREG.md` rules MUST be refreshed following context compaction.\n";
+        format!("{SKREG_START}\n{body}{SKREG_END}\n")
+    }
+
+    /// Write (or update) the skreg-managed pointer section in `claude_md_path`.
+    ///
+    /// The pointer block is static — it does not vary by enforcement level. It instructs
+    /// the AI to load and follow `~/.claude/rules/SKREG.md`.
+    ///
+    /// When `entries` is empty, removes the pointer block. When non-empty, adds or
+    /// replaces it in-place using skreg markers.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the file cannot be read or written.
+    pub fn write_claude_md_pointer(
+        &self,
+        claude_md_path: &Path,
+        entries: &[SkillEntry],
+    ) -> Result<()> {
+        let existing = if claude_md_path.exists() {
+            fs::read_to_string(claude_md_path)
+                .with_context(|| format!("failed to read {}", claude_md_path.display()))?
+        } else {
+            String::new()
+        };
+
+        if entries.is_empty() {
+            if let Some((before, after)) = Self::split_around_managed_block(&existing) {
+                fs::write(claude_md_path, format!("{before}{after}"))
+                    .with_context(|| format!("failed to write {}", claude_md_path.display()))?;
+            }
+            return Ok(());
+        }
+
+        let pointer = Self::render_pointer_section();
+
+        let new_content = if let Some((before, after)) = Self::split_around_managed_block(&existing)
+        {
+            format!("{before}{pointer}{after}")
+        } else if existing.is_empty() {
+            pointer
+        } else {
+            format!("{}\n\n{pointer}", existing.trim_end())
+        };
+
+        if let Some(parent) = claude_md_path.parent() {
+            fs::create_dir_all(parent)
+                .with_context(|| format!("failed to create parent dir {}", parent.display()))?;
+        }
+
+        fs::write(claude_md_path, new_content)
+            .with_context(|| format!("failed to write {}", claude_md_path.display()))?;
+
+        Ok(())
+    }
+
     /// Render the full managed block (including start/end markers).
     fn render_managed_section(entries: &[SkillEntry], enforcement: &EnforcementLevel) -> String {
         let skill_list = entries
@@ -769,5 +832,142 @@ mod tests {
                 p.display()
             );
         }
+    }
+
+    #[test]
+    fn write_claude_md_pointer_creates_file_with_pointer_block() {
+        let tmp = TempDir::new().unwrap();
+        let claude_md = tmp.path().join("CLAUDE.md");
+        let links_path = tmp.path().join("links.toml");
+        let linker = Linker::new(links_path);
+
+        let entries = vec![SkillEntry {
+            package: "dymo/color-analysis@1.0.0".to_string(),
+            verified_date: "2026-03-24".to_string(),
+        }];
+
+        linker
+            .write_claude_md_pointer(&claude_md, &entries)
+            .unwrap();
+
+        let content = fs::read_to_string(&claude_md).unwrap();
+        assert!(content.contains("<!-- skreg:start -->"));
+        assert!(content.contains("<!-- skreg:end -->"));
+        assert!(content.contains("SKREG.md"));
+        assert!(content.contains("MUST be followed"));
+        assert!(content.contains("MUST be refreshed at session start"));
+        assert!(content.contains("MUST be refreshed following context compaction"));
+        // Skill list must NOT appear in the pointer block
+        assert!(!content.contains("dymo/color-analysis"));
+    }
+
+    #[test]
+    fn write_claude_md_pointer_removes_block_when_entries_empty() {
+        let tmp = TempDir::new().unwrap();
+        let claude_md = tmp.path().join("CLAUDE.md");
+        let initial = "Before.\n<!-- skreg:start -->\n## Required behavior\n\nsome pointer\n<!-- skreg:end -->\nAfter.\n";
+        fs::write(&claude_md, initial).unwrap();
+
+        let links_path = tmp.path().join("links.toml");
+        let linker = Linker::new(links_path);
+
+        linker.write_claude_md_pointer(&claude_md, &[]).unwrap();
+
+        let result = fs::read_to_string(&claude_md).unwrap();
+        assert!(!result.contains("skreg:start"));
+        assert!(!result.contains("skreg:end"));
+        assert!(result.contains("Before."));
+        assert!(result.contains("After."));
+    }
+
+    #[test]
+    fn write_claude_md_pointer_noop_when_entries_empty_and_no_markers() {
+        let tmp = TempDir::new().unwrap();
+        let claude_md = tmp.path().join("CLAUDE.md");
+        let initial = "# My Config\n\nNo skreg section here.\n";
+        fs::write(&claude_md, initial).unwrap();
+
+        let links_path = tmp.path().join("links.toml");
+        let linker = Linker::new(links_path);
+
+        linker.write_claude_md_pointer(&claude_md, &[]).unwrap();
+
+        let result = fs::read_to_string(&claude_md).unwrap();
+        assert_eq!(result, initial);
+    }
+
+    #[test]
+    fn write_claude_md_pointer_noop_when_entries_empty_and_file_absent() {
+        let tmp = TempDir::new().unwrap();
+        let claude_md = tmp.path().join("CLAUDE.md");
+
+        let links_path = tmp.path().join("links.toml");
+        let linker = Linker::new(links_path);
+
+        linker.write_claude_md_pointer(&claude_md, &[]).unwrap();
+
+        assert!(!claude_md.exists());
+    }
+
+    #[test]
+    fn write_claude_md_pointer_preserves_content_outside_markers() {
+        let tmp = TempDir::new().unwrap();
+        let claude_md = tmp.path().join("CLAUDE.md");
+        fs::write(
+            &claude_md,
+            "# My Config\n\nExisting content.\n\n<!-- skreg:start -->\nOLD\n<!-- skreg:end -->\n\nTrailing.\n",
+        ).unwrap();
+
+        let links_path = tmp.path().join("links.toml");
+        let linker = Linker::new(links_path);
+
+        let entries = vec![SkillEntry {
+            package: "dymo/color-analysis@1.0.0".to_string(),
+            verified_date: "2026-03-24".to_string(),
+        }];
+
+        linker
+            .write_claude_md_pointer(&claude_md, &entries)
+            .unwrap();
+
+        let result = fs::read_to_string(&claude_md).unwrap();
+        assert!(result.contains("Existing content."));
+        assert!(result.contains("Trailing."));
+        assert!(!result.contains("OLD"));
+        assert!(result.contains("SKREG.md"));
+    }
+
+    #[test]
+    fn write_claude_md_pointer_content_is_static_across_enforcement_levels() {
+        // The pointer block must not vary by enforcement level — it is purely a pointer.
+        // This test verifies by calling write_claude_md_pointer twice with different entries
+        // (simulating different installs) and confirming the pointer content is the same.
+        let tmp = TempDir::new().unwrap();
+        let links_path = tmp.path().join("links.toml");
+        let linker = Linker::new(links_path);
+
+        let entries_a = vec![SkillEntry {
+            package: "dymo/color-analysis@1.0.0".to_string(),
+            verified_date: "2026-03-24".to_string(),
+        }];
+        let entries_b = vec![SkillEntry {
+            package: "dymo/other@2.0.0".to_string(),
+            verified_date: "2026-03-24".to_string(),
+        }];
+
+        let path_a = tmp.path().join("A.md");
+        let path_b = tmp.path().join("B.md");
+
+        linker.write_claude_md_pointer(&path_a, &entries_a).unwrap();
+        linker.write_claude_md_pointer(&path_b, &entries_b).unwrap();
+
+        let content_a = fs::read_to_string(&path_a).unwrap();
+        let content_b = fs::read_to_string(&path_b).unwrap();
+
+        // Content must be identical regardless of which skills are installed
+        assert_eq!(content_a, content_b);
+        // And must not contain any skill names
+        assert!(!content_a.contains("color-analysis"));
+        assert!(!content_a.contains("other"));
     }
 }
