@@ -2,6 +2,7 @@
 
 use std::sync::Arc;
 
+use log::warn;
 use ratatui::crossterm::event::{Event, KeyCode, KeyEvent};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
@@ -11,6 +12,10 @@ use ratatui::{
 };
 use skreg_client::client::{HttpRegistryClient, PackagePreview, RegistryClient};
 use skreg_client::installer::Installer;
+use skreg_client::linker::{
+    build_claude_md_entries, default_claude_md_path, default_links_path, default_tool_skill_dirs,
+    Linker,
+};
 use skreg_core::config::CliConfig;
 use skreg_core::package_ref::PackageRef;
 use tokio::sync::oneshot;
@@ -223,6 +228,7 @@ impl PackageDetailView {
     fn install(&mut self) {
         let registry = self.config.registry().to_string();
         let install_root = packages_dir();
+        let enforcement = self.config.policy.enforcement.clone();
         let ref_str = format!("{}/{}@{}", self.namespace, self.name, self.version);
         let (tx, rx) = oneshot::channel();
         self.install_rx = Some(rx);
@@ -231,20 +237,59 @@ impl PackageDetailView {
                 Ok(pkg_ref) => {
                     let client = Arc::new(HttpRegistryClient::new(registry));
                     let installer = Installer::new(client, install_root);
-                    installer
-                        .install(&pkg_ref)
-                        .await
-                        .map(|(p, _manifest)| {
-                            format!(
+                    match installer.install(&pkg_ref).await {
+                        Ok((installed_pkg, _manifest)) => {
+                            let label = format!(
                                 "{} v{}",
-                                p.pkg_ref.name,
-                                p.pkg_ref.version.as_ref().map_or_else(
+                                installed_pkg.pkg_ref.name,
+                                installed_pkg.pkg_ref.version.as_ref().map_or_else(
                                     || "?".to_string(),
                                     std::string::ToString::to_string
                                 ),
-                            )
-                        })
-                        .map_err(|e| e.to_string())
+                            );
+                            // Symlink into tool directories and update CLAUDE.md,
+                            // mirroring the same steps as `skreg install`.
+                            if let (Some(links_path), Some(tool_dirs)) =
+                                (default_links_path(), default_tool_skill_dirs())
+                            {
+                                let ns = installed_pkg.pkg_ref.namespace.as_str();
+                                let name = installed_pkg.pkg_ref.name.as_str();
+                                let version = installed_pkg
+                                    .install_path
+                                    .file_name()
+                                    .and_then(|n| n.to_str())
+                                    .unwrap_or("");
+                                let mut linker = Linker::new(links_path);
+                                if let Err(e) = linker.create_symlinks(
+                                    ns,
+                                    name,
+                                    version,
+                                    &installed_pkg.install_path,
+                                    &tool_dirs,
+                                    true,
+                                ) {
+                                    warn!("failed to create symlinks for {ns}/{name}: {e}");
+                                }
+                                if let Some(claude_md) = default_claude_md_path() {
+                                    if claude_md.parent().is_some_and(std::path::Path::exists) {
+                                        let today =
+                                            chrono::Local::now().format("%Y-%m-%d").to_string();
+                                        let entries =
+                                            build_claude_md_entries(linker.links(), &today);
+                                        if let Err(e) = linker.write_claude_md(
+                                            &claude_md,
+                                            &entries,
+                                            &enforcement,
+                                        ) {
+                                            warn!("failed to update CLAUDE.md: {e}");
+                                        }
+                                    }
+                                }
+                            }
+                            Ok(label)
+                        }
+                        Err(e) => Err(e.to_string()),
+                    }
                 }
                 Err(e) => Err(format!("invalid package ref '{ref_str}': {e}")),
             };

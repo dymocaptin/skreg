@@ -2,6 +2,7 @@
 
 use std::time::{Duration, Instant};
 
+use log::warn;
 use ratatui::crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use ratatui::{
     layout::{Constraint, Layout, Rect},
@@ -14,6 +15,10 @@ use std::sync::Arc;
 
 use skreg_client::client::{HttpRegistryClient, RegistryClient, SearchResult};
 use skreg_client::installer::Installer;
+use skreg_client::linker::{
+    build_claude_md_entries, default_claude_md_path, default_links_path, default_tool_skill_dirs,
+    Linker,
+};
 use skreg_core::config::CliConfig;
 use skreg_core::package_ref::PackageRef;
 use tokio::sync::oneshot;
@@ -105,6 +110,8 @@ pub struct PackageListView {
     install_rx: Option<oneshot::Receiver<Result<String, String>>>,
     /// Set of `"namespace/name"` keys that are currently installed locally.
     installed: HashSet<String>,
+    /// When `installed` was last rescanned from disk.
+    last_installed_scan: Instant,
     /// Whether the uninstall confirmation prompt is active.
     /// Resets to `false` on any non-`y` keypress, so stale state resolves
     /// itself on the next user interaction even if the view is re-entered
@@ -131,6 +138,7 @@ impl PackageListView {
             search_changed_at: None,
             install_rx: None,
             installed: Self::scan_installed_set(),
+            last_installed_scan: Instant::now(),
             confirming: false,
             installed_mode: false,
         };
@@ -150,6 +158,7 @@ impl PackageListView {
     fn install_selected(&mut self, namespace: String, name: String, version: String) {
         let registry = self.config.registry().to_string();
         let install_root = packages_dir();
+        let enforcement = self.config.policy.enforcement.clone();
         let (tx, rx) = oneshot::channel();
         self.install_rx = Some(rx);
         tokio::spawn(async move {
@@ -157,20 +166,56 @@ impl PackageListView {
             let installer = Installer::new(client, install_root);
             let pkg_ref = PackageRef::parse(&format!("{namespace}/{name}@{version}"))
                 .unwrap_or_else(|_| PackageRef::parse(&format!("{namespace}/{name}")).unwrap());
-            let result = installer
-                .install(&pkg_ref)
-                .await
-                .map(|(p, _manifest)| {
-                    format!(
+            let result = match installer.install(&pkg_ref).await {
+                Ok((installed_pkg, _manifest)) => {
+                    let label = format!(
                         "{} v{}",
-                        p.pkg_ref.name,
-                        p.pkg_ref
+                        installed_pkg.pkg_ref.name,
+                        installed_pkg
+                            .pkg_ref
                             .version
                             .as_ref()
                             .map_or_else(|| "?".to_string(), std::string::ToString::to_string)
-                    )
-                })
-                .map_err(|e| e.to_string());
+                    );
+                    // Symlink into tool directories and update CLAUDE.md,
+                    // mirroring the same steps as `skreg install`.
+                    if let (Some(links_path), Some(tool_dirs)) =
+                        (default_links_path(), default_tool_skill_dirs())
+                    {
+                        let ns = installed_pkg.pkg_ref.namespace.as_str();
+                        let inst_name = installed_pkg.pkg_ref.name.as_str();
+                        let inst_version = installed_pkg
+                            .install_path
+                            .file_name()
+                            .and_then(|n| n.to_str())
+                            .unwrap_or("");
+                        let mut linker = Linker::new(links_path);
+                        if let Err(e) = linker.create_symlinks(
+                            ns,
+                            inst_name,
+                            inst_version,
+                            &installed_pkg.install_path,
+                            &tool_dirs,
+                            true,
+                        ) {
+                            warn!("failed to create symlinks for {ns}/{inst_name}: {e}");
+                        }
+                        if let Some(claude_md) = default_claude_md_path() {
+                            if claude_md.parent().is_some_and(std::path::Path::exists) {
+                                let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+                                let entries = build_claude_md_entries(linker.links(), &today);
+                                if let Err(e) =
+                                    linker.write_claude_md(&claude_md, &entries, &enforcement)
+                                {
+                                    warn!("failed to update CLAUDE.md: {e}");
+                                }
+                            }
+                        }
+                    }
+                    Ok(label)
+                }
+                Err(e) => Err(e.to_string()),
+            };
             let _ = tx.send(result);
         });
     }
@@ -270,6 +315,14 @@ impl PackageListView {
 
 impl View for PackageListView {
     fn tick(&mut self) -> Option<Action> {
+        // Periodically rescan the installed set from disk so that packages
+        // installed (or uninstalled) from the detail pane are reflected here
+        // without requiring a full view reload.
+        if self.last_installed_scan.elapsed() >= Duration::from_secs(1) {
+            self.installed = Self::scan_installed_set();
+            self.last_installed_scan = Instant::now();
+        }
+
         // Debounced search: fire fetch once input settles for SEARCH_DEBOUNCE.
         if !self.installed_mode {
             if let Some(changed_at) = self.search_changed_at {

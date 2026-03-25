@@ -3394,7 +3394,7 @@ dependencies = [
 
 [[package]]
 name = "skreg-cli"
-version = "0.2.1"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -3429,6 +3429,9 @@ dependencies = [
 name = "skreg-client"
 version = "0.2.0"
 dependencies = [
+ "anyhow",
+ "chrono",
+ "dirs",
  "hex",
  "log",
  "reqwest",
@@ -3441,11 +3444,12 @@ dependencies = [
  "tempfile",
  "thiserror 1.0.69",
  "tokio",
+ "toml",
 ]
 
 [[package]]
 name = "skreg-core"
-version = "0.1.2"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -3492,10 +3496,12 @@ dependencies = [
 
 [[package]]
 name = "skreg-tui"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "anyhow",
+ "chrono",
  "dirs",
+ "log",
  "ratatui",
  "serde",
  "serde_json",
