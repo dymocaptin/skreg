@@ -9,6 +9,14 @@ use super::{Finding, Severity, StaticAnalysisError};
 /// Compiled YARA rules. Built once at worker startup.
 pub struct CompiledRules(yara_x::Rules);
 
+impl CompiledRules {
+    /// Return a reference to the inner compiled YARA rules.
+    #[must_use]
+    pub fn inner(&self) -> &yara_x::Rules {
+        &self.0
+    }
+}
+
 /// Compile all `.yar` files under `rules_dir` into a [`CompiledRules`] instance.
 ///
 /// # Errors

@@ -1,5 +1,6 @@
 //! Stage: Static Analysis — YARA + language-specific tools.
 
+pub mod hooks;
 pub mod pass1;
 pub mod pass2;
 pub mod startup;
