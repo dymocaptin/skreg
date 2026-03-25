@@ -13,7 +13,7 @@ use skreg_crypto::verifier::{RsaPssVerifier, SignatureVerifier};
 use crate::config::{default_config_path, load_config};
 use crate::installer::Installer;
 use skreg_client::linker::{
-    build_claude_md_entries, default_claude_md_path, default_links_path, default_tool_skill_dirs,
+    build_skill_entries, default_claude_md_path, default_links_path, default_tool_skill_dirs,
     Linker,
 };
 
@@ -90,8 +90,8 @@ pub async fn run_install(
         .ok_or_else(|| anyhow::anyhow!("cannot determine home directory"))?;
     if claude_md.parent().is_some_and(std::path::Path::exists) {
         let today = chrono::Local::now().format("%Y-%m-%d").to_string();
-        let entries = build_claude_md_entries(linker.links(), &today);
-        linker.write_claude_md(&claude_md, &entries, &enforcement)?;
+        let entries = build_skill_entries(linker.links(), &today);
+        linker.write_skreg_rules(&claude_md, &entries, &enforcement)?;
         println!("\nUpdated {}", claude_md.display());
     }
 

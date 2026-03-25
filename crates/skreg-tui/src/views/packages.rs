@@ -16,7 +16,7 @@ use std::sync::Arc;
 use skreg_client::client::{HttpRegistryClient, RegistryClient, SearchResult};
 use skreg_client::installer::Installer;
 use skreg_client::linker::{
-    build_claude_md_entries, default_claude_md_path, default_links_path, default_tool_skill_dirs,
+    build_skill_entries, default_claude_md_path, default_links_path, default_tool_skill_dirs,
     Linker,
 };
 use skreg_core::config::CliConfig;
@@ -203,9 +203,9 @@ impl PackageListView {
                         if let Some(claude_md) = default_claude_md_path() {
                             if claude_md.parent().is_some_and(std::path::Path::exists) {
                                 let today = chrono::Local::now().format("%Y-%m-%d").to_string();
-                                let entries = build_claude_md_entries(linker.links(), &today);
+                                let entries = build_skill_entries(linker.links(), &today);
                                 if let Err(e) =
-                                    linker.write_claude_md(&claude_md, &entries, &enforcement)
+                                    linker.write_skreg_rules(&claude_md, &entries, &enforcement)
                                 {
                                     warn!("failed to update CLAUDE.md: {e}");
                                 }

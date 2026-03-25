@@ -134,19 +134,19 @@ pub fn run_uninstall_with_root_and_links(
                     .map(|c| c.policy.enforcement)
                     .unwrap_or_default()
             };
-            let entries: Vec<crate::linker::ClaudeMdEntry> = {
+            let entries: Vec<crate::linker::SkillEntry> = {
                 let mut seen = std::collections::HashSet::new();
                 linker
                     .links()
                     .iter()
                     .filter(|r| seen.insert(r.package.clone()))
-                    .map(|r| crate::linker::ClaudeMdEntry {
+                    .map(|r| crate::linker::SkillEntry {
                         package: r.package.clone(),
                         verified_date: String::new(),
                     })
                     .collect()
             };
-            let _ = linker.write_claude_md(&claude_md, &entries, &enforcement);
+            let _ = linker.write_skreg_rules(&claude_md, &entries, &enforcement);
         }
     }
 
