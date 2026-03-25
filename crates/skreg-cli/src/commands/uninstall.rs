@@ -123,7 +123,7 @@ pub fn run_uninstall_with_root_and_links(
     let mut linker = Linker::new(links_path.to_path_buf());
     let removed_links = linker.remove_symlinks(&pkg_key)?;
 
-    // Update ~/.claude/CLAUDE.md if ~/.claude/ exists (best-effort)
+    // Update ~/.claude/CLAUDE.md and ~/.claude/rules/SKREG.md if ~/.claude/ exists (best-effort)
     let home_opt = home::home_dir();
     if let Some(ref home) = home_opt {
         let claude_md = home.join(".claude").join("CLAUDE.md");
@@ -146,7 +146,10 @@ pub fn run_uninstall_with_root_and_links(
                     })
                     .collect()
             };
-            let _ = linker.write_skreg_rules(&claude_md, &entries, &enforcement);
+            let rules_path = crate::linker::default_skreg_rules_path()
+                .unwrap_or_else(|| home.join(".claude").join("rules").join("SKREG.md"));
+            let _ = linker.write_skreg_rules(&rules_path, &entries, &enforcement);
+            let _ = linker.write_claude_md_pointer(&claude_md, &entries);
         }
     }
 
