@@ -3394,7 +3394,7 @@ dependencies = [
 
 [[package]]
 name = "skreg-cli"
-version = "0.3.1"
+version = "0.3.2"
 dependencies = [
  "anyhow",
  "chrono",
@@ -3427,7 +3427,7 @@ dependencies = [
 
 [[package]]
 name = "skreg-client"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -3496,7 +3496,7 @@ dependencies = [
 
 [[package]]
 name = "skreg-tui"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "anyhow",
  "chrono",
