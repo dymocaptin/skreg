@@ -13,8 +13,8 @@ use skreg_crypto::verifier::{RsaPssVerifier, SignatureVerifier};
 use crate::config::{default_config_path, load_config};
 use crate::installer::Installer;
 use skreg_client::linker::{
-    build_skill_entries, default_claude_md_path, default_links_path, default_tool_skill_dirs,
-    Linker,
+    build_skill_entries, default_claude_md_path, default_links_path, default_skreg_rules_path,
+    default_tool_skill_dirs, Linker,
 };
 
 fn default_install_root() -> Result<PathBuf> {
@@ -85,14 +85,18 @@ pub async fn run_install(
         }
     }
 
-    // Update ~/.claude/CLAUDE.md if ~/.claude/ exists
+    // Update ~/.claude/CLAUDE.md and ~/.claude/rules/SKREG.md if ~/.claude/ exists
     let claude_md = default_claude_md_path()
         .ok_or_else(|| anyhow::anyhow!("cannot determine home directory"))?;
     if claude_md.parent().is_some_and(std::path::Path::exists) {
         let today = chrono::Local::now().format("%Y-%m-%d").to_string();
         let entries = build_skill_entries(linker.links(), &today);
-        linker.write_skreg_rules(&claude_md, &entries, &enforcement)?;
-        println!("\nUpdated {}", claude_md.display());
+        let rules_path = default_skreg_rules_path()
+            .ok_or_else(|| anyhow::anyhow!("cannot determine home directory"))?;
+        linker.write_skreg_rules(&rules_path, &entries, &enforcement)?;
+        linker.write_claude_md_pointer(&claude_md, &entries)?;
+        println!("\nUpdated {}", rules_path.display());
+        println!("Updated {}", claude_md.display());
     }
 
     let tier = if manifest.cert_chain_pem.len() >= 2 {
