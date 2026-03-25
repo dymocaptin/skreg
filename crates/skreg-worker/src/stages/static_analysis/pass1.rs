@@ -286,4 +286,17 @@ mod tests {
             "perl -e should trigger YARA: {findings:?}"
         );
     }
+
+    #[test]
+    fn destructive_ops_triggers_yara() {
+        let rules = compiled();
+        let fixture =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/bad_destructive.sh");
+        let findings =
+            run_pass1(&fixture, Path::new("scripts/bad_destructive.sh"), &rules).unwrap();
+        assert!(
+            findings.iter().any(|f| f.tool == "yara"),
+            "rm -rf should trigger YARA: {findings:?}"
+        );
+    }
 }
