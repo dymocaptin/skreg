@@ -21,6 +21,10 @@ eula = false
 name = "skreg-worker"
 path = "src/main.rs"
 
+[[bin]]
+name = "validate-packages"
+path = "src/bin/validate_packages.rs"
+
 [lib]
 name = "skreg_worker"
 path = "src/lib.rs"
