@@ -136,3 +136,107 @@ fn make_malicious_hook(dir: &Path, command: &str) {
     )
     .unwrap();
 }
+
+// ── Clean fixtures ────────────────────────────────────────────────────────────
+
+#[test]
+fn clean_minimal_passes() {
+    let dir = TempDir::new().unwrap();
+    make_valid_base(dir.path());
+    assert_no_blocking(&dir);
+}
+
+#[test]
+fn clean_with_references_passes() {
+    let dir = TempDir::new().unwrap();
+    make_valid_base(dir.path());
+    fs::create_dir(dir.path().join("references")).unwrap();
+    fs::write(
+        dir.path().join("references/setup.md"),
+        "# Setup Guide\nInstall dependencies using your system package manager.\nConfigure your environment by editing the provided config file.\n",
+    )
+    .unwrap();
+    assert_no_blocking(&dir);
+}
+
+#[test]
+fn clean_with_python_script_passes() {
+    let dir = TempDir::new().unwrap();
+    make_valid_base(dir.path());
+    add_script(
+        dir.path(),
+        "check.py",
+        b"import sys\n\ndef check_version():\n    \"\"\"Verify Python version is 3.8+.\"\"\"\n    if sys.version_info < (3, 8):\n        print('Python 3.8+ required')\n        return False\n    return True\n\nif __name__ == '__main__':\n    if check_version():\n        print('Requirements met')\n",
+    );
+    assert_no_blocking(&dir);
+}
+
+#[test]
+fn clean_with_shell_script_passes() {
+    let dir = TempDir::new().unwrap();
+    make_valid_base(dir.path());
+    add_script(
+        dir.path(),
+        "verify.sh",
+        b"#!/bin/sh\nset -e\necho 'Checking environment...'\nif [ -z \"$HOME\" ]; then\n    echo 'HOME is not set'\n    exit 1\nfi\necho 'Environment looks good.'\n",
+    );
+    assert_no_blocking(&dir);
+}
+
+#[test]
+fn clean_with_assets_passes() {
+    let dir = TempDir::new().unwrap();
+    make_valid_base(dir.path());
+    fs::create_dir(dir.path().join("assets")).unwrap();
+    // Minimal valid PNG header
+    fs::write(
+        dir.path().join("assets/diagram.png"),
+        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x02",
+    )
+    .unwrap();
+    fs::write(
+        dir.path().join("assets/notes.txt"),
+        b"Architecture notes.\n",
+    )
+    .unwrap();
+    assert_no_blocking(&dir);
+}
+
+#[test]
+fn clean_with_benign_hook_passes() {
+    let dir = TempDir::new().unwrap();
+    fs::write(
+        dir.path().join("SKILL.md"),
+        "---\nname: test-skill\ndescription: A test fixture package for integration testing.\nhooks:\n  PreToolUse:\n    - matcher: Bash\n      hooks:\n        - type: command\n          command: \"bash scripts/verify.sh\"\n---\n# Test\n",
+    )
+    .unwrap();
+    fs::write(
+        dir.path().join("manifest.json"),
+        r#"{"name":"test-skill","version":"1.0.0","description":"A test fixture package for integration testing."}"#,
+    )
+    .unwrap();
+    add_script(dir.path(), "verify.sh", b"#!/bin/sh\necho 'hook ran'\n");
+    assert_no_blocking(&dir);
+}
+
+#[test]
+fn clean_full_package_passes() {
+    let dir = TempDir::new().unwrap();
+    make_valid_base(dir.path());
+    fs::write(dir.path().join("LICENSE"), b"Apache License 2.0\n").unwrap();
+    fs::create_dir(dir.path().join("references")).unwrap();
+    fs::write(
+        dir.path().join("references/guide.md"),
+        b"# Guide\nFollow these steps to configure the tool.\n",
+    )
+    .unwrap();
+    fs::create_dir(dir.path().join("assets")).unwrap();
+    fs::write(
+        dir.path().join("assets/overview.txt"),
+        b"Overview of the skill.\n",
+    )
+    .unwrap();
+    add_script(dir.path(), "setup.py", b"print('setup complete')\n");
+    add_script(dir.path(), "check.sh", b"#!/bin/sh\necho 'ok'\n");
+    assert_no_blocking(&dir);
+}
