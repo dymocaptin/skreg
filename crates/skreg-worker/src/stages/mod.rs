@@ -3,12 +3,12 @@
 pub mod content;
 pub mod safety;
 pub mod signing;
+pub mod static_analysis;
 pub mod structure;
 pub mod verify_publisher;
 
 use anyhow::Result;
 use aws_sdk_s3::Client as S3Client;
-use aws_sdk_secretsmanager::Client as SmClient;
 use sqlx::PgPool;
 use uuid::Uuid;
 
@@ -23,9 +23,8 @@ pub async fn run_pipeline(
     job_id: Uuid,
     pool: &PgPool,
     s3: &S3Client,
-    sm: &SmClient,
     bucket: &str,
-    ca_secret_arn: &str,
+    registry_ca_key_pem: &str,
 ) -> Result<()> {
     // Load job + version info (including namespace slug for Stage 4)
     let row = sqlx::query_as::<_, (Uuid, String, String, String, String, String)>(
@@ -58,6 +57,46 @@ pub async fn run_pipeline(
     // Stage 2
     content::check_content(tmp.path()).map_err(|e| anyhow::anyhow!("Stage 2 failed: {e}"))?;
 
+    // Stage 2.5 — static analysis
+    // Skipped when SKREG_SKIP_STATIC_ANALYSIS=true (dev fast-loop mode).
+    if std::env::var("SKREG_SKIP_STATIC_ANALYSIS").as_deref() == Ok("true") {
+        log::info!("Stage 2.5 skipped (SKREG_SKIP_STATIC_ANALYSIS=true)");
+    } else {
+        let rules_dir = std::path::PathBuf::from(
+            std::env::var("SKREG_YARA_RULES_DIR")
+                .unwrap_or_else(|_| "crates/skreg-worker/rules".into()),
+        );
+        let compiled_rules = static_analysis::startup::check_yara_rules(&rules_dir)
+            .map_err(|e| anyhow::anyhow!("YARA compilation failed: {e}"))?;
+        let tracee_available = std::path::Path::new("/var/run/tracee/tracee.sock").exists();
+
+        let sa_findings =
+            static_analysis::run_static_analysis(tmp.path(), &compiled_rules, tracee_available)
+                .map_err(|e| anyhow::anyhow!("Stage 2.5 failed: {e}"))?;
+
+        if sa_findings.iter().any(|f| f.severity.is_blocking()) {
+            let results = serde_json::json!({
+                "status": "rejected",
+                "stage": "static_analysis",
+                "findings": sa_findings.iter().map(|f| serde_json::json!({
+                    "file": f.file,
+                    "tool": f.tool,
+                    "rule_id": f.rule_id,
+                    "severity": format!("{:?}", f.severity),
+                    "message": f.message,
+                })).collect::<Vec<_>>()
+            });
+            sqlx::query(
+                "UPDATE vetting_jobs SET status = 'rejected', completed_at = now(), results = $1 WHERE id = $2"
+            )
+            .bind(sqlx::types::Json(results))
+            .bind(job_id)
+            .execute(pool)
+            .await?;
+            return Ok(());
+        }
+    }
+
     // Stage 3 — load existing names and yanked versions from DB
     let existing_names: Vec<String> = sqlx::query_scalar("SELECT name FROM packages")
         .fetch_all(pool)
@@ -87,7 +126,7 @@ pub async fn run_pipeline(
     .map_err(|e| anyhow::anyhow!("Stage 4 failed: {e}"))?;
 
     // Stage 5 — sign with registry CA and store .sig in S3
-    let sig_path = signing::run_signing(&sha256, &storage_path, s3, sm, bucket, ca_secret_arn)
+    let sig_path = signing::run_signing(&sha256, &storage_path, s3, bucket, registry_ca_key_pem)
         .await
         .map_err(|e| anyhow::anyhow!("Stage 5 failed: {e}"))?;
 

@@ -14,4 +14,10 @@ pub enum PackError {
     /// `manifest.json` could not be parsed.
     #[error("manifest.json parse error: {0}")]
     ManifestParse(String),
+    /// A tar entry is a symlink, which is not allowed in skill packages.
+    #[error("symlink found in package: '{0}'")]
+    Symlink(String),
+    /// A tar entry path contains '..' or an absolute path component.
+    #[error("path traversal attempt in package entry: '{0}'")]
+    PathTraversal(String),
 }

@@ -4,6 +4,7 @@
 
 pub mod config;
 pub mod installed;
+pub mod limits;
 pub mod manifest;
 pub mod package_ref;
 pub mod types;

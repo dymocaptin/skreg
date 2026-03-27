@@ -99,10 +99,11 @@ fn generate_new_key(namespace: &str) -> Result<(String, String)> {
 /// # Errors
 ///
 /// Returns an error if config, keys, or the registry request fails.
-pub async fn run_rotate(new_key_override: Option<&Path>) -> Result<()> {
+pub async fn run_rotate(new_key_override: Option<&Path>, context: Option<&str>) -> Result<()> {
     let cfg_path = default_config_path();
     let cfg =
         load_config(&cfg_path).context("not logged in — run `skreg login <namespace>` first")?;
+    let cfg = crate::config::apply_context(cfg, context)?;
 
     let namespace = cfg.namespace().to_owned();
     let api_key = cfg.api_key().to_owned();

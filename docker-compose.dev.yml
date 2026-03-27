@@ -1,0 +1,106 @@
+# docker-compose.dev.yml
+# Local dev stack for skreg. Run: docker compose -f docker-compose.dev.yml up --build
+# Prerequisites: run ./scripts/dev-setup.sh once to generate ~/.skreg/dev/ PKI.
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: skreg
+      POSTGRES_PASSWORD: skreg
+      POSTGRES_DB: skreg
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U skreg"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - miniodata:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio-init:
+    image: minio/mc
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+        mc alias set local http://minio:9000 minioadmin minioadmin &&
+        mc mb --ignore-existing local/skreg-dev
+      "
+    restart: on-failure
+
+  postgres-seed:
+    image: postgres:16
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./scripts/seed-dev.sql:/seed.sql:ro
+      - "${HOME}/.skreg/dev:/run/dev-pki:ro"
+    entrypoint: >
+      /bin/sh -c "
+        DEV_KEY_HASH=$$(cat /run/dev-pki/api-key | sha256sum | cut -d' ' -f1) &&
+        psql postgres://skreg:skreg@postgres:5432/skreg -v dev_key_hash=\"$$DEV_KEY_HASH\" -f /seed.sql
+      "
+    restart: on-failure
+
+  skreg-api:
+    build:
+      context: .
+      dockerfile: crates/skreg-api/Dockerfile
+    depends_on:
+      postgres-seed:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
+    env_file: .env.dev
+    volumes:
+      - "${HOME}/.skreg/dev:/run/dev-pki:ro"
+    entrypoint: >
+      /bin/sh -c "
+        export PUBLISHER_CA_KEY_PEM=$$(cat /run/dev-pki/publisher-ca.key) &&
+        export PUBLISHER_CA_CERT_PEM=$$(cat /run/dev-pki/publisher-ca.pem) &&
+        exec /usr/local/bin/skreg-api
+      "
+    ports:
+      - "8080:8080"
+
+  skreg-worker:
+    build:
+      context: .
+      dockerfile: crates/skreg-worker/Dockerfile
+    depends_on:
+      postgres-seed:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
+    env_file: .env.dev
+    volumes:
+      - "${HOME}/.skreg/dev:/run/dev-pki:ro"
+    entrypoint: >
+      /bin/sh -c "
+        export REGISTRY_CA_KEY_PEM=$$(cat /run/dev-pki/registry-ca.key) &&
+        exec /usr/local/bin/skreg-worker
+      "
+
+volumes:
+  pgdata:
+  miniodata:

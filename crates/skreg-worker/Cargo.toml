@@ -21,6 +21,10 @@ eula = false
 name = "skreg-worker"
 path = "src/main.rs"
 
+[[bin]]
+name = "validate-packages"
+path = "src/bin/validate_packages.rs"
+
 [lib]
 name = "skreg_worker"
 path = "src/lib.rs"
@@ -40,6 +44,7 @@ env_logger      = { workspace = true }
 uuid            = { workspace = true }
 chrono          = { workspace = true }
 walkdir                 = "2"
+serde_yaml              = "0.9"
 aws-config              = { version = "1", features = ["behavior-version-latest"] }
 aws-sdk-s3              = "1"
 aws-sdk-secretsmanager  = "1"
@@ -50,5 +55,10 @@ x509-cert               = { workspace = true }
 rand                    = "0.8"
 rsa                     = { version = "0.9", features = ["sha2", "pem"] }
 tempfile                = "3"
+yara-x = "0.12"
+infer = "0.16"
+
+[features]
+integration = []
 
 [dev-dependencies]
