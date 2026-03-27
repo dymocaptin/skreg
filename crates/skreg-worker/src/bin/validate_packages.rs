@@ -6,16 +6,19 @@
 //!   cargo run -p skreg-worker --bin validate-packages -- <dir>
 //!   cargo run -p skreg-worker --bin validate-packages -- --skip-pass2 <dir>
 //!
-//! SKREG_YARA_RULES_DIR env var overrides the default rules path.
+//! Environment variables:
+//!   SKREG_YARA_RULES_DIR   Override the default YARA rules path
+//!                          (default: crates/skreg-worker/rules)
+//!   SKREG_TRACEE_SOCKET    Override the tracee eBPF socket path
+//!                          (default: /var/run/tracee/tracee.sock)
 
 use std::path::{Path, PathBuf};
 
 use skreg_worker::stages::{
     content::check_content,
     static_analysis::{
-        hooks,
-        pass1::{self, compile_rules, run_pass1},
-        run_static_analysis, Finding, StaticAnalysisError,
+        pass1::{self, compile_rules},
+        run_static_analysis, run_yara_and_hooks, Finding,
     },
     structure::check_structure,
 };
@@ -27,10 +30,21 @@ fn print_usage(prog: &str) {
     eprintln!("--skip-pass2  Skip subprocess tools (shellcheck, bandit, semgrep, tracee).");
     eprintln!("              Prints a warning. YARA + structure + content still run.");
     eprintln!();
-    eprintln!("Set SKREG_YARA_RULES_DIR to override the default rules path.");
+    eprintln!("Environment:");
+    eprintln!("  SKREG_YARA_RULES_DIR  Override default YARA rules path");
+    eprintln!("  SKREG_TRACEE_SOCKET   Override tracee eBPF socket path");
+}
+
+fn tracee_socket_path() -> PathBuf {
+    PathBuf::from(
+        std::env::var("SKREG_TRACEE_SOCKET")
+            .unwrap_or_else(|_| "/var/run/tracee/tracee.sock".into()),
+    )
 }
 
 fn main() {
+    env_logger::init();
+
     let args: Vec<String> = std::env::args().collect();
     let prog = &args[0];
 
@@ -126,9 +140,9 @@ fn validate_one(path: &Path, rules: &pass1::CompiledRules, skip_pass2: bool) -> 
     // rather than run_static_analysis, which hard-errors on .sh/.rb scripts
     // when tracee is unavailable.
     let findings: Vec<Finding> = if skip_pass2 {
-        run_yara_only(tmp.path(), rules).map_err(|e| format!("stage 2.5 (yara): {e}"))?
+        run_yara_and_hooks(tmp.path(), rules).map_err(|e| format!("stage 2.5 (yara): {e}"))?
     } else {
-        let tracee = Path::new("/var/run/tracee/tracee.sock").exists();
+        let tracee = tracee_socket_path().exists();
         run_static_analysis(tmp.path(), rules, tracee)
             .map_err(|e| format!("stage 2.5 (static analysis): {e}"))?
     };
@@ -147,37 +161,4 @@ fn validate_one(path: &Path, rules: &pass1::CompiledRules, skip_pass2: bool) -> 
     }
 
     Ok(())
-}
-
-/// Run Pass 1 (YARA) and hook command scan on all files without invoking
-/// Pass 2 subprocess tools. Used when --skip-pass2 is active.
-fn run_yara_only(
-    path: &Path,
-    rules: &pass1::CompiledRules,
-) -> Result<Vec<Finding>, StaticAnalysisError> {
-    let mut all_findings: Vec<Finding> = Vec::new();
-
-    for entry in walkdir::WalkDir::new(path).follow_links(false) {
-        // walkdir::Error -> std::io::Error -> StaticAnalysisError::Io via #[from]
-        let entry = entry.map_err(|e| std::io::Error::other(e.to_string()))?;
-        if entry.file_type().is_dir() {
-            continue;
-        }
-        let abs = entry.path();
-        let rel = abs
-            .strip_prefix(path)
-            .map_err(|e| std::io::Error::other(e.to_string()))?;
-
-        let file_findings = run_pass1(abs, rel, rules)?;
-        let blocking = file_findings.iter().any(|f| f.severity.is_blocking());
-        all_findings.extend(file_findings);
-        if blocking {
-            return Ok(all_findings);
-        }
-    }
-
-    let hook_findings = hooks::scan_hook_commands(path, rules)?;
-    all_findings.extend(hook_findings);
-
-    Ok(all_findings)
 }

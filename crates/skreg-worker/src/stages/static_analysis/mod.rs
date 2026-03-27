@@ -136,6 +136,49 @@ pub fn run_static_analysis(
     Ok(all_findings)
 }
 
+/// Run Pass 1 (YARA magic-byte check + YARA rules) and hook command scan on
+/// every file in `path`, without invoking Pass 2 subprocess tools.
+///
+/// Use this when the full subprocess toolchain (shellcheck, bandit, semgrep,
+/// tracee) is unavailable. Structure and content stages are not run here —
+/// callers are responsible for running those first.
+///
+/// Returns the full list of findings; callers decide whether to reject based
+/// on blocking severity.
+///
+/// # Errors
+///
+/// Returns `Err` on I/O failure, YARA scanner error, or walkdir error.
+pub fn run_yara_and_hooks(
+    path: &Path,
+    rules: &pass1::CompiledRules,
+) -> Result<Vec<Finding>, StaticAnalysisError> {
+    let mut all_findings: Vec<Finding> = Vec::new();
+
+    for entry in walkdir::WalkDir::new(path).follow_links(false) {
+        let entry = entry.map_err(|e| std::io::Error::other(e.to_string()))?;
+        if entry.file_type().is_dir() {
+            continue;
+        }
+        let abs = entry.path();
+        let rel = abs
+            .strip_prefix(path)
+            .map_err(|e| std::io::Error::other(e.to_string()))?;
+
+        let file_findings = pass1::run_pass1(abs, rel, rules)?;
+        let blocking = file_findings.iter().any(|f| f.severity.is_blocking());
+        all_findings.extend(file_findings);
+        if blocking {
+            return Ok(all_findings);
+        }
+    }
+
+    let hook_findings = hooks::scan_hook_commands(path, rules)?;
+    all_findings.extend(hook_findings);
+
+    Ok(all_findings)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

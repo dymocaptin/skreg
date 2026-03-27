@@ -6,7 +6,6 @@
 //!
 //! Run with: cargo test --features integration -p skreg-worker corpus
 #![cfg(feature = "integration")]
-#![allow(dead_code)]
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -20,26 +19,32 @@ use skreg_worker::stages::{
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+#[allow(dead_code)]
 fn rules_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("rules")
 }
 
+#[allow(dead_code)]
 fn compiled_rules() -> pass1::CompiledRules {
     pass1::compile_rules(&rules_dir()).expect("YARA rules must compile in integration env")
 }
 
 /// Run all three stages against `dir`. Panics if structure or content errors
 /// (fixture is misconfigured). Returns static analysis findings.
+#[allow(dead_code)]
 fn run_all_stages(dir: &Path) -> Vec<Finding> {
     check_structure(dir).expect("structure stage errored — check fixture setup");
     check_content(dir).expect("content stage errored — check fixture setup");
     let rules = compiled_rules();
-    let tracee = Path::new("/var/run/tracee/tracee.sock").exists();
+    let tracee = std::env::var("SKREG_TRACEE_SOCKET")
+        .unwrap_or_else(|_| "/var/run/tracee/tracee.sock".into());
+    let tracee = Path::new(&tracee).exists();
     run_static_analysis(dir, &rules, tracee)
         .expect("static_analysis infrastructure error — check tool availability")
 }
 
 /// Assert no blocking findings for a clean fixture.
+#[allow(dead_code)]
 fn assert_no_blocking(dir: &TempDir) {
     let findings = run_all_stages(dir.path());
     let blocking: Vec<_> = findings
@@ -53,6 +58,7 @@ fn assert_no_blocking(dir: &TempDir) {
 }
 
 /// Assert the pipeline produces at least one blocking finding matching `rule_id`.
+#[allow(dead_code)]
 fn assert_blocked_by(dir: &TempDir, rule_id: &str) {
     let findings = run_all_stages(dir.path());
     assert!(
@@ -66,6 +72,7 @@ fn assert_blocked_by(dir: &TempDir, rule_id: &str) {
 /// Assert the pipeline produces at least one blocking finding where
 /// `rule_id` starts with `prefix`. Used for magic-byte findings whose
 /// rule_id includes the file extension (e.g. "binary_disguised_elf").
+#[allow(dead_code)]
 fn assert_blocked_by_prefix(dir: &TempDir, prefix: &str) {
     let findings = run_all_stages(dir.path());
     assert!(
@@ -77,6 +84,7 @@ fn assert_blocked_by_prefix(dir: &TempDir, prefix: &str) {
 }
 
 /// Assert the hook command scanner produces at least one blocking finding.
+#[allow(dead_code)]
 fn assert_hook_blocked_by(dir: &TempDir, rule_id: &str) {
     let findings = run_all_stages(dir.path());
     assert!(
@@ -90,6 +98,7 @@ fn assert_hook_blocked_by(dir: &TempDir, rule_id: &str) {
 // ── Fixture builders ─────────────────────────────────────────────────────────
 
 /// Write a valid base package (passes all stages on its own).
+#[allow(dead_code)]
 fn make_valid_base(dir: &Path) {
     fs::write(
         dir.join("SKILL.md"),
@@ -105,6 +114,7 @@ fn make_valid_base(dir: &Path) {
 
 /// Write a malicious base package. The SKILL.md is valid so structure and
 /// content stages pass; malicious content goes in scripts/ or hooks.
+#[allow(dead_code)]
 fn make_malicious_base(dir: &Path) {
     fs::write(
         dir.join("SKILL.md"),
@@ -119,12 +129,14 @@ fn make_malicious_base(dir: &Path) {
 }
 
 /// Write `content` to `scripts/<filename>` inside `dir`.
+#[allow(dead_code)]
 fn add_script(dir: &Path, filename: &str, content: &[u8]) {
     fs::create_dir_all(dir.join("scripts")).unwrap();
     fs::write(dir.join("scripts").join(filename), content).unwrap();
 }
 
 /// Write a SKILL.md with a hooks block containing `command`.
+#[allow(dead_code)]
 fn make_malicious_hook(dir: &Path, command: &str) {
     let skill_md = format!(
         "---\nname: test-skill\ndescription: FAKE MALICIOUS TEST FIXTURE — DO NOT PUBLISH.\nhooks:\n  PreToolUse:\n    - matcher: Bash\n      hooks:\n        - type: command\n          command: \"{command}\"\n---\n> **FAKE TEST FIXTURE — NOT A REAL SKILL — DO NOT PUBLISH**\n"
