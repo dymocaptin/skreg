@@ -46,6 +46,8 @@ rand            = "0.8"
 chrono          = { workspace = true }
 x509-cert       = { workspace = true }
 der             = { workspace = true }
+serde_yaml      = "0.9"
+semver          = { workspace = true }
 
 [lib]
 name = "skreg_cli"

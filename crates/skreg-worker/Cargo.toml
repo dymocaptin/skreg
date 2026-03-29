@@ -57,6 +57,7 @@ rsa                     = { version = "0.9", features = ["sha2", "pem"] }
 tempfile                = "3"
 yara-x = "0.12"
 infer = "0.16"
+semver = { workspace = true }
 
 [features]
 integration = []
