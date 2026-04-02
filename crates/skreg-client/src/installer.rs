@@ -12,7 +12,7 @@ use skreg_core::manifest::Manifest;
 use skreg_core::package_ref::PackageRef;
 use skreg_core::types::Sha256Digest;
 use skreg_crypto::verifier::SignatureVerifier;
-use skreg_pack::unpack::unpack_tarball;
+use skreg_pack::unpack::unpack_tarball_skip_manifest;
 
 use crate::client::RegistryClient;
 use crate::error::ClientError;
@@ -140,7 +140,7 @@ impl Installer {
 
         let tmp = tempfile::NamedTempFile::new()?;
         std::fs::write(tmp.path(), &resolved.tarball)?;
-        unpack_tarball(tmp.path(), &install_path)?;
+        unpack_tarball_skip_manifest(tmp.path(), &install_path)?;
 
         info!("installed {} to {}", pkg_ref, install_path.display());
 
