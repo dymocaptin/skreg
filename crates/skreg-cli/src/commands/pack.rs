@@ -1,6 +1,6 @@
 //! `skreg pack` — create a .skill tarball from the current directory.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use sha2::{Digest, Sha256};
@@ -25,7 +25,7 @@ pub fn run_pack(
     dir: &Path,
     key_override: Option<&Path>,
     cert_override: Option<&Path>,
-) -> Result<()> {
+) -> Result<PathBuf> {
     // Step 1: Read SKILL.md frontmatter.
     let skill_md = dir.join("SKILL.md");
     let meta = crate::frontmatter::read_skill_metadata(&skill_md)?;
@@ -91,7 +91,7 @@ pub fn run_pack(
     skreg_pack::pack::pack_with_manifest(dir, &signed, &output)?;
 
     println!("packed: {}", output.display());
-    Ok(())
+    Ok(output)
 }
 
 /// Resolve the namespace from the CLI config, falling back to `"local"` when
@@ -131,9 +131,8 @@ mod tests {
         fs::write(&key_path, &keys.private_key_pem).unwrap();
         fs::write(&cert_path, &keys.cert_pem).unwrap();
 
-        run_pack(dir.path(), Some(&key_path), Some(&cert_path)).unwrap();
+        let out = run_pack(dir.path(), Some(&key_path), Some(&cert_path)).unwrap();
 
-        let out = dir.path().join("test-1.0.0.skill");
         assert!(out.exists(), "expected {}", out.display());
         assert!(out.metadata().unwrap().len() > 0);
     }

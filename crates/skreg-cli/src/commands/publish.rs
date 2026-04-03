@@ -37,13 +37,19 @@ pub async fn run_publish(context: Option<&str>) -> Result<()> {
 
     let cwd = std::env::current_dir()?;
 
-    let meta = crate::frontmatter::read_skill_metadata(&cwd.join("SKILL.md"))
-        .context("failed to read SKILL.md metadata")?;
-    let name = meta.name.as_str();
-    let version = meta.version.to_string();
-
-    let skill_file = cwd.join(format!("{name}-{version}.skill"));
-    run_pack(&cwd, None, None)?;
+    let skill_file = run_pack(&cwd, None, None)?;
+    let name = skill_file
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .and_then(|s| s.rsplit_once('-'))
+        .map(|(n, _)| n.to_owned())
+        .context("could not derive package name from packed skill filename")?;
+    let version = skill_file
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .and_then(|s| s.rsplit_once('-'))
+        .map(|(_, v)| v.to_owned())
+        .context("could not derive version from packed skill filename")?;
 
     let bytes = std::fs::read(&skill_file)?;
     let client = reqwest::Client::new();
