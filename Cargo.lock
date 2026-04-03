@@ -4347,7 +4347,7 @@ dependencies = [
 
 [[package]]
 name = "skreg-cli"
-version = "0.3.2"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4382,7 +4382,7 @@ dependencies = [
 
 [[package]]
 name = "skreg-client"
-version = "0.4.0"
+version = "0.4.1"
 dependencies = [
  "anyhow",
  "chrono",
@@ -4436,7 +4436,7 @@ dependencies = [
 
 [[package]]
 name = "skreg-pack"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "flate2",
