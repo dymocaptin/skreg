@@ -4363,8 +4363,10 @@ dependencies = [
  "rcgen",
  "reqwest",
  "rsa",
+ "semver",
  "serde",
  "serde_json",
+ "serde_yaml",
  "sha2",
  "skreg-client",
  "skreg-core",
@@ -4436,8 +4438,10 @@ dependencies = [
 name = "skreg-pack"
 version = "0.2.0"
 dependencies = [
+ "anyhow",
  "flate2",
  "log",
+ "semver",
  "serde",
  "serde_json",
  "sha2",
@@ -4480,6 +4484,7 @@ dependencies = [
  "log",
  "rand 0.8.5",
  "rsa",
+ "semver",
  "serde",
  "serde_json",
  "serde_yaml",

@@ -6,6 +6,8 @@
 pub mod commands;
 /// CLI configuration — read/write `~/.skreg/config.toml`.
 pub mod config;
+/// SKILL.md frontmatter parser — extracts metadata from YAML frontmatter blocks.
+pub mod frontmatter;
 /// Publisher key management — auto-keygen and RSA-PSS signing.
 pub mod keys;
 /// Symlink creation, removal, and tracking in `~/.skreg/links.toml`.

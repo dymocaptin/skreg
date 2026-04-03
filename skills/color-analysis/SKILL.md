@@ -1,6 +1,8 @@
 ---
 name: color-analysis
 description: Analyzes the dominant colors in any image file, producing a ranked color palette with hex codes, RGB/HSL values, human-readable color names, and percentage breakdowns.
+metadata:
+  version: "1.0.0"
 ---
 
 # Color Analysis

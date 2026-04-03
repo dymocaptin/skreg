@@ -37,14 +37,19 @@ pub async fn run_publish(context: Option<&str>) -> Result<()> {
 
     let cwd = std::env::current_dir()?;
 
-    let manifest_raw = std::fs::read_to_string(cwd.join("manifest.json"))
-        .context("manifest.json not found in current directory")?;
-    let manifest: serde_json::Value = serde_json::from_str(&manifest_raw)?;
-    let name = manifest["name"].as_str().unwrap_or("skill");
-    let version = manifest["version"].as_str().unwrap_or("0.0.0");
-
-    let skill_file = cwd.join(format!("{name}-{version}.skill"));
-    run_pack(&cwd, None, None)?;
+    let skill_file = run_pack(&cwd, None, None)?;
+    let name = skill_file
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .and_then(|s| s.rsplit_once('-'))
+        .map(|(n, _)| n.to_owned())
+        .context("could not derive package name from packed skill filename")?;
+    let version = skill_file
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .and_then(|s| s.rsplit_once('-'))
+        .map(|(_, v)| v.to_owned())
+        .context("could not derive version from packed skill filename")?;
 
     let bytes = std::fs::read(&skill_file)?;
     let client = reqwest::Client::new();

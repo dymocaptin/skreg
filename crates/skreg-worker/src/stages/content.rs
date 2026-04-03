@@ -35,17 +35,37 @@ pub enum ContentError {
     Io(#[from] std::io::Error),
 }
 
+/// Frontmatter structure for deserializing SKILL.md YAML.
+#[derive(serde::Deserialize)]
+struct Frontmatter {
+    description: Option<String>,
+}
+
+/// Extract the `description` field from SKILL.md YAML frontmatter.
+/// Returns `None` if frontmatter is absent, malformed, or description is missing.
+fn extract_frontmatter_description(content: &str) -> Option<String> {
+    if !content.starts_with("---") {
+        return None;
+    }
+    let after_open = &content[3..];
+    let close_pos = after_open
+        .find("\n---\n")
+        .or_else(|| after_open.strip_suffix("\n---").map(str::len))?;
+    let yaml_block = &after_open[..close_pos];
+
+    let fm: Frontmatter = serde_yaml::from_str(yaml_block).ok()?;
+    fm.description.filter(|s| !s.is_empty())
+}
+
 /// Run Stage 2 content checks on an unpacked skill directory.
 ///
 /// # Errors
 ///
 /// Returns a [`ContentError`] if any check fails.
 pub fn check_content(path: &Path) -> Result<(), ContentError> {
-    // 1. Description length from manifest
-    let manifest_raw = std::fs::read_to_string(path.join("manifest.json"))?;
-    let manifest: serde_json::Value =
-        serde_json::from_str(&manifest_raw).map_err(|e| std::io::Error::other(e.to_string()))?;
-    let desc = manifest["description"].as_str().unwrap_or("");
+    // 1. Description length from SKILL.md frontmatter
+    let skill_md = std::fs::read_to_string(path.join("SKILL.md"))?;
+    let desc = extract_frontmatter_description(&skill_md).unwrap_or_default();
     if desc.len() < MIN_DESCRIPTION_LEN {
         return Err(ContentError::DescriptionTooShort);
     }
@@ -97,11 +117,6 @@ mod tests {
 
     fn make_skill(dir: &std::path::Path, description: &str) {
         fs::write(
-            dir.join("manifest.json"),
-            format!(r#"{{"name":"test","version":"1.0.0","description":"{description}"}}"#),
-        )
-        .unwrap();
-        fs::write(
             dir.join("SKILL.md"),
             format!("---\ndescription: {description}\n---\n"),
         )
@@ -123,7 +138,11 @@ mod tests {
             dir.path(),
             "A description that is long enough to pass the length check here",
         );
-        fs::write(dir.path().join("SKILL.md"), "password=hunter2").unwrap();
+        fs::write(
+            dir.path().join("SKILL.md"),
+            "---\ndescription: A description that is long enough to pass the length check here\n---\n\npassword=hunter2",
+        )
+        .unwrap();
         let err = check_content(dir.path()).unwrap_err();
         assert!(matches!(err, ContentError::HardcodedSecret(_)));
     }

@@ -62,6 +62,42 @@ pub fn unpack_tarball(tarball_path: &Path, dest_dir: &Path) -> Result<(), PackEr
     Ok(())
 }
 
+/// Unpack a `.skill` tarball into `dest_dir`, skipping any `manifest.json` entry.
+///
+/// Installed skill directories will be clean agentskills-spec-compliant trees.
+/// The destination directory is created if it does not exist.
+/// Existing files in `dest_dir` are overwritten.
+///
+/// # Errors
+///
+/// Returns [`PackError::Symlink`] if any entry is a symlink.
+/// Returns [`PackError::PathTraversal`] if any entry path contains `..` or an absolute component.
+/// Returns [`PackError::Io`] on any other I/O or decompression failure.
+pub fn unpack_tarball_skip_manifest(tarball_path: &Path, dest_dir: &Path) -> Result<(), PackError> {
+    std::fs::create_dir_all(dest_dir)?;
+    let file = File::open(tarball_path)?;
+    let decoder = GzDecoder::new(file);
+    let mut archive = tar::Archive::new(decoder);
+
+    for entry in archive.entries()? {
+        let mut entry = entry?;
+        let path = validate_entry(&entry)?;
+
+        // Skip top-level manifest.json
+        if path.file_name().and_then(|n| n.to_str()) == Some("manifest.json")
+            && path.components().count() == 1
+        {
+            debug!("skipping: {}", path.display());
+            continue;
+        }
+
+        debug!("unpacking: {}", path.display());
+        entry.unpack_in(dest_dir)?;
+    }
+
+    Ok(())
+}
+
 /// Unpack a `.skill` tarball from an in-memory byte slice into a new temporary directory.
 ///
 /// Rejects any entry that is a symlink or contains path traversal components (`..` or
@@ -229,5 +265,42 @@ mod tests {
             ("manifest.json", b"{}", tar::EntryType::Regular),
         ]);
         assert!(unpack_to_tempdir(&bytes).is_ok());
+    }
+
+    #[test]
+    fn skip_manifest_strips_manifest_json() {
+        use crate::pack::pack_with_manifest;
+        use semver::Version;
+        use skreg_core::manifest::Manifest;
+        use skreg_core::types::{Namespace, PackageName, Sha256Digest};
+
+        let src = tempfile::tempdir().unwrap();
+        std::fs::write(
+            src.path().join("SKILL.md"),
+            "---\nname: test\ndescription: hello\nmetadata:\n  version: \"1.0.0\"\n---\n",
+        )
+        .unwrap();
+
+        let manifest = Manifest {
+            namespace: Namespace::new("acme").unwrap(),
+            name: PackageName::new("test").unwrap(),
+            version: Version::parse("1.0.0").unwrap(),
+            description: "hello".to_owned(),
+            category: None,
+            sha256: Sha256Digest::from_hex(&"a".repeat(64)).unwrap(),
+            cert_chain_pem: vec![],
+            publisher_sig_hex: None,
+        };
+
+        let out = src.path().join("out.skill");
+        pack_with_manifest(src.path(), &manifest, &out).unwrap();
+
+        let dest = tempfile::tempdir().unwrap();
+        unpack_tarball_skip_manifest(&out, dest.path()).unwrap();
+
+        // manifest.json must NOT be present in installed dir
+        assert!(!dest.path().join("manifest.json").exists());
+        // SKILL.md must be present
+        assert!(dest.path().join("SKILL.md").exists());
     }
 }

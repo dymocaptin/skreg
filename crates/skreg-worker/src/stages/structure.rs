@@ -2,10 +2,11 @@
 
 use std::path::{Component, Path};
 
+use semver::Version;
 use skreg_core::limits;
 use thiserror::Error;
 
-const REQUIRED_FILES: &[&str] = &["SKILL.md", "manifest.json"];
+const REQUIRED_FILES: &[&str] = &["SKILL.md"];
 const ALLOWED_ROOT_FILES: &[&str] = &["SKILL.md", "manifest.json"];
 const ALLOWED_ROOT_PREFIXES: &[&str] = &["LICENSE"];
 const SCRIPT_EXTENSIONS: &[&str] = &["py", "sh", "bash", "js", "ts", "rb"];
@@ -80,14 +81,6 @@ pub enum StructureError {
         /// Maximum allowed line count.
         max: usize,
     },
-    /// `manifest.json` exceeds its size limit.
-    #[error("manifest.json is {size} bytes, exceeds limit of {max} bytes")]
-    ManifestTooLarge {
-        /// Actual size.
-        size: u64,
-        /// Maximum allowed size.
-        max: u64,
-    },
     /// An I/O error occurred during checking.
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
@@ -100,7 +93,6 @@ struct SkillFrontmatter {
     compatibility: Option<String>,
     #[allow(dead_code)]
     license: Option<String>,
-    #[allow(dead_code)]
     metadata: Option<std::collections::HashMap<String, String>>,
     #[serde(rename = "allowed-tools")]
     #[allow(dead_code)]
@@ -120,19 +112,10 @@ pub fn check_structure(path: &Path) -> Result<(), StructureError> {
         }
     }
 
-    // 2. manifest.json size limit
-    let manifest_size = std::fs::metadata(path.join("manifest.json"))?.len();
-    if manifest_size > limits::LIMIT_MANIFEST_SIZE {
-        return Err(StructureError::ManifestTooLarge {
-            size: manifest_size,
-            max: limits::LIMIT_MANIFEST_SIZE,
-        });
-    }
-
-    // 3. Validate SKILL.md frontmatter and line count
+    // 2. Validate SKILL.md frontmatter and line count
     validate_skill_md(&path.join("SKILL.md"))?;
 
-    // 4. Walk all entries
+    // 3. Walk all entries
     let mut total_size: u64 = 0;
     let mut file_count: usize = 0;
 
@@ -266,6 +249,37 @@ fn validate_file_location(rel: &Path) -> Result<(), StructureError> {
     Ok(())
 }
 
+fn validate_name(name: &str) -> Result<(), StructureError> {
+    if name.len() > limits::LIMIT_NAME_LEN {
+        return Err(StructureError::FrontmatterFieldInvalid {
+            field: "name".to_owned(),
+            reason: "must be 64 characters or fewer".to_owned(),
+        });
+    }
+    if !name
+        .chars()
+        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+    {
+        return Err(StructureError::FrontmatterFieldInvalid {
+            field: "name".to_owned(),
+            reason: "must contain only lowercase letters, digits, and hyphens".to_owned(),
+        });
+    }
+    if name.starts_with('-') || name.ends_with('-') {
+        return Err(StructureError::FrontmatterFieldInvalid {
+            field: "name".to_owned(),
+            reason: "must not start or end with a hyphen".to_owned(),
+        });
+    }
+    if name.contains("--") {
+        return Err(StructureError::FrontmatterFieldInvalid {
+            field: "name".to_owned(),
+            reason: "must not contain consecutive hyphens".to_owned(),
+        });
+    }
+    Ok(())
+}
+
 fn validate_skill_md(path: &Path) -> Result<(), StructureError> {
     // Pre-read size guard: reject oversized SKILL.md before loading into memory.
     let file_size = std::fs::metadata(path)?.len();
@@ -314,35 +328,7 @@ fn validate_skill_md(path: &Path) -> Result<(), StructureError> {
                 reason: "field is missing or empty".to_owned(),
             });
         }
-        Some(name) => {
-            if name.len() > limits::LIMIT_NAME_LEN {
-                return Err(StructureError::FrontmatterFieldInvalid {
-                    field: "name".to_owned(),
-                    reason: "must be 64 characters or fewer".to_owned(),
-                });
-            }
-            if !name
-                .chars()
-                .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
-            {
-                return Err(StructureError::FrontmatterFieldInvalid {
-                    field: "name".to_owned(),
-                    reason: "must contain only lowercase letters, digits, and hyphens".to_owned(),
-                });
-            }
-            if name.starts_with('-') || name.ends_with('-') {
-                return Err(StructureError::FrontmatterFieldInvalid {
-                    field: "name".to_owned(),
-                    reason: "must not start or end with a hyphen".to_owned(),
-                });
-            }
-            if name.contains("--") {
-                return Err(StructureError::FrontmatterFieldInvalid {
-                    field: "name".to_owned(),
-                    reason: "must not contain consecutive hyphens".to_owned(),
-                });
-            }
-        }
+        Some(name) => validate_name(name)?,
     }
 
     // Validate description
@@ -361,6 +347,25 @@ fn validate_skill_md(path: &Path) -> Result<(), StructureError> {
                 });
             }
         }
+    }
+
+    // Validate metadata.version — required, must be valid semver
+    let version_str = frontmatter
+        .metadata
+        .as_ref()
+        .and_then(|m| m.get("version"))
+        .map_or("", String::as_str);
+    if version_str.is_empty() {
+        return Err(StructureError::FrontmatterFieldInvalid {
+            field: "metadata.version".to_owned(),
+            reason: "field is missing or empty".to_owned(),
+        });
+    }
+    if Version::parse(version_str).is_err() {
+        return Err(StructureError::FrontmatterFieldInvalid {
+            field: "metadata.version".to_owned(),
+            reason: format!("{version_str:?} is not valid semver"),
+        });
     }
 
     // Optionally validate compatibility if present
@@ -386,37 +391,16 @@ mod tests {
     /// Write the minimum valid package to `dir`.
     fn make_valid_package(dir: &Path) {
         let frontmatter =
-            "---\nname: my-skill\ndescription: A valid skill description\n---\n# My Skill\n";
+            "---\nname: my-skill\ndescription: A valid skill description\nmetadata:\n  version: \"1.0.0\"\n---\n# My Skill\n";
         fs::write(dir.join("SKILL.md"), frontmatter).unwrap();
-        fs::write(
-            dir.join("manifest.json"),
-            r#"{"name":"my-skill","version":"1.0.0","description":"A valid skill description"}"#,
-        )
-        .unwrap();
     }
 
     #[test]
     fn missing_skill_md_fails() {
         let dir = tempdir().unwrap();
-        fs::write(dir.path().join("manifest.json"), "{}").unwrap();
         let err = check_structure(dir.path()).unwrap_err();
         assert!(
             matches!(err, StructureError::MissingFile(ref f) if f == "SKILL.md"),
-            "got: {err}"
-        );
-    }
-
-    #[test]
-    fn missing_manifest_fails() {
-        let dir = tempdir().unwrap();
-        fs::write(
-            dir.path().join("SKILL.md"),
-            "---\nname: x\ndescription: y\n---\n",
-        )
-        .unwrap();
-        let err = check_structure(dir.path()).unwrap_err();
-        assert!(
-            matches!(err, StructureError::MissingFile(ref f) if f == "manifest.json"),
             "got: {err}"
         );
     }
@@ -467,20 +451,6 @@ mod tests {
         let err = check_structure(dir.path()).unwrap_err();
         assert!(
             matches!(err, StructureError::FileTooLarge { .. }),
-            "got: {err}"
-        );
-    }
-
-    #[test]
-    fn manifest_too_large_fails() {
-        let dir = tempdir().unwrap();
-        let frontmatter = "---\nname: my-skill\ndescription: A valid skill description\n---\n";
-        fs::write(dir.path().join("SKILL.md"), frontmatter).unwrap();
-        let big = vec![b'x'; (limits::LIMIT_MANIFEST_SIZE + 1) as usize];
-        fs::write(dir.path().join("manifest.json"), &big).unwrap();
-        let err = check_structure(dir.path()).unwrap_err();
-        assert!(
-            matches!(err, StructureError::ManifestTooLarge { .. }),
             "got: {err}"
         );
     }
@@ -577,11 +547,6 @@ mod tests {
     fn missing_frontmatter_fails() {
         let dir = tempdir().unwrap();
         fs::write(dir.path().join("SKILL.md"), "# No frontmatter here\n").unwrap();
-        fs::write(
-            dir.path().join("manifest.json"),
-            r#"{"name":"x","version":"1.0.0","description":"desc"}"#,
-        )
-        .unwrap();
         let err = check_structure(dir.path()).unwrap_err();
         assert!(
             matches!(err, StructureError::FrontmatterMissing),
@@ -595,11 +560,6 @@ mod tests {
         fs::write(
             dir.path().join("SKILL.md"),
             "---\ndescription: A valid skill description\n---\n",
-        )
-        .unwrap();
-        fs::write(
-            dir.path().join("manifest.json"),
-            r#"{"name":"x","version":"1.0.0","description":"desc"}"#,
         )
         .unwrap();
         let err = check_structure(dir.path()).unwrap_err();
@@ -617,11 +577,6 @@ mod tests {
             "---\nname: my--skill\ndescription: A valid skill description\n---\n",
         )
         .unwrap();
-        fs::write(
-            dir.path().join("manifest.json"),
-            r#"{"name":"x","version":"1.0.0","description":"desc"}"#,
-        )
-        .unwrap();
         let err = check_structure(dir.path()).unwrap_err();
         assert!(
             matches!(err, StructureError::FrontmatterFieldInvalid { ref field, .. } if field == "name"),
@@ -637,11 +592,6 @@ mod tests {
             "---\nname: -bad\ndescription: A valid skill description\n---\n",
         )
         .unwrap();
-        fs::write(
-            dir.path().join("manifest.json"),
-            r#"{"name":"x","version":"1.0.0","description":"desc"}"#,
-        )
-        .unwrap();
         let err = check_structure(dir.path()).unwrap_err();
         assert!(
             matches!(err, StructureError::FrontmatterFieldInvalid { ref field, .. } if field == "name"),
@@ -653,11 +603,6 @@ mod tests {
     fn frontmatter_missing_description_fails() {
         let dir = tempdir().unwrap();
         fs::write(dir.path().join("SKILL.md"), "---\nname: my-skill\n---\n").unwrap();
-        fs::write(
-            dir.path().join("manifest.json"),
-            r#"{"name":"x","version":"1.0.0","description":"desc"}"#,
-        )
-        .unwrap();
         let err = check_structure(dir.path()).unwrap_err();
         assert!(
             matches!(err, StructureError::FrontmatterFieldInvalid { ref field, .. } if field == "description"),
@@ -671,11 +616,6 @@ mod tests {
         let long_desc = "x".repeat(1025);
         let content = format!("---\nname: my-skill\ndescription: {long_desc}\n---\n");
         fs::write(dir.path().join("SKILL.md"), &content).unwrap();
-        fs::write(
-            dir.path().join("manifest.json"),
-            r#"{"name":"x","version":"1.0.0","description":"desc"}"#,
-        )
-        .unwrap();
         let err = check_structure(dir.path()).unwrap_err();
         assert!(
             matches!(err, StructureError::FrontmatterFieldInvalid { ref field, .. } if field == "description"),
@@ -690,11 +630,6 @@ mod tests {
         let content =
             format!("---\nname: my-skill\ndescription: A valid skill description\n---\n{lines}");
         fs::write(dir.path().join("SKILL.md"), &content).unwrap();
-        fs::write(
-            dir.path().join("manifest.json"),
-            r#"{"name":"x","version":"1.0.0","description":"desc"}"#,
-        )
-        .unwrap();
         let err = check_structure(dir.path()).unwrap_err();
         assert!(
             matches!(err, StructureError::SkillMdTooLong { .. }),
@@ -740,12 +675,7 @@ mod tests {
         let dir = tempdir().unwrap();
         fs::write(
             dir.path().join("SKILL.md"),
-            "---\nname: a\ndescription: A valid skill description\n---\n",
-        )
-        .unwrap();
-        fs::write(
-            dir.path().join("manifest.json"),
-            r#"{"name":"a","version":"1.0.0","description":"desc"}"#,
+            "---\nname: a\ndescription: A valid skill description\nmetadata:\n  version: \"1.0.0\"\n---\n",
         )
         .unwrap();
         assert!(
@@ -779,5 +709,35 @@ mod tests {
         std::os::unix::fs::symlink("/etc/passwd", dir.path().join("evil-link")).unwrap();
         let err = check_structure(dir.path()).unwrap_err();
         assert!(matches!(err, StructureError::Symlink(_)), "got: {err}");
+    }
+
+    #[test]
+    fn missing_metadata_version_fails() {
+        let dir = tempdir().unwrap();
+        fs::write(
+            dir.path().join("SKILL.md"),
+            "---\nname: my-skill\ndescription: A valid skill description\n---\n",
+        )
+        .unwrap();
+        let err = check_structure(dir.path()).unwrap_err();
+        assert!(
+            matches!(err, StructureError::FrontmatterFieldInvalid { ref field, .. } if field == "metadata.version"),
+            "got: {err}"
+        );
+    }
+
+    #[test]
+    fn invalid_semver_metadata_version_fails() {
+        let dir = tempdir().unwrap();
+        fs::write(
+            dir.path().join("SKILL.md"),
+            "---\nname: my-skill\ndescription: A valid skill description\nmetadata:\n  version: not-semver\n---\n",
+        )
+        .unwrap();
+        let err = check_structure(dir.path()).unwrap_err();
+        assert!(
+            matches!(err, StructureError::FrontmatterFieldInvalid { ref field, .. } if field == "metadata.version"),
+            "got: {err}"
+        );
     }
 }
