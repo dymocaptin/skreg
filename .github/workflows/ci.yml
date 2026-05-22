@@ -220,4 +220,5 @@ jobs:
           SKREG_WEB_CERT_ARN: ${{ secrets.SKREG_WEB_CERT_ARN }}
         run: |
           pulumi stack select main
+          pulumi refresh --yes
           pulumi up --yes
