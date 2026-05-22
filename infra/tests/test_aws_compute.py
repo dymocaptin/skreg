@@ -1,6 +1,8 @@
 """Unit tests for the AWS compute component using Pulumi mocks."""
 from __future__ import annotations
 
+from typing import Any
+
 import pulumi
 from pulumi.runtime import Mocks
 
@@ -152,7 +154,7 @@ class _CapturingMocks(SkillpkgMocks):
 
     def __init__(self) -> None:
         super().__init__()
-        self.security_groups: dict[str, dict[str, object]] = {}
+        self.security_groups: dict[str, dict[str, Any]] = {}
 
     def new_resource(
         self, args: pulumi.runtime.MockResourceArgs
