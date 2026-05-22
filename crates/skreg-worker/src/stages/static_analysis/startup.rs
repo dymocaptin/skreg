@@ -24,8 +24,7 @@ pub fn check_tools() -> Result<(), StaticAnalysisError> {
         let ok = Command::new(tool)
             .arg("--version")
             .output()
-            .map(|o| o.status.success() || !o.stdout.is_empty() || !o.stderr.is_empty())
-            .unwrap_or(false);
+            .is_ok_and(|o| o.status.success() || !o.stdout.is_empty() || !o.stderr.is_empty());
         if !ok {
             return Err(StaticAnalysisError::MissingComponent(format!(
                 "required tool not found or not executable: {tool}"
