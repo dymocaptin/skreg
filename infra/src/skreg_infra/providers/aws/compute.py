@@ -33,6 +33,8 @@ class AwsComputeArgs:
         ses_region: str = "",
         ca_secret_arn: pulumi.Input[str] = "",
         db_sg_id: pulumi.Input[str] = "",
+        publisher_ca_key_secret_name: pulumi.Input[str] = "",
+        publisher_ca_cert_pem: pulumi.Input[str] = "",
     ) -> None:
         self.vpc_id: pulumi.Input[str] = vpc_id
         self.public_subnet_ids: list[pulumi.Input[str]] = public_subnet_ids
@@ -47,6 +49,8 @@ class AwsComputeArgs:
         self.ses_region: str = ses_region
         self.ca_secret_arn: pulumi.Input[str] = ca_secret_arn
         self.db_sg_id: pulumi.Input[str] = db_sg_id
+        self.publisher_ca_key_secret_name: pulumi.Input[str] = publisher_ca_key_secret_name
+        self.publisher_ca_cert_pem: pulumi.Input[str] = publisher_ca_cert_pem
 
 
 class AwsCompute(pulumi.ComponentResource):
@@ -454,9 +458,12 @@ class AwsCompute(pulumi.ComponentResource):
         api_image = args.api_image_uri
         from_email = args.from_email
         ses_region = args.ses_region
+        aws_region = region.name
         api_container_defs = pulumi.Output.all(
             pulumi.Output.from_input(args.db_secret_arn),
             pulumi.Output.from_input(args.s3_bucket),
+            pulumi.Output.from_input(args.publisher_ca_key_secret_name),
+            pulumi.Output.from_input(args.publisher_ca_cert_pem),
         ).apply(
             lambda vals: json.dumps(
                 [
@@ -469,6 +476,9 @@ class AwsCompute(pulumi.ComponentResource):
                             {"name": "S3_BUCKET", "value": vals[1]},
                             {"name": "FROM_EMAIL", "value": from_email},
                             {"name": "SES_REGION", "value": ses_region},
+                            {"name": "AWS_REGION", "value": aws_region},
+                            {"name": "PUBLISHER_CA_KEY_SECRET_NAME", "value": vals[2]},
+                            {"name": "PUBLISHER_CA_CERT_PEM", "value": vals[3]},
                         ],
                         "secrets": [{"name": "DATABASE_URL", "valueFrom": vals[0]}],
                         "logConfiguration": {
