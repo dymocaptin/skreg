@@ -216,8 +216,7 @@ class AwsWorkerTrigger(pulumi.ComponentResource):
             opts=pulumi.ResourceOptions(parent=self),
         )
 
-        # Create the output as a combination of lambda_arn and bucket_notification
-        # to ensure the BucketNotification is created before the output is resolved
+        # ensures BucketNotification is created before the component output resolves
         lambda_arn_output = pulumi.Output.all(trigger_fn.arn, bucket_notification.id).apply(
             lambda vals: vals[0]
         )
