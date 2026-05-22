@@ -13,11 +13,11 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 
 class AwsNetwork(pulumi.ComponentResource):
-    """AWS VPC + subnets + IGW + NAT Gateway satisfying ``SkillpkgNetwork``.
+    """AWS VPC + subnets + IGW satisfying ``SkillpkgNetwork``.
 
     Provisions 10.0.0.0/16 across us-west-2a and us-west-2b with two public
-    subnets (ALB), two private subnets (ECS/RDS), one IGW, one NAT Gateway
-    (single AZ, cost-optimised), and the corresponding route tables.
+    subnets (ECS/ALB), two private subnets (RDS), one IGW, and the
+    corresponding route tables. ECS tasks run in public subnets.
     """
 
     def __init__(
@@ -87,21 +87,6 @@ class AwsNetwork(pulumi.ComponentResource):
             opts=pulumi.ResourceOptions(parent=self),
         )
 
-        eip = aws.ec2.Eip(
-            f"{name}-nat-eip",
-            aws.ec2.EipArgs(domain="vpc"),
-            opts=pulumi.ResourceOptions(parent=self),
-        )
-
-        nat = aws.ec2.NatGateway(
-            f"{name}-nat",
-            aws.ec2.NatGatewayArgs(
-                subnet_id=pub_a.id,
-                allocation_id=eip.id,
-            ),
-            opts=pulumi.ResourceOptions(parent=self, depends_on=[igw]),
-        )
-
         pub_rt = aws.ec2.RouteTable(
             f"{name}-pub-rt",
             aws.ec2.RouteTableArgs(
@@ -131,12 +116,7 @@ class AwsNetwork(pulumi.ComponentResource):
             f"{name}-priv-rt",
             aws.ec2.RouteTableArgs(
                 vpc_id=vpc.id,
-                routes=[
-                    aws.ec2.RouteTableRouteArgs(
-                        cidr_block="0.0.0.0/0",
-                        nat_gateway_id=nat.id,
-                    )
-                ],
+                routes=[],
             ),
             opts=pulumi.ResourceOptions(parent=self),
         )
