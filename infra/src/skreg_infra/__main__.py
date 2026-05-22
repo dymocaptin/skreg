@@ -73,6 +73,8 @@ class SkregStack:
                 ses_region=config.ses_region,
                 ca_secret_arn=pki.outputs.hsm_key_id,
                 db_sg_id=database.outputs.security_group_id,
+                publisher_ca_key_secret_name=pki.outputs.publisher_ca_key_secret_name,
+                publisher_ca_cert_pem=pki.publisher_ca_cert_pem,
             ),
         )
         pulumi.export(

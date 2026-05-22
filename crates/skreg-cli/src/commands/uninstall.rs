@@ -42,7 +42,7 @@ pub(crate) fn run_uninstall_with_root(package_ref: &str, install_root: &Path) ->
     let version_dirs: Vec<_> = std::fs::read_dir(&name_dir)
         .with_context(|| format!("failed to read {}", name_dir.display()))?
         .filter_map(std::result::Result::ok)
-        .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
+        .filter(|e| e.file_type().is_ok_and(|t| t.is_dir()))
         .collect();
 
     if version_dirs.is_empty() {
@@ -58,16 +58,10 @@ pub(crate) fn run_uninstall_with_root(package_ref: &str, install_root: &Path) ->
     }
 
     // Best-effort cleanup of empty parent dirs
-    if std::fs::read_dir(&name_dir)
-        .map(|mut d| d.next().is_none())
-        .unwrap_or(false)
-    {
+    if std::fs::read_dir(&name_dir).is_ok_and(|mut d| d.next().is_none()) {
         let _ = std::fs::remove_dir(&name_dir);
         let ns_dir = install_root.join(pkg_ref.namespace.as_str());
-        if std::fs::read_dir(&ns_dir)
-            .map(|mut d| d.next().is_none())
-            .unwrap_or(false)
-        {
+        if std::fs::read_dir(&ns_dir).is_ok_and(|mut d| d.next().is_none()) {
             let _ = std::fs::remove_dir(&ns_dir);
         }
     }
@@ -108,7 +102,7 @@ pub fn run_uninstall_with_root_and_links(
     let version_dirs: Vec<_> = std::fs::read_dir(&name_dir)
         .with_context(|| format!("failed to read {}", name_dir.display()))?
         .filter_map(std::result::Result::ok)
-        .filter(|e| e.file_type().map(|t| t.is_dir()).unwrap_or(false))
+        .filter(|e| e.file_type().is_ok_and(|t| t.is_dir()))
         .collect();
 
     if version_dirs.is_empty() {
@@ -159,16 +153,10 @@ pub fn run_uninstall_with_root_and_links(
     }
 
     // Best-effort cleanup of empty parent dirs
-    if std::fs::read_dir(&name_dir)
-        .map(|mut d| d.next().is_none())
-        .unwrap_or(false)
-    {
+    if std::fs::read_dir(&name_dir).is_ok_and(|mut d| d.next().is_none()) {
         let _ = std::fs::remove_dir(&name_dir);
         let ns_dir = install_root.join(pkg_ref.namespace.as_str());
-        if std::fs::read_dir(&ns_dir)
-            .map(|mut d| d.next().is_none())
-            .unwrap_or(false)
-        {
+        if std::fs::read_dir(&ns_dir).is_ok_and(|mut d| d.next().is_none()) {
             let _ = std::fs::remove_dir(&ns_dir);
         }
     }

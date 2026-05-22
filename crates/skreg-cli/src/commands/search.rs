@@ -36,7 +36,7 @@ pub async fn run_search(query: &str, verified_only: bool, context: Option<&str>)
         return Ok(());
     }
 
-    let term_width = terminal::size().map(|(w, _)| w).unwrap_or(120);
+    let term_width = terminal::size().map_or(120, |(w, _)| w);
 
     let mut table = Table::new();
     table
