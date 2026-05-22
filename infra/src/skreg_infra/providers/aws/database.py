@@ -1,4 +1,4 @@
-"""AWS RDS PostgreSQL implementation of SkillpkgDatabase."""
+"""AWS Aurora Serverless v2 PostgreSQL implementation of SkillpkgDatabase."""
 
 from __future__ import annotations
 
@@ -14,13 +14,14 @@ logger: logging.Logger = logging.getLogger(__name__)
 
 
 class AwsDatabaseArgs:
-    """Arguments for the AWS RDS database component.
+    """Arguments for the AWS Aurora Serverless v2 database component.
 
     Args:
-        vpc_id: ID of the VPC in which to place the RDS instance.
+        vpc_id: ID of the VPC in which to place the cluster.
         subnet_ids: Private subnet IDs for the DB subnet group.
-        instance_class: RDS instance class.
-        multi_az: Enable Multi-AZ deployment.
+        max_capacity: Maximum Aurora Capacity Units (ACUs). Defaults to 1.
+        instance_class: Unused — kept for interface compatibility.
+        multi_az: Unused — Aurora Serverless v2 manages AZ placement automatically.
     """
 
     def __init__(
@@ -29,19 +30,20 @@ class AwsDatabaseArgs:
         subnet_ids: list[pulumi.Input[str]],
         instance_class: pulumi.Input[str] = "db.t3.micro",
         multi_az: pulumi.Input[bool] = False,
+        max_capacity: float = 1.0,
     ) -> None:
-        """Initialise RDS database arguments."""
+        """Initialise Aurora Serverless v2 database arguments."""
         self.vpc_id: pulumi.Input[str] = vpc_id
         self.subnet_ids: list[pulumi.Input[str]] = subnet_ids
-        self.instance_class: pulumi.Input[str] = instance_class
-        self.multi_az: pulumi.Input[bool] = multi_az
+        self.max_capacity: float = max_capacity
 
 
 class AwsDatabase(pulumi.ComponentResource):
-    """AWS RDS PostgreSQL component satisfying ``SkillpkgDatabase``.
+    """AWS Aurora Serverless v2 PostgreSQL component satisfying ``SkillpkgDatabase``.
 
-    Provisions an encrypted RDS instance, a Secrets Manager secret,
-    a security group, and a DB subnet group.
+    Provisions an encrypted Aurora Serverless v2 cluster that auto-pauses after
+    ~5 minutes of inactivity (min_capacity=0). Provisions a Secrets Manager secret
+    and a security group. Cold-start after idle is ~15-30 s.
     """
 
     def __init__(
@@ -50,13 +52,7 @@ class AwsDatabase(pulumi.ComponentResource):
         args: AwsDatabaseArgs,
         opts: pulumi.ResourceOptions | None = None,
     ) -> None:
-        """Initialise and provision the AWS database component.
-
-        Args:
-            name: Logical Pulumi resource name.
-            args: Validated AWS-specific database arguments.
-            opts: Optional Pulumi resource options.
-        """
+        """Initialise and provision the Aurora Serverless v2 database component."""
         super().__init__("skreg:aws:Database", name, {}, opts)
 
         logger.debug("provisioning_aws_database", extra={"name": name})
@@ -84,21 +80,33 @@ class AwsDatabase(pulumi.ComponentResource):
             opts=pulumi.ResourceOptions(parent=self),
         )
 
-        instance = aws.rds.Instance(
-            f"{name}-rds",
-            aws.rds.InstanceArgs(
-                engine="postgres",
-                engine_version="16",
-                instance_class=args.instance_class,
-                allocated_storage=20,
-                storage_encrypted=True,
-                db_name="skreg",
-                username="skreg",
-                password=db_password.result,
-                multi_az=args.multi_az,
+        cluster = aws.rds.Cluster(
+            f"{name}-cluster",
+            aws.rds.ClusterArgs(
+                engine="aurora-postgresql",
+                engine_version="16.6",
+                database_name="skreg",
+                master_username="skreg",
+                master_password=db_password.result,
                 db_subnet_group_name=subnet_group.name,
                 vpc_security_group_ids=[security_group.id],
-                skip_final_snapshot=False,
+                serverlessv2_scaling_configuration=aws.rds.ClusterServerlessv2ScalingConfigurationArgs(
+                    min_capacity=0,
+                    max_capacity=args.max_capacity,
+                ),
+                storage_encrypted=True,
+                skip_final_snapshot=True,
+            ),
+            opts=pulumi.ResourceOptions(parent=self),
+        )
+
+        aws.rds.ClusterInstance(
+            f"{name}-instance",
+            aws.rds.ClusterInstanceArgs(
+                cluster_identifier=cluster.id,
+                instance_class="db.serverless",
+                engine="aurora-postgresql",
+                engine_version="16.6",
             ),
             opts=pulumi.ResourceOptions(parent=self),
         )
@@ -107,8 +115,12 @@ class AwsDatabase(pulumi.ComponentResource):
             f"{name}-db-password-version",
             aws.secretsmanager.SecretVersionArgs(
                 secret_id=credentials_secret.id,
-                secret_string=pulumi.Output.all(db_password.result, instance.address).apply(
-                    lambda vals: f"postgresql://skreg:{vals[0]}@{vals[1]}:5432/skreg?sslmode=require"
+                secret_string=pulumi.Output.all(
+                    db_password.result, cluster.endpoint
+                ).apply(
+                    lambda vals: (
+                        f"postgresql://skreg:{vals[0]}@{vals[1]}:5432/skreg?sslmode=require"
+                    )
                 ),
             ),
             opts=pulumi.ResourceOptions(parent=self),
@@ -117,7 +129,7 @@ class AwsDatabase(pulumi.ComponentResource):
         self._outputs: DatabaseOutputs = DatabaseOutputs(
             connection_secret_name=credentials_secret.name,
             connection_secret_arn=credentials_secret.arn,
-            host=instance.address,
+            host=cluster.endpoint,
             port=pulumi.Output.from_input(5432),
             database_name=pulumi.Output.from_input("skreg"),
             security_group_id=security_group.id,
