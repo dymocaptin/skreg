@@ -115,9 +115,7 @@ class AwsDatabase(pulumi.ComponentResource):
             f"{name}-db-password-version",
             aws.secretsmanager.SecretVersionArgs(
                 secret_id=credentials_secret.id,
-                secret_string=pulumi.Output.all(
-                    db_password.result, cluster.endpoint
-                ).apply(
+                secret_string=pulumi.Output.all(db_password.result, cluster.endpoint).apply(
                     lambda vals: (
                         f"postgresql://skreg:{vals[0]}@{vals[1]}:5432/skreg?sslmode=require"
                     )

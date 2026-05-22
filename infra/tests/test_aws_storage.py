@@ -29,6 +29,7 @@ from skreg_infra.providers.aws.storage import AwsStorage  # noqa: E402
 @pulumi.runtime.test
 def test_storage_cdn_url_starts_with_https() -> None:
     """AwsStorage CDN URL must begin with https://."""
+    pulumi.runtime.set_mocks(SkillpkgMocks())
     storage = AwsStorage("test-storage")
 
     def assert_https(url: str) -> None:
@@ -40,6 +41,7 @@ def test_storage_cdn_url_starts_with_https() -> None:
 @pulumi.runtime.test
 def test_storage_bucket_arn_is_set() -> None:
     """AwsStorage must expose bucket_arn as a non-empty Output."""
+    pulumi.runtime.set_mocks(SkillpkgMocks())
     storage = AwsStorage("test-storage-arn")
 
     def assert_arn(arn: str) -> None:

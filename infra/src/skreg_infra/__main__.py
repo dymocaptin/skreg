@@ -14,6 +14,7 @@ from skreg_infra.providers.aws.network import AwsNetwork
 from skreg_infra.providers.aws.pki import AwsPki, AwsPkiArgs
 from skreg_infra.providers.aws.storage import AwsStorage
 from skreg_infra.providers.aws.web_hosting import AwsWebHosting
+from skreg_infra.providers.aws.worker_trigger import AwsWorkerTrigger, AwsWorkerTriggerArgs
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -73,6 +74,19 @@ class SkregStack:
                 ses_region=config.ses_region,
                 ca_secret_arn=pki.outputs.hsm_key_id,
                 db_sg_id=database.outputs.security_group_id,
+            ),
+        )
+        AwsWorkerTrigger(
+            "skreg-worker-trigger",
+            AwsWorkerTriggerArgs(
+                cluster_arn=compute.cluster_arn,
+                worker_task_def_arn=compute.worker_task_def_arn,
+                worker_task_role_arn=compute.worker_task_role_arn,
+                exec_role_arn=compute.exec_role_arn,
+                public_subnet_ids=list(network.outputs.public_subnet_ids),
+                worker_sg_id=compute.worker_sg_id,
+                bucket_name=storage.outputs.bucket_name,
+                bucket_arn=storage.bucket_arn,
             ),
         )
         pulumi.export(

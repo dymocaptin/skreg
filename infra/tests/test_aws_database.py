@@ -91,4 +91,4 @@ def test_database_aurora_auto_pause_configured() -> None:
             f"Expected minCapacity=0 for auto-pause, got {scaling['minCapacity']}"
         )
 
-    return db.outputs.connection_secret_arn.apply(check)
+    return db.outputs.host.apply(check)
