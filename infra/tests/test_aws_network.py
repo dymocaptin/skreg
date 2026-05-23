@@ -60,3 +60,27 @@ def test_network_first_private_subnet_is_set() -> None:
         assert subnet_id
 
     return net.outputs.private_subnet_ids[0].apply(check)
+
+
+class _CapturingNetworkMocks(SkillpkgMocks):
+    """Records resource types created during network provisioning."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.resource_types: list[str] = []
+
+    def new_resource(
+        self, args: pulumi.runtime.MockResourceArgs
+    ) -> tuple[str, dict[str, object]]:
+        self.resource_types.append(args.typ)
+        return super().new_resource(args)
+
+
+def test_network_has_no_nat_gateway() -> None:
+    """Verify NAT Gateway is not created (ECS tasks use public subnets)."""
+    mocks = _CapturingNetworkMocks()
+    pulumi.runtime.set_mocks(mocks)
+    AwsNetwork("test-no-nat")
+    assert "aws:ec2/natGateway:NatGateway" not in mocks.resource_types, (
+        "Network must not create a NAT Gateway — ECS tasks run in public subnets"
+    )

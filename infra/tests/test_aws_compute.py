@@ -1,6 +1,8 @@
 """Unit tests for the AWS compute component using Pulumi mocks."""
 from __future__ import annotations
 
+from typing import Any
+
 import pulumi
 from pulumi.runtime import Mocks
 
@@ -145,3 +147,45 @@ def test_compute_alb_dns_name_is_set() -> None:
         assert dns
 
     return compute.outputs.alb_dns_name.apply(check)
+
+
+class _CapturingMocks(SkillpkgMocks):
+    """Extends SkillpkgMocks to record security group inputs for assertion."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.security_groups: dict[str, dict[str, Any]] = {}
+
+    def new_resource(
+        self, args: pulumi.runtime.MockResourceArgs
+    ) -> tuple[str, dict[str, object]]:
+        resource_id, outputs = super().new_resource(args)
+        if args.typ == "aws:ec2/securityGroup:SecurityGroup":
+            self.security_groups[args.name] = dict(args.inputs)
+        return resource_id, outputs
+
+
+@pulumi.runtime.test
+def test_ecs_task_sgs_deny_public_internet_ingress() -> None:
+    mocks = _CapturingMocks()
+    pulumi.runtime.set_mocks(mocks)
+    compute = AwsCompute("test-sg-inet", _args())
+
+    def check(_: str) -> None:
+        task_sgs = {
+            name: inputs
+            for name, inputs in mocks.security_groups.items()
+            if "-api-sg" in name or "-worker-sg" in name
+        }
+        assert task_sgs, "Expected api-sg and worker-sg to be captured in mocks"
+        for sg_name, sg_inputs in task_sgs.items():
+            for rule in sg_inputs.get("ingress") or []:
+                cidr_blocks: list[str] = rule.get("cidrBlocks") or []
+                assert "0.0.0.0/0" not in cidr_blocks, (
+                    f"Security group '{sg_name}' allows inbound from 0.0.0.0/0"
+                )
+                assert "::/0" not in cidr_blocks, (
+                    f"Security group '{sg_name}' allows inbound from ::/0"
+                )
+
+    return compute.outputs.service_url.apply(check)

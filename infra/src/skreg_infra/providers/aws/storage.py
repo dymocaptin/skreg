@@ -94,11 +94,14 @@ class AwsStorage(pulumi.ComponentResource):
             service_account_secret_name=service_secret.name,
         )
 
+        self.bucket_arn: pulumi.Output[str] = bucket.arn
+
         self.register_outputs(
             {
                 "bucket_name": self._outputs.bucket_name,
                 "cdn_base_url": self._outputs.cdn_base_url,
                 "service_account_secret_name": self._outputs.service_account_secret_name,
+                "bucket_arn": self.bucket_arn,
             }
         )
 

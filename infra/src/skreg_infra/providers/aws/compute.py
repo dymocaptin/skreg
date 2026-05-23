@@ -257,13 +257,13 @@ class AwsCompute(pulumi.ComponentResource):
 
         aws.cloudwatch.LogGroup(
             f"{name}-api-logs",
-            aws.cloudwatch.LogGroupArgs(name="/ecs/skreg-api", retention_in_days=30),
+            aws.cloudwatch.LogGroupArgs(name="/ecs/skreg-api", retention_in_days=7),
             opts=pulumi.ResourceOptions(parent=self),
         )
 
         aws.cloudwatch.LogGroup(
             f"{name}-worker-logs",
-            aws.cloudwatch.LogGroupArgs(name="/ecs/skreg-worker", retention_in_days=30),
+            aws.cloudwatch.LogGroupArgs(name="/ecs/skreg-worker", retention_in_days=7),
             opts=pulumi.ResourceOptions(parent=self),
         )
 
@@ -562,8 +562,9 @@ class AwsCompute(pulumi.ComponentResource):
                 desired_count=1,
                 enable_execute_command=True,
                 network_configuration=aws.ecs.ServiceNetworkConfigurationArgs(
-                    subnets=args.private_subnet_ids,
+                    subnets=args.public_subnet_ids,
                     security_groups=[api_sg.id],
+                    assign_public_ip=True,
                 ),
                 load_balancers=[
                     aws.ecs.ServiceLoadBalancerArgs(
@@ -582,15 +583,23 @@ class AwsCompute(pulumi.ComponentResource):
                 cluster=cluster.arn,
                 task_definition=worker_task.arn,
                 launch_type="FARGATE",
-                desired_count=1,
+                desired_count=0,
                 enable_execute_command=True,
                 network_configuration=aws.ecs.ServiceNetworkConfigurationArgs(
-                    subnets=args.private_subnet_ids,
+                    subnets=args.public_subnet_ids,
                     security_groups=[worker_sg.id],
+                    assign_public_ip=True,
                 ),
             ),
             opts=pulumi.ResourceOptions(parent=self),
         )
+
+        # Trigger output attributes
+        self.cluster_arn: pulumi.Output[str] = cluster.arn
+        self.worker_task_def_arn: pulumi.Output[str] = worker_task.arn
+        self.worker_task_role_arn: pulumi.Output[str] = worker_task_role.arn
+        self.exec_role_arn: pulumi.Output[str] = exec_role.arn
+        self.worker_sg_id: pulumi.Output[str] = worker_sg.id
 
         self._outputs: ComputeOutputs = ComputeOutputs(
             service_url=service_url,
@@ -611,6 +620,11 @@ class AwsCompute(pulumi.ComponentResource):
                 "ecr_worker_repo": self.ecr_worker_repo,
                 "alb_dns_name": self._outputs.alb_dns_name,
                 "cert_validation_cname": self._outputs.cert_validation_cname,
+                "cluster_arn": self.cluster_arn,
+                "worker_task_def_arn": self.worker_task_def_arn,
+                "worker_task_role_arn": self.worker_task_role_arn,
+                "exec_role_arn": self.exec_role_arn,
+                "worker_sg_id": self.worker_sg_id,
             }
         )
 

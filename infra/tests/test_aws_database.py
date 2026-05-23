@@ -13,8 +13,9 @@ class SkregMocks(Mocks):
     ) -> tuple[str, dict[str, object]]:
         outputs: dict[str, object] = dict(args.inputs)
         outputs["arn"] = f"arn:aws:secretsmanager:us-east-1:123456789012:secret:{args.name}-id"
-        outputs["address"] = "localhost"
         outputs["name"] = args.name
+        if args.typ == "aws:rds/cluster:Cluster":
+            outputs["endpoint"] = "test.cluster-abc.us-west-2.rds.amazonaws.com"
         return (f"{args.name}-id", outputs)
 
     def call(
@@ -57,3 +58,37 @@ def test_database_connection_secret_arn_is_set() -> None:
         assert arn, f"Expected non-empty connection_secret_arn, got {arn!r}"
 
     return db.outputs.connection_secret_arn.apply(assert_arn)
+
+
+class _CapturingMocks(SkregMocks):
+    def __init__(self) -> None:
+        self.clusters: dict[str, dict[str, object]] = {}
+
+    def new_resource(
+        self, args: pulumi.runtime.MockResourceArgs
+    ) -> tuple[str, dict[str, object]]:
+        resource_id, outputs = super().new_resource(args)
+        if args.typ == "aws:rds/cluster:Cluster":
+            self.clusters[args.name] = dict(args.inputs)
+        return resource_id, outputs
+
+
+@pulumi.runtime.test
+def test_database_aurora_auto_pause_configured() -> None:
+    mocks = _CapturingMocks()
+    pulumi.runtime.set_mocks(mocks, preview=False)
+    db = AwsDatabase("test-db4", AwsDatabaseArgs(vpc_id="vpc-abc", subnet_ids=["subnet-1"]))
+
+    def check(_: str) -> None:
+        cluster = next(
+            (inputs for name, inputs in mocks.clusters.items() if "test-db4" in name),
+            None,
+        )
+        assert cluster is not None, "Expected an aws:rds/cluster:Cluster resource"
+        scaling = cluster.get("serverlessv2ScalingConfiguration")
+        assert scaling is not None, "Expected serverlessv2ScalingConfiguration to be set"
+        assert scaling["minCapacity"] == 0, (
+            f"Expected minCapacity=0 for auto-pause, got {scaling['minCapacity']}"
+        )
+
+    return db.outputs.host.apply(check)
