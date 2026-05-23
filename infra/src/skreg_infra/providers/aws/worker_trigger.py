@@ -190,7 +190,7 @@ class AwsWorkerTrigger(pulumi.ComponentResource):
             opts=pulumi.ResourceOptions(parent=self),
         )
 
-        aws.lambda_.Permission(
+        s3_permission = aws.lambda_.Permission(
             f"{name}-s3-permission",
             aws.lambda_.PermissionArgs(
                 action="lambda:InvokeFunction",
@@ -213,7 +213,7 @@ class AwsWorkerTrigger(pulumi.ComponentResource):
                     )
                 ],
             ),
-            opts=pulumi.ResourceOptions(parent=self),
+            opts=pulumi.ResourceOptions(parent=self, depends_on=[s3_permission]),
         )
 
         # ensures BucketNotification is created before the component output resolves
