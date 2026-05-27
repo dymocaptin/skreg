@@ -1,4 +1,5 @@
 """skreg-api Deployment + Traefik IngressRoute."""
+
 from __future__ import annotations
 
 import pulumi
@@ -131,9 +132,7 @@ class K8sCompute(pulumi.ComponentResource):
             f"{name}-redirect-mw",
             api_version="traefik.io/v1alpha1",
             kind="Middleware",
-            metadata=k8s.meta.v1.ObjectMetaArgs(
-                name="redirect-https", namespace="skreg-infra"
-            ),
+            metadata=k8s.meta.v1.ObjectMetaArgs(name="redirect-https", namespace="skreg-infra"),
             spec={"redirectScheme": {"scheme": "https", "permanent": True}},
             opts=pulumi.ResourceOptions(parent=self),
         )

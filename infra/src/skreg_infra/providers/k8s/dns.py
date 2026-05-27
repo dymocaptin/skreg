@@ -1,4 +1,5 @@
 """Route53 dynamic DNS CronJob + IAM credentials Secret reference."""
+
 from __future__ import annotations
 
 import pathlib
@@ -31,9 +32,7 @@ class K8sDns(pulumi.ComponentResource):
 
         script_cm = k8s.core.v1.ConfigMap(
             f"{name}-script",
-            metadata=k8s.meta.v1.ObjectMetaArgs(
-                name="dns-updater-script", namespace="skreg-infra"
-            ),
+            metadata=k8s.meta.v1.ObjectMetaArgs(name="dns-updater-script", namespace="skreg-infra"),
             data={"dns_updater.py": _SCRIPT_PATH.read_text()},
             opts=pulumi.ResourceOptions(parent=self),
         )

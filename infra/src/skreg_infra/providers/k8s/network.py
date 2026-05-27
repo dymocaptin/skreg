@@ -1,4 +1,5 @@
 """Traefik v3 ingress + ACME TLS for Kind."""
+
 from __future__ import annotations
 
 import pulumi

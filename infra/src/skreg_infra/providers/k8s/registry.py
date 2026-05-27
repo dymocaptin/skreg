@@ -1,4 +1,5 @@
 """Docker registry v2 in-cluster, exposed via NodePort 30500."""
+
 from __future__ import annotations
 
 import pulumi

@@ -1,4 +1,5 @@
 """MinIO Helm release — S3-compatible package storage."""
+
 from __future__ import annotations
 
 import pulumi

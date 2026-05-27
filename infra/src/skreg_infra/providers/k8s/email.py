@@ -1,4 +1,5 @@
 """Postfix SMTP relay Deployment in the skreg namespace."""
+
 from __future__ import annotations
 
 import pulumi

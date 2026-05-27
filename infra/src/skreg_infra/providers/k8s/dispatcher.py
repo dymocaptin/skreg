@@ -1,4 +1,5 @@
 """skreg-dispatcher Deployment + RBAC for K8s Job creation."""
+
 from __future__ import annotations
 
 import pulumi
@@ -74,20 +75,14 @@ class K8sDispatcher(pulumi.ComponentResource):
                                 image=worker_image.replace("skreg-worker", "skreg-dispatcher"),
                                 ports=[k8s.core.v1.ContainerPortArgs(container_port=9090)],
                                 env=[
-                                    k8s.core.v1.EnvVarArgs(
-                                        name="KUBE_NAMESPACE", value="skreg"
-                                    ),
-                                    k8s.core.v1.EnvVarArgs(
-                                        name="WORKER_IMAGE", value=worker_image
-                                    ),
+                                    k8s.core.v1.EnvVarArgs(name="KUBE_NAMESPACE", value="skreg"),
+                                    k8s.core.v1.EnvVarArgs(name="WORKER_IMAGE", value=worker_image),
                                     k8s.core.v1.EnvVarArgs(name="S3_BUCKET", value=s3_bucket),
                                     k8s.core.v1.EnvVarArgs(name="FROM_EMAIL", value=from_email),
                                     k8s.core.v1.EnvVarArgs(
                                         name="PKI_SECRET_NAME", value="skreg-pki"
                                     ),
-                                    k8s.core.v1.EnvVarArgs(
-                                        name="DB_SECRET_NAME", value="skreg-db"
-                                    ),
+                                    k8s.core.v1.EnvVarArgs(name="DB_SECRET_NAME", value="skreg-db"),
                                 ],
                                 liveness_probe=k8s.core.v1.ProbeArgs(
                                     http_get=k8s.core.v1.HTTPGetActionArgs(

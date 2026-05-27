@@ -1,4 +1,5 @@
 """Bitnami PostgreSQL Helm release."""
+
 from __future__ import annotations
 
 import pulumi

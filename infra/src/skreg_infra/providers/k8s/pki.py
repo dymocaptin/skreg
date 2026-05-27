@@ -1,4 +1,5 @@
 """PKI: reads the manually-created skreg-pki Secret (does not provision it)."""
+
 from __future__ import annotations
 
 import pulumi

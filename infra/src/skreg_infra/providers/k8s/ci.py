@@ -1,4 +1,5 @@
 """GitHub Actions self-hosted runner via actions-runner-controller (ARC)."""
+
 from __future__ import annotations
 
 import pulumi
