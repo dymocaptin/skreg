@@ -170,6 +170,11 @@ async fn send_rotation_email(
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
+    if state.smtp_disabled {
+        log::info!("[DEV] rotation email for namespace '{namespace}': {confirm_url}");
+        return Ok(());
+    }
+
     crate::email::send_email(
         &state.smtp_host,
         state.smtp_port,
@@ -383,7 +388,7 @@ async fn persist_rotation(
 /// - `409` — nonce already used
 /// - `422` — malformed token or cert
 /// - `429` — rate limit exceeded
-/// - `500` — database or SES error
+/// - `500` — database or SMTP error
 pub async fn rotate_submit_handler(
     State(state): State<SharedState>,
     Path(ns): Path<String>,

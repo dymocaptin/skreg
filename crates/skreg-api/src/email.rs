@@ -28,6 +28,7 @@ pub async fn send_email(
         .header(ContentType::TEXT_PLAIN)
         .body(body.to_owned())
         .map_err(|e| format!("build email: {e}"))?;
+    // Unauthenticated, unencrypted — correct for in-cluster Postfix relay on port 25.
     AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(smtp_host)
         .port(smtp_port)
         .build()

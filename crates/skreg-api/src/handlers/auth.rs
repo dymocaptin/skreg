@@ -42,7 +42,7 @@ pub struct TokenResponse {
 /// # Errors
 ///
 /// Returns `404` if the namespace is not found, `403` if the email is not registered,
-/// `503` if the SES send fails, or `500` on a database error.
+/// `503` if the SMTP send fails, or `500` on a database error.
 pub async fn login_handler(
     State(state): State<SharedState>,
     Json(body): Json<LoginRequest>,
