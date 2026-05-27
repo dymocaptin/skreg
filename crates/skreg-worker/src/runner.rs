@@ -117,7 +117,15 @@ async fn process_job(job_id: Uuid, ctx: &JobCtx<'_>) -> Result<()> {
 
     info!("processing job {job_id}");
 
-    match run_pipeline(job_id, ctx.pool, ctx.s3, ctx.bucket, ctx.registry_ca_key_pem).await {
+    match run_pipeline(
+        job_id,
+        ctx.pool,
+        ctx.s3,
+        ctx.bucket,
+        ctx.registry_ca_key_pem,
+    )
+    .await
+    {
         Ok(()) => {
             info!("job {job_id} completed successfully");
         }

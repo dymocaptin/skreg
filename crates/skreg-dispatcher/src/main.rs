@@ -75,8 +75,7 @@ async fn notify_handler(
         smtp_port: state.smtp_port,
         from_email: &state.from_email,
     };
-    match job::ensure_worker_job(&state.kube, &cfg).await
-    {
+    match job::ensure_worker_job(&state.kube, &cfg).await {
         Ok(name) => {
             log::info!("job: {name}");
             StatusCode::OK
@@ -92,24 +91,19 @@ async fn notify_handler(
 async fn main() -> Result<()> {
     env_logger::init();
     let kube = kube::Client::try_default().await?;
-    let namespace =
-        std::env::var("KUBE_NAMESPACE").unwrap_or_else(|_| "skreg".to_owned());
+    let namespace = std::env::var("KUBE_NAMESPACE").unwrap_or_else(|_| "skreg".to_owned());
     let worker_image = std::env::var("WORKER_IMAGE")?;
-    let pki_secret =
-        std::env::var("PKI_SECRET_NAME").unwrap_or_else(|_| "skreg-pki".to_owned());
-    let db_secret =
-        std::env::var("DB_SECRET_NAME").unwrap_or_else(|_| "skreg-db".to_owned());
+    let pki_secret = std::env::var("PKI_SECRET_NAME").unwrap_or_else(|_| "skreg-pki".to_owned());
+    let db_secret = std::env::var("DB_SECRET_NAME").unwrap_or_else(|_| "skreg-db".to_owned());
     let s3_bucket = std::env::var("S3_BUCKET")?;
-    let smtp_host = std::env::var("SMTP_HOST")
-        .unwrap_or_else(|_| "postfix.skreg.svc.cluster.local".to_owned());
+    let smtp_host =
+        std::env::var("SMTP_HOST").unwrap_or_else(|_| "postfix.skreg.svc.cluster.local".to_owned());
     let smtp_port: u16 = std::env::var("SMTP_PORT")
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or(25);
-    let from_email =
-        std::env::var("FROM_EMAIL").unwrap_or_else(|_| "noreply@skreg.ai".to_owned());
-    let bind =
-        std::env::var("BIND_ADDR").unwrap_or_else(|_| "0.0.0.0:9090".to_owned());
+    let from_email = std::env::var("FROM_EMAIL").unwrap_or_else(|_| "noreply@skreg.ai".to_owned());
+    let bind = std::env::var("BIND_ADDR").unwrap_or_else(|_| "0.0.0.0:9090".to_owned());
 
     let state = Arc::new(AppState {
         kube,
