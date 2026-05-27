@@ -6,6 +6,7 @@
 pub mod auth;
 pub mod config;
 pub mod db;
+pub mod email;
 pub mod handlers;
 /// Auth helpers: Bearer token extraction and namespace resolution.
 pub mod middleware;

@@ -44,8 +44,7 @@ tower-http      = { version = "0.5", features = ["trace", "cors"] }
 jsonwebtoken    = "9"
 aws-config              = { version = "1", features = ["behavior-version-latest"] }
 aws-sdk-s3              = "1"
-aws-sdk-sesv2           = "1"
-aws-sdk-secretsmanager  = "1"
+lettre = { version = "0.11", features = ["tokio1", "smtp-transport", "builder"], default-features = false }
 rcgen                   = { workspace = true }
 rand            = "0.8"
 rsa             = { version = "0.9", features = ["sha2", "pem"] }

@@ -21,10 +21,12 @@ pub struct ApiConfig {
     pub bind_addr: String,
     /// S3 bucket name used for package artifact storage.
     pub s3_bucket: String,
-    /// Sender address used for SES transactional email.
+    /// Sender address used for transactional email.
     pub from_email: String,
-    /// AWS region where SES is configured (e.g. `us-east-1`).
-    pub ses_region: String,
+    /// SMTP relay hostname.
+    pub smtp_host: String,
+    /// SMTP relay port.
+    pub smtp_port: u16,
 }
 
 impl ApiConfig {
@@ -42,8 +44,12 @@ impl ApiConfig {
                 .map_err(|_| ConfigError::Missing("S3_BUCKET".to_owned()))?,
             from_email: env::var("FROM_EMAIL")
                 .map_err(|_| ConfigError::Missing("FROM_EMAIL".to_owned()))?,
-            ses_region: env::var("SES_REGION")
-                .map_err(|_| ConfigError::Missing("SES_REGION".to_owned()))?,
+            smtp_host: env::var("SMTP_HOST")
+                .unwrap_or_else(|_| "postfix.skreg.svc.cluster.local".to_owned()),
+            smtp_port: env::var("SMTP_PORT")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(25),
         })
     }
 }

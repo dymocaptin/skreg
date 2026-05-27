@@ -3,7 +3,6 @@
 use std::sync::Arc;
 
 use aws_sdk_s3::Client as S3Client;
-use aws_sdk_sesv2::Client as SesClient;
 use axum::{
     http::HeaderValue,
     routing::{get, post},
@@ -32,18 +31,20 @@ pub struct AppState {
     pub pool: PgPool,
     /// AWS S3 client.
     pub s3: S3Client,
-    /// AWS SES v2 client.
-    pub ses: SesClient,
     /// S3 bucket name for package artifacts.
     pub s3_bucket: String,
     /// Sender address for transactional email.
     pub from_email: String,
+    /// SMTP relay hostname.
+    pub smtp_host: String,
+    /// SMTP relay port.
+    pub smtp_port: u16,
     /// PEM-encoded Publisher CA private key, resolved once at startup.
     pub publisher_ca_key_pem: String,
     /// PEM-encoded Publisher CA certificate.
     pub publisher_ca_cert_pem: String,
-    /// When `true`, OTPs are logged at INFO level instead of sent via SES.
-    pub ses_disabled: bool,
+    /// When `true`, OTPs are logged at INFO level instead of sent via SMTP.
+    pub smtp_disabled: bool,
 }
 
 /// Arc-wrapped [`AppState`] used as the Axum router state.
