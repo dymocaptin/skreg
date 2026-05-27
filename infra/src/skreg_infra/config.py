@@ -15,6 +15,7 @@ class CloudProvider(StrEnum):
     AWS = "aws"
     GCP = "gcp"
     AZURE = "azure"
+    K8S = "k8s"
 
 
 class HsmBackend(StrEnum):
@@ -43,6 +44,8 @@ class StackConfig(BaseSettings):
     hsm_backend: HsmBackend = HsmBackend.HSM
     multi_az: bool = False
     environment: Literal["prod", "staging", "dev"] = "prod"
+    github_repo: str = ""
+    hosted_zone_id: str = ""
 
     @classmethod
     def load(cls) -> StackConfig:

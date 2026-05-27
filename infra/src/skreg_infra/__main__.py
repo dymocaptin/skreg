@@ -34,10 +34,17 @@ class SkregStack:
         )
         if self._config.cloud_provider == CloudProvider.AWS:
             self._run_aws()
+        elif self._config.cloud_provider == CloudProvider.K8S:
+            self._run_k8s()
         else:
             raise NotImplementedError(
                 f"Provider '{self._config.cloud_provider}' not yet implemented."
             )
+
+    def _run_k8s(self) -> None:
+        from skreg_infra.providers.k8s.stack import K8sStack
+
+        K8sStack(self._config).run()
 
     def _run_aws(self) -> None:
         config = self._config
