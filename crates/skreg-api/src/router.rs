@@ -11,6 +11,7 @@ use axum::{
 use serde::Serialize;
 use sqlx::PgPool;
 use tower_http::cors::{AllowHeaders, AllowMethods, CorsLayer};
+use tower_http::services::ServeDir;
 
 use crate::handlers::auth::{login_handler, token_handler};
 use crate::handlers::cert::cert_handler;
@@ -71,6 +72,7 @@ pub fn build_router(state: AppState) -> Router {
         .allow_origin(origin)
         .allow_methods(AllowMethods::mirror_request())
         .allow_headers(AllowHeaders::mirror_request());
+    let web_dist = std::env::var("WEB_DIST_DIR").unwrap_or_else(|_| "/web/dist".to_owned());
     Router::new()
         .route("/healthz", get(health_handler))
         .route("/v1/search", get(search_handler))
@@ -98,6 +100,7 @@ pub fn build_router(state: AppState) -> Router {
             "/v1/download/:ns/:name/:version/sig",
             get(package_sig_handler),
         )
+        .nest_service("/", ServeDir::new(&web_dist))
         .layer(cors)
         .with_state(shared)
 }
