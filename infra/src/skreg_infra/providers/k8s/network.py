@@ -7,7 +7,7 @@ from pulumi_kubernetes.helm.v3 import Release, ReleaseArgs, RepositoryOptsArgs
 
 
 class K8sNetworkOutputs:
-    def __init__(self, traefik_release_name: "pulumi.Output[str | None]") -> None:
+    def __init__(self, traefik_release_name: pulumi.Output[str | None]) -> None:
         self.traefik_release_name = traefik_release_name
 
 
