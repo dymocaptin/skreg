@@ -47,8 +47,7 @@ walkdir                 = "2"
 serde_yaml              = "0.9"
 aws-config              = { version = "1", features = ["behavior-version-latest"] }
 aws-sdk-s3              = "1"
-aws-sdk-secretsmanager  = "1"
-aws-sdk-sesv2           = "1"
+lettre = { version = "0.11", features = ["tokio1", "smtp-transport", "builder"], default-features = false }
 hex                     = "0.4"
 sha2                    = { workspace = true }
 x509-cert               = { workspace = true }
