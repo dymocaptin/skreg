@@ -8,6 +8,7 @@ members = [
     "crates/skreg-api",
     "crates/skreg-worker",
     "crates/skreg-tui",
+    "crates/skreg-dispatcher",
 ]
 resolver = "2"
 

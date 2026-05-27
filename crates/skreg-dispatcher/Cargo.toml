@@ -1,0 +1,20 @@
+[package]
+name = "skreg-dispatcher"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "skreg-dispatcher"
+path = "src/main.rs"
+
+[dependencies]
+tokio      = { workspace = true }
+axum       = { workspace = true }
+serde      = { workspace = true }
+serde_json = { workspace = true }
+log        = { workspace = true }
+env_logger = { workspace = true }
+anyhow     = { workspace = true }
+uuid       = { workspace = true }
+kube       = { version = "0.97", features = ["runtime"] }
+k8s-openapi = { version = "0.23", features = ["v1_31"] }
