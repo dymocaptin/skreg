@@ -99,63 +99,53 @@ jobs:
               - 'Cargo.lock'
 
   build-push:
-    name: Build and push Docker images to ECR
+    name: Build and push Docker images to local registry
     needs: [rust, python-infra, web, changes]
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     if: github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.changes.outputs.rust == 'true'
-    permissions:
-      id-token: write
-      contents: read
-    outputs:
-      registry: ${{ steps.ecr-login.outputs.registry }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Configure AWS credentials via OIDC
-        uses: aws-actions/configure-aws-credentials@v4
+      - name: Download web dist
+        uses: actions/download-artifact@v4
         with:
-          role-to-assume: ${{ vars.AWS_ROLE_ARN }}
-          aws-region: us-west-2
-
-      - name: Login to Amazon ECR
-        id: ecr-login
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Ensure ECR repositories exist
-        run: |
-          aws ecr create-repository --repository-name skreg-api --image-tag-mutability MUTABLE 2>/dev/null || true
-          aws ecr create-repository --repository-name skreg-worker --image-tag-mutability MUTABLE 2>/dev/null || true
+          name: web-dist
+          path: web/dist/
 
       - name: Build and push skreg-api
-        env:
-          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
-          SHA: ${{ github.sha }}
         run: |
           docker build \
             -f crates/skreg-api/Dockerfile \
-            -t "$REGISTRY/skreg-api:$SHA" \
-            -t "$REGISTRY/skreg-api:latest" \
+            -t localhost:30500/skreg-api:${{ github.sha }} \
+            -t localhost:30500/skreg-api:latest \
             .
-          docker push "$REGISTRY/skreg-api:$SHA"
-          docker push "$REGISTRY/skreg-api:latest"
+          docker push localhost:30500/skreg-api:${{ github.sha }}
+          docker push localhost:30500/skreg-api:latest
 
       - name: Build and push skreg-worker
-        env:
-          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
-          SHA: ${{ github.sha }}
         run: |
           docker build \
             -f crates/skreg-worker/Dockerfile \
-            -t "$REGISTRY/skreg-worker:$SHA" \
-            -t "$REGISTRY/skreg-worker:latest" \
+            -t localhost:30500/skreg-worker:${{ github.sha }} \
+            -t localhost:30500/skreg-worker:latest \
             .
-          docker push "$REGISTRY/skreg-worker:$SHA"
-          docker push "$REGISTRY/skreg-worker:latest"
+          docker push localhost:30500/skreg-worker:${{ github.sha }}
+          docker push localhost:30500/skreg-worker:latest
+
+      - name: Build and push skreg-dispatcher
+        run: |
+          docker build \
+            -f crates/skreg-dispatcher/Dockerfile \
+            -t localhost:30500/skreg-dispatcher:${{ github.sha }} \
+            -t localhost:30500/skreg-dispatcher:latest \
+            .
+          docker push localhost:30500/skreg-dispatcher:${{ github.sha }}
+          docker push localhost:30500/skreg-dispatcher:latest
 
   deploy:
-    name: Deploy infrastructure with Pulumi
+    name: Deploy with Pulumi
     needs: [rust, python-infra, web, changes, build-push]
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     if: >
       always() &&
       github.ref == 'refs/heads/main' &&
@@ -164,33 +154,11 @@ jobs:
       needs.python-infra.result == 'success' &&
       needs.web.result == 'success' &&
       (needs.build-push.result == 'success' || needs.build-push.result == 'skipped')
-    permissions:
-      id-token: write
-      contents: read
     defaults:
       run:
         working-directory: infra
     steps:
       - uses: actions/checkout@v4
-
-      - name: Configure AWS credentials via OIDC
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
-          aws-region: us-west-2
-
-      - name: Resolve image URIs
-        working-directory: .
-        run: |
-          if [ "${{ needs.build-push.result }}" = "success" ]; then
-            echo "SKREG_API_IMAGE_URI=${{ needs.build-push.outputs.registry }}/skreg-api:${{ github.sha }}" >> "$GITHUB_ENV"
-            echo "SKREG_WORKER_IMAGE_URI=${{ needs.build-push.outputs.registry }}/skreg-worker:${{ github.sha }}" >> "$GITHUB_ENV"
-          else
-            ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
-            REGISTRY="${ACCOUNT}.dkr.ecr.us-west-2.amazonaws.com"
-            echo "SKREG_API_IMAGE_URI=${REGISTRY}/skreg-api:latest" >> "$GITHUB_ENV"
-            echo "SKREG_WORKER_IMAGE_URI=${REGISTRY}/skreg-worker:latest" >> "$GITHUB_ENV"
-          fi
 
       - name: Download web dist
         uses: actions/download-artifact@v4
@@ -211,14 +179,19 @@ jobs:
         env:
           PULUMI_BACKEND_URL: ${{ secrets.PULUMI_BACKEND_URL }}
           PULUMI_CONFIG_PASSPHRASE: ${{ secrets.PULUMI_CONFIG_PASSPHRASE }}
-          SKREG_CLOUD_PROVIDER: aws
+          SKREG_CLOUD_PROVIDER: k8s
           SKREG_DOMAIN_NAME: ${{ vars.SKREG_DOMAIN_NAME }}
-          SKREG_EXISTING_CERT_ARN: ${{ secrets.SKREG_EXISTING_CERT_ARN }}
           SKREG_FROM_EMAIL: ${{ vars.SKREG_FROM_EMAIL }}
-          SKREG_SES_REGION: ${{ vars.SKREG_SES_REGION }}
-          SKREG_WEB_DOMAIN_NAME: ${{ vars.SKREG_WEB_DOMAIN_NAME }}
-          SKREG_WEB_CERT_ARN: ${{ secrets.SKREG_WEB_CERT_ARN }}
+          SKREG_GITHUB_REPO: dymocaptin/skreg
+          SKREG_HOSTED_ZONE_ID: ${{ secrets.SKREG_HOSTED_ZONE_ID }}
+          SKREG_API_IMAGE_URI: >-
+            ${{ needs.build-push.result == 'success' &&
+                format('localhost:30500/skreg-api:{0}', github.sha) ||
+                'localhost:30500/skreg-api:latest' }}
+          SKREG_WORKER_IMAGE_URI: >-
+            ${{ needs.build-push.result == 'success' &&
+                format('localhost:30500/skreg-worker:{0}', github.sha) ||
+                'localhost:30500/skreg-worker:latest' }}
         run: |
           pulumi stack select main
-          pulumi refresh --yes
           pulumi up --yes
