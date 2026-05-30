@@ -27,7 +27,7 @@ class K8sNetwork(pulumi.ComponentResource):
                 namespace="skreg-infra",
                 create_namespace=False,
                 values={
-                    "deployment": {"kind": "DaemonSet"},
+                    "deployment": {"replicas": 1},
                     "hostNetwork": True,
                     "dnsPolicy": "ClusterFirstWithHostNet",
                     "service": {"type": "ClusterIP"},
@@ -43,11 +43,13 @@ class K8sNetwork(pulumi.ComponentResource):
                         }
                     ],
                     "nodeSelector": {"ingress-ready": "true"},
-                    "additionalArguments": [
-                        "--certificatesresolvers.letsencrypt.acme.email=peknudsen@gmail.com",
-                        "--certificatesresolvers.letsencrypt.acme.storage=/data/acme.json",
-                        "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web",
-                    ],
+                    "certResolvers": {
+                        "letsencrypt": {
+                            "email": "peknudsen@gmail.com",
+                            "httpChallenge": {"entryPoint": "web"},
+                            "storage": "/data/acme.json",
+                        }
+                    },
                     "persistence": {"enabled": True, "size": "128Mi"},
                     "ingressClass": {"enabled": True, "isDefaultClass": True},
                 },

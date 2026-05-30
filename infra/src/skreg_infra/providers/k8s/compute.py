@@ -31,7 +31,11 @@ class K8sCompute(pulumi.ComponentResource):
 
         deploy = k8s.apps.v1.Deployment(
             f"{name}-api-deploy",
-            metadata=k8s.meta.v1.ObjectMetaArgs(name="skreg-api", namespace="skreg"),
+            metadata=k8s.meta.v1.ObjectMetaArgs(
+                name="skreg-api",
+                namespace="skreg",
+                annotations={"pulumi.io/skipAwait": "true"},
+            ),
             spec=k8s.apps.v1.DeploymentSpecArgs(
                 replicas=1,
                 selector=k8s.meta.v1.LabelSelectorArgs(match_labels=labels),

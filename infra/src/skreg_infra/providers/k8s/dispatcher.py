@@ -61,7 +61,11 @@ class K8sDispatcher(pulumi.ComponentResource):
 
         k8s.apps.v1.Deployment(
             f"{name}-deploy",
-            metadata=k8s.meta.v1.ObjectMetaArgs(name="skreg-dispatcher", namespace="skreg"),
+            metadata=k8s.meta.v1.ObjectMetaArgs(
+                name="skreg-dispatcher",
+                namespace="skreg",
+                annotations={"pulumi.io/skipAwait": "true"},
+            ),
             spec=k8s.apps.v1.DeploymentSpecArgs(
                 replicas=1,
                 selector=k8s.meta.v1.LabelSelectorArgs(match_labels=labels),
