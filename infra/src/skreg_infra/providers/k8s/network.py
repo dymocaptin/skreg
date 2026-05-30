@@ -18,18 +18,6 @@ class K8sNetwork(pulumi.ComponentResource):
     def __init__(self, name: str, opts: pulumi.ResourceOptions | None = None) -> None:
         super().__init__("skreg:k8s:Network", name, {}, opts)
 
-        ns = k8s.core.v1.Namespace(
-            f"{name}-ns",
-            metadata=k8s.meta.v1.ObjectMetaArgs(name="skreg-infra"),
-            opts=pulumi.ResourceOptions(parent=self),
-        )
-
-        skreg_ns = k8s.core.v1.Namespace(
-            f"{name}-skreg-ns",
-            metadata=k8s.meta.v1.ObjectMetaArgs(name="skreg"),
-            opts=pulumi.ResourceOptions(parent=self),
-        )
-
         self._traefik_release = Release(
             f"{name}-traefik",
             ReleaseArgs(
@@ -64,7 +52,7 @@ class K8sNetwork(pulumi.ComponentResource):
                     "ingressClass": {"enabled": True, "isDefaultClass": True},
                 },
             ),
-            opts=pulumi.ResourceOptions(parent=self, depends_on=[ns, skreg_ns]),
+            opts=pulumi.ResourceOptions(parent=self),
         )
 
         self._outputs = K8sNetworkOutputs(

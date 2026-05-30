@@ -58,6 +58,6 @@ class K8sStack:
         # suppress unused-variable warnings — these resources register themselves
         _ = database, pki, email
 
-        pulumi.export("api_url", f"https://{config.domain_name}")
+        pulumi.export("api_url", f"https://api.{config.domain_name}")
         pulumi.export("registry_url", registry.outputs.registry_url)
         pulumi.export("api_service_url", compute.outputs.service_url)

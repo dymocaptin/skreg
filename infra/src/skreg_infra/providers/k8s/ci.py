@@ -25,7 +25,7 @@ class K8sCi(pulumi.ComponentResource):
                 chart="oci://ghcr.io/actions/actions-runner-controller-charts/gha-runner-scale-set-controller",
                 version="0.10.1",
                 namespace="skreg-ci",
-                create_namespace=True,
+                create_namespace=False,
                 values={
                     "resources": {
                         "requests": {"cpu": "50m", "memory": "64Mi"},
