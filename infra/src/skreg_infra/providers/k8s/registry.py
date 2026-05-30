@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pulumi
-from pulumi_kubernetes.helm.v3 import Release, ReleaseArgs, RepositoryOptsArgs
+import pulumi_kubernetes as k8s
 
 
 class K8sRegistryOutputs:
@@ -12,7 +12,11 @@ class K8sRegistryOutputs:
 
 
 class K8sRegistry(pulumi.ComponentResource):
-    """Docker registry v2, NodePort 30500 on the Kind host."""
+    """Docker registry v2, NodePort 30500 on the Kind host.
+
+    Deployed as a plain Deployment + PVC + NodePort Service rather than a Helm
+    chart to avoid the unreliable helm.twun.io repository.
+    """
 
     REGISTRY_URL = "localhost:30500"
 
@@ -20,24 +24,75 @@ class K8sRegistry(pulumi.ComponentResource):
         super().__init__("skreg:k8s:Registry", name, {}, opts)
 
         self._registry_url = self.REGISTRY_URL
+        labels = {"app": "docker-registry"}
 
-        Release(
-            f"{name}-registry",
-            ReleaseArgs(
-                chart="docker-registry",
-                repository_opts=RepositoryOptsArgs(repo="https://helm.twun.io"),
-                version="2.2.3",
-                namespace="skreg-infra",
-                create_namespace=False,
-                values={
-                    "service": {"type": "NodePort", "nodePort": 30500},
-                    "persistence": {"enabled": True, "size": "20Gi"},
-                    "resources": {
-                        "requests": {"cpu": "50m", "memory": "64Mi"},
-                    },
-                },
+        pvc = k8s.core.v1.PersistentVolumeClaim(
+            f"{name}-pvc",
+            metadata=k8s.meta.v1.ObjectMetaArgs(name="docker-registry", namespace="skreg-infra"),
+            spec=k8s.core.v1.PersistentVolumeClaimSpecArgs(
+                access_modes=["ReadWriteOnce"],
+                resources=k8s.core.v1.VolumeResourceRequirementsArgs(
+                    requests={"storage": "20Gi"},
+                ),
             ),
             opts=pulumi.ResourceOptions(parent=self),
+        )
+
+        deploy = k8s.apps.v1.Deployment(
+            f"{name}-deploy",
+            metadata=k8s.meta.v1.ObjectMetaArgs(name="docker-registry", namespace="skreg-infra"),
+            spec=k8s.apps.v1.DeploymentSpecArgs(
+                replicas=1,
+                selector=k8s.meta.v1.LabelSelectorArgs(match_labels=labels),
+                template=k8s.core.v1.PodTemplateSpecArgs(
+                    metadata=k8s.meta.v1.ObjectMetaArgs(labels=labels),
+                    spec=k8s.core.v1.PodSpecArgs(
+                        containers=[
+                            k8s.core.v1.ContainerArgs(
+                                name="registry",
+                                image="registry:2",
+                                ports=[k8s.core.v1.ContainerPortArgs(container_port=5000)],
+                                env=[
+                                    k8s.core.v1.EnvVarArgs(
+                                        name="REGISTRY_STORAGE_FILESYSTEM_ROOTDIRECTORY",
+                                        value="/var/lib/registry",
+                                    ),
+                                ],
+                                resources=k8s.core.v1.ResourceRequirementsArgs(
+                                    requests={"cpu": "50m", "memory": "64Mi"},
+                                ),
+                                volume_mounts=[
+                                    k8s.core.v1.VolumeMountArgs(
+                                        name="data", mount_path="/var/lib/registry"
+                                    )
+                                ],
+                            )
+                        ],
+                        volumes=[
+                            k8s.core.v1.VolumeArgs(
+                                name="data",
+                                persistent_volume_claim=k8s.core.v1.PersistentVolumeClaimVolumeSourceArgs(
+                                    claim_name="docker-registry"
+                                ),
+                            )
+                        ],
+                    ),
+                ),
+            ),
+            opts=pulumi.ResourceOptions(parent=self, depends_on=[pvc]),
+        )
+
+        k8s.core.v1.Service(
+            f"{name}-svc",
+            metadata=k8s.meta.v1.ObjectMetaArgs(name="docker-registry", namespace="skreg-infra"),
+            spec=k8s.core.v1.ServiceSpecArgs(
+                selector=labels,
+                type="NodePort",
+                ports=[
+                    k8s.core.v1.ServicePortArgs(port=5000, target_port=5000, node_port=30500)
+                ],
+            ),
+            opts=pulumi.ResourceOptions(parent=self, depends_on=[deploy]),
         )
 
         self._outputs = K8sRegistryOutputs(registry_url=self._registry_url)
