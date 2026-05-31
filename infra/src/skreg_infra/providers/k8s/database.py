@@ -23,7 +23,7 @@ class K8sDatabase(pulumi.ComponentResource):
     def __init__(self, name: str, opts: pulumi.ResourceOptions | None = None) -> None:
         super().__init__("skreg:k8s:Database", name, {}, opts)
 
-        self._secret_name = "skreg-db"
+        self._secret_name = "skreg-db"  # noqa: S105
         labels = {"app": "postgresql"}
 
         pvc = k8s.core.v1.PersistentVolumeClaim(

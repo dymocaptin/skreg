@@ -19,6 +19,8 @@ def test_hsm_backend_values() -> None:
 
 def test_stack_config_load(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("SKREG_CLOUD_PROVIDER", "aws")
+    monkeypatch.setenv("SKREG_API_IMAGE_URI", "")
+    monkeypatch.setenv("SKREG_WORKER_IMAGE_URI", "")
     config = StackConfig.load()
     assert config.cloud_provider == CloudProvider.AWS
     assert config.hsm_backend == HsmBackend.HSM
@@ -51,6 +53,7 @@ def test_stack_config_image_uris(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def test_stack_config_domain_name_defaults_to_empty(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("SKREG_CLOUD_PROVIDER", "aws")
+    monkeypatch.setenv("SKREG_DOMAIN_NAME", "")
     config = StackConfig.load()
     assert config.domain_name == ""
 

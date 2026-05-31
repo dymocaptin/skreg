@@ -1,17 +1,31 @@
 //! Thin async SMTP send helper used by auth and rotate handlers.
 
 use lettre::message::{header::ContentType, Mailbox, Message};
+use lettre::transport::smtp::authentication::Credentials;
 use lettre::{AsyncSmtpTransport, AsyncTransport, Tokio1Executor};
 use log::error;
 
-/// Send a plain-text email via an unauthenticated SMTP relay.
+/// SMTP relay configuration.
+#[derive(Clone, Debug)]
+pub struct SmtpConfig {
+    /// Hostname of the SMTP relay.
+    pub host: String,
+    /// TCP port of the SMTP relay.
+    pub port: u16,
+    /// When `Some`, uses STARTTLS + PLAIN auth (e.g. Amazon SES SMTP on port 587).
+    /// When `None`, connects anonymously (e.g. in-cluster Postfix on port 25).
+    pub username: Option<String>,
+    /// SMTP password paired with `username`.
+    pub password: Option<String>,
+}
+
+/// Send a plain-text email.
 ///
 /// # Errors
 ///
 /// Returns a human-readable error string if the message cannot be built or sent.
 pub async fn send_email(
-    smtp_host: &str,
-    smtp_port: u16,
+    cfg: &SmtpConfig,
     from: &str,
     to: &str,
     subject: &str,
@@ -28,15 +42,28 @@ pub async fn send_email(
         .header(ContentType::TEXT_PLAIN)
         .body(body.to_owned())
         .map_err(|e| format!("build email: {e}"))?;
-    // Unauthenticated, unencrypted — correct for in-cluster Postfix relay on port 25.
-    AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(smtp_host)
-        .port(smtp_port)
-        .build()
-        .send(email)
-        .await
-        .map(|_| ())
-        .map_err(|e| {
-            error!("smtp send error: {e}");
-            format!("smtp: {e}")
-        })
+
+    match (&cfg.username, &cfg.password) {
+        (Some(user), Some(pass)) => {
+            AsyncSmtpTransport::<Tokio1Executor>::starttls_relay(&cfg.host)
+                .map_err(|e| format!("smtp relay: {e}"))?
+                .port(cfg.port)
+                .credentials(Credentials::new(user.clone(), pass.clone()))
+                .build()
+                .send(email)
+                .await
+        }
+        _ => {
+            AsyncSmtpTransport::<Tokio1Executor>::builder_dangerous(&cfg.host)
+                .port(cfg.port)
+                .build()
+                .send(email)
+                .await
+        }
+    }
+    .map(|_| ())
+    .map_err(|e| {
+        error!("smtp send error: {e}");
+        format!("smtp: {e}")
+    })
 }

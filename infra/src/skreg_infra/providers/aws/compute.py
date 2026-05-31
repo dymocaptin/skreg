@@ -30,11 +30,13 @@ class AwsComputeArgs:
         existing_cert_arn: str = "",
         s3_bucket: pulumi.Input[str] = "",
         from_email: str = "",
-        ses_region: str = "",
-        ca_secret_arn: pulumi.Input[str] = "",
-        db_sg_id: pulumi.Input[str] = "",
-        publisher_ca_key_secret_name: pulumi.Input[str] = "",
+        smtp_host: str = "",
+        smtp_port: int = 587,
+        smtp_credentials_secret_arn: pulumi.Input[str] = "",
+        publisher_ca_key_secret_arn: pulumi.Input[str] = "",
         publisher_ca_cert_pem: pulumi.Input[str] = "",
+        registry_ca_key_secret_arn: pulumi.Input[str] = "",
+        db_sg_id: pulumi.Input[str] = "",
     ) -> None:
         self.vpc_id: pulumi.Input[str] = vpc_id
         self.public_subnet_ids: list[pulumi.Input[str]] = public_subnet_ids
@@ -46,11 +48,13 @@ class AwsComputeArgs:
         self.existing_cert_arn: str = existing_cert_arn
         self.s3_bucket: pulumi.Input[str] = s3_bucket
         self.from_email: str = from_email
-        self.ses_region: str = ses_region
-        self.ca_secret_arn: pulumi.Input[str] = ca_secret_arn
-        self.db_sg_id: pulumi.Input[str] = db_sg_id
-        self.publisher_ca_key_secret_name: pulumi.Input[str] = publisher_ca_key_secret_name
+        self.smtp_host: str = smtp_host
+        self.smtp_port: int = smtp_port
+        self.smtp_credentials_secret_arn: pulumi.Input[str] = smtp_credentials_secret_arn
+        self.publisher_ca_key_secret_arn: pulumi.Input[str] = publisher_ca_key_secret_arn
         self.publisher_ca_cert_pem: pulumi.Input[str] = publisher_ca_cert_pem
+        self.registry_ca_key_secret_arn: pulumi.Input[str] = registry_ca_key_secret_arn
+        self.db_sg_id: pulumi.Input[str] = db_sg_id
 
 
 class AwsCompute(pulumi.ComponentResource):
@@ -111,15 +115,20 @@ class AwsCompute(pulumi.ComponentResource):
             f"{name}-exec-secrets-policy",
             aws.iam.RolePolicyArgs(
                 role=exec_role.name,
-                policy=pulumi.Output.from_input(args.db_secret_arn).apply(
-                    lambda arn: json.dumps(
+                policy=pulumi.Output.all(
+                    pulumi.Output.from_input(args.db_secret_arn),
+                    pulumi.Output.from_input(args.publisher_ca_key_secret_arn),
+                    pulumi.Output.from_input(args.registry_ca_key_secret_arn),
+                    pulumi.Output.from_input(args.smtp_credentials_secret_arn),
+                ).apply(
+                    lambda arns: json.dumps(
                         {
                             "Version": "2012-10-17",
                             "Statement": [
                                 {
                                     "Effect": "Allow",
                                     "Action": "secretsmanager:GetSecretValue",
-                                    "Resource": arn,
+                                    "Resource": [a for a in arns if a],
                                 }
                             ],
                         }
@@ -169,11 +178,6 @@ class AwsCompute(pulumi.ComponentResource):
                                         f"arn:aws:s3:::{bucket}/*",
                                     ],
                                 },
-                                {
-                                    "Effect": "Allow",
-                                    "Action": "ses:SendEmail",
-                                    "Resource": "*",
-                                },
                             ],
                         }
                     )
@@ -191,11 +195,8 @@ class AwsCompute(pulumi.ComponentResource):
             f"{name}-worker-task-policy",
             aws.iam.RolePolicyArgs(
                 role=worker_task_role.name,
-                policy=pulumi.Output.all(
-                    pulumi.Output.from_input(args.s3_bucket),
-                    pulumi.Output.from_input(args.ca_secret_arn),
-                ).apply(
-                    lambda vals: json.dumps(
+                policy=pulumi.Output.from_input(args.s3_bucket).apply(
+                    lambda bucket: json.dumps(
                         {
                             "Version": "2012-10-17",
                             "Statement": [
@@ -208,14 +209,9 @@ class AwsCompute(pulumi.ComponentResource):
                                         "s3:ListBucket",
                                     ],
                                     "Resource": [
-                                        f"arn:aws:s3:::{vals[0]}",
-                                        f"arn:aws:s3:::{vals[0]}/*",
+                                        f"arn:aws:s3:::{bucket}",
+                                        f"arn:aws:s3:::{bucket}/*",
                                     ],
-                                },
-                                {
-                                    "Effect": "Allow",
-                                    "Action": "secretsmanager:GetSecretValue",
-                                    "Resource": vals[1],
                                 },
                             ],
                         }
@@ -457,13 +453,15 @@ class AwsCompute(pulumi.ComponentResource):
 
         api_image = args.api_image_uri
         from_email = args.from_email
-        ses_region = args.ses_region
+        smtp_host = args.smtp_host
+        smtp_port = str(args.smtp_port)
         aws_region = region.name
         api_container_defs = pulumi.Output.all(
             pulumi.Output.from_input(args.db_secret_arn),
             pulumi.Output.from_input(args.s3_bucket),
-            pulumi.Output.from_input(args.publisher_ca_key_secret_name),
+            pulumi.Output.from_input(args.publisher_ca_key_secret_arn),
             pulumi.Output.from_input(args.publisher_ca_cert_pem),
+            pulumi.Output.from_input(args.smtp_credentials_secret_arn),
         ).apply(
             lambda vals: json.dumps(
                 [
@@ -475,17 +473,23 @@ class AwsCompute(pulumi.ComponentResource):
                             {"name": "BIND_ADDR", "value": "0.0.0.0:8080"},
                             {"name": "S3_BUCKET", "value": vals[1]},
                             {"name": "FROM_EMAIL", "value": from_email},
-                            {"name": "SES_REGION", "value": ses_region},
+                            {"name": "SMTP_HOST", "value": smtp_host},
+                            {"name": "SMTP_PORT", "value": smtp_port},
                             {"name": "AWS_REGION", "value": aws_region},
-                            {"name": "PUBLISHER_CA_KEY_SECRET_NAME", "value": vals[2]},
                             {"name": "PUBLISHER_CA_CERT_PEM", "value": vals[3]},
                         ],
-                        "secrets": [{"name": "DATABASE_URL", "valueFrom": vals[0]}],
+                        "secrets": [
+                            {"name": "DATABASE_URL", "valueFrom": vals[0]},
+                            {"name": "PUBLISHER_CA_KEY_PEM", "valueFrom": vals[2]},
+                            *([{"name": "SMTP_USERNAME", "valueFrom": f"{vals[4]}:username::"},
+                               {"name": "SMTP_PASSWORD", "valueFrom": f"{vals[4]}:password::"}]
+                              if vals[4] else []),
+                        ],
                         "logConfiguration": {
                             "logDriver": "awslogs",
                             "options": {
                                 "awslogs-group": "/ecs/skreg-api",
-                                "awslogs-region": "us-west-2",
+                                "awslogs-region": aws_region,
                                 "awslogs-stream-prefix": "ecs",
                             },
                         },
@@ -513,7 +517,8 @@ class AwsCompute(pulumi.ComponentResource):
         worker_container_defs = pulumi.Output.all(
             pulumi.Output.from_input(args.db_secret_arn),
             pulumi.Output.from_input(args.s3_bucket),
-            pulumi.Output.from_input(args.ca_secret_arn),
+            pulumi.Output.from_input(args.registry_ca_key_secret_arn),
+            pulumi.Output.from_input(args.smtp_credentials_secret_arn),
         ).apply(
             lambda vals: json.dumps(
                 [
@@ -522,14 +527,23 @@ class AwsCompute(pulumi.ComponentResource):
                         "image": worker_image,
                         "environment": [
                             {"name": "S3_BUCKET", "value": vals[1]},
-                            {"name": "CA_SECRET_ARN", "value": vals[2]},
+                            {"name": "FROM_EMAIL", "value": from_email},
+                            {"name": "SMTP_HOST", "value": smtp_host},
+                            {"name": "SMTP_PORT", "value": smtp_port},
+                            {"name": "AWS_REGION", "value": aws_region},
                         ],
-                        "secrets": [{"name": "DATABASE_URL", "valueFrom": vals[0]}],
+                        "secrets": [
+                            {"name": "DATABASE_URL", "valueFrom": vals[0]},
+                            {"name": "REGISTRY_CA_KEY_PEM", "valueFrom": vals[2]},
+                            *([{"name": "SMTP_USERNAME", "valueFrom": f"{vals[3]}:username::"},
+                               {"name": "SMTP_PASSWORD", "valueFrom": f"{vals[3]}:password::"}]
+                              if vals[3] else []),
+                        ],
                         "logConfiguration": {
                             "logDriver": "awslogs",
                             "options": {
                                 "awslogs-group": "/ecs/skreg-worker",
-                                "awslogs-region": "us-west-2",
+                                "awslogs-region": aws_region,
                                 "awslogs-stream-prefix": "ecs",
                             },
                         },

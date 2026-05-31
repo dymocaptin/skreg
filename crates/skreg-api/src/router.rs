@@ -36,10 +36,8 @@ pub struct AppState {
     pub s3_bucket: String,
     /// Sender address for transactional email.
     pub from_email: String,
-    /// SMTP relay hostname.
-    pub smtp_host: String,
-    /// SMTP relay port.
-    pub smtp_port: u16,
+    /// SMTP relay configuration.
+    pub smtp: crate::email::SmtpConfig,
     /// PEM-encoded Publisher CA private key, resolved once at startup.
     pub publisher_ca_key_pem: String,
     /// PEM-encoded Publisher CA certificate.

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pulumi
-import pulumi_kubernetes as k8s
 from pulumi_kubernetes.helm.v3 import Release, ReleaseArgs, RepositoryOptsArgs
 
 

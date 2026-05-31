@@ -4,6 +4,8 @@ use std::env;
 
 use thiserror::Error;
 
+use crate::email::SmtpConfig;
+
 /// Errors during configuration loading.
 #[derive(Debug, Error)]
 pub enum ConfigError {
@@ -23,10 +25,8 @@ pub struct ApiConfig {
     pub s3_bucket: String,
     /// Sender address used for transactional email.
     pub from_email: String,
-    /// SMTP relay hostname.
-    pub smtp_host: String,
-    /// SMTP relay port.
-    pub smtp_port: u16,
+    /// SMTP relay configuration.
+    pub smtp: SmtpConfig,
 }
 
 impl ApiConfig {
@@ -44,12 +44,16 @@ impl ApiConfig {
                 .map_err(|_| ConfigError::Missing("S3_BUCKET".to_owned()))?,
             from_email: env::var("FROM_EMAIL")
                 .map_err(|_| ConfigError::Missing("FROM_EMAIL".to_owned()))?,
-            smtp_host: env::var("SMTP_HOST")
-                .unwrap_or_else(|_| "postfix.skreg.svc.cluster.local".to_owned()),
-            smtp_port: env::var("SMTP_PORT")
-                .ok()
-                .and_then(|v| v.parse().ok())
-                .unwrap_or(25),
+            smtp: SmtpConfig {
+                host: env::var("SMTP_HOST")
+                    .unwrap_or_else(|_| "postfix.skreg.svc.cluster.local".to_owned()),
+                port: env::var("SMTP_PORT")
+                    .ok()
+                    .and_then(|v| v.parse().ok())
+                    .unwrap_or(25),
+                username: env::var("SMTP_USERNAME").ok(),
+                password: env::var("SMTP_PASSWORD").ok(),
+            },
         })
     }
 }

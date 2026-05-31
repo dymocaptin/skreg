@@ -13,8 +13,7 @@ use crate::stages::run_pipeline;
 struct JobCtx<'a> {
     pool: &'a PgPool,
     s3: &'a S3Client,
-    smtp_host: &'a str,
-    smtp_port: u16,
+    smtp: &'a crate::email::SmtpConfig,
     from_email: &'a str,
     bucket: &'a str,
     registry_ca_key_pem: &'a str,
@@ -28,8 +27,7 @@ struct JobCtx<'a> {
 pub async fn run(
     pool: PgPool,
     s3: S3Client,
-    smtp_host: String,
-    smtp_port: u16,
+    smtp: crate::email::SmtpConfig,
     from_email: String,
     bucket: String,
     registry_ca_key_pem: String,
@@ -39,8 +37,7 @@ pub async fn run(
     drain_pending(&JobCtx {
         pool: &pool,
         s3: &s3,
-        smtp_host: &smtp_host,
-        smtp_port,
+        smtp: &smtp,
         from_email: &from_email,
         bucket: &bucket,
         registry_ca_key_pem: &registry_ca_key_pem,
@@ -58,7 +55,7 @@ pub async fn run(
             Ok(job_id) => {
                 let pool2 = pool.clone();
                 let s3_2 = s3.clone();
-                let smtp2 = smtp_host.clone();
+                let smtp2 = smtp.clone();
                 let from2 = from_email.clone();
                 let bucket2 = bucket.clone();
                 let pem2 = registry_ca_key_pem.clone();
@@ -66,8 +63,7 @@ pub async fn run(
                     let ctx = JobCtx {
                         pool: &pool2,
                         s3: &s3_2,
-                        smtp_host: &smtp2,
-                        smtp_port,
+                        smtp: &smtp2,
                         from_email: &from2,
                         bucket: &bucket2,
                         registry_ca_key_pem: &pem2,
@@ -176,8 +172,7 @@ async fn send_failure_email(job_id: Uuid, message: &str, ctx: &JobCtx<'_>) -> Re
     };
 
     crate::email::send_email(
-        ctx.smtp_host,
-        ctx.smtp_port,
+        ctx.smtp,
         ctx.from_email,
         &to_email,
         &format!("Publishing {pkg_ref} failed"),

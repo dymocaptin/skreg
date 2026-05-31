@@ -98,8 +98,7 @@ pub async fn login_handler(
         log::info!("[DEV] OTP for namespace '{}': {}", body.namespace, otp);
     } else {
         crate::email::send_email(
-            &state.smtp_host,
-            state.smtp_port,
+            &state.smtp,
             &state.from_email,
             &body.email,
             "Your skreg login code",

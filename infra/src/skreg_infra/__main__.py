@@ -78,11 +78,13 @@ class SkregStack:
                 existing_cert_arn=config.existing_cert_arn,
                 s3_bucket=storage.outputs.bucket_name,
                 from_email=config.from_email,
-                ses_region=config.ses_region,
-                ca_secret_arn=pki.outputs.hsm_key_id,
-                db_sg_id=database.outputs.security_group_id,
-                publisher_ca_key_secret_name=pki.outputs.publisher_ca_key_secret_name,
+                smtp_host=config.smtp_host,
+                smtp_port=config.smtp_port,
+                smtp_credentials_secret_arn=config.smtp_credentials_secret_arn,
+                publisher_ca_key_secret_arn=pki.outputs.publisher_ca_key_secret_arn or "",
                 publisher_ca_cert_pem=pki.publisher_ca_cert_pem,
+                registry_ca_key_secret_arn=pki.outputs.registry_ca_key_secret_arn or "",
+                db_sg_id=database.outputs.security_group_id,
             ),
         )
         AwsWorkerTrigger(

@@ -20,21 +20,17 @@ class PkiOutputs:
         crl_bucket_path: pulumi.Output[str],
         hsm_backend: str,
         publisher_ca_key_secret_name: pulumi.Output[str],
+        publisher_ca_key_secret_arn: pulumi.Output[str] | None = None,
+        registry_ca_key_secret_arn: pulumi.Output[str] | None = None,
     ) -> None:
-        """Initialise PKI outputs.
-
-        Args:
-            hsm_key_id: Provider-specific HSM key identifier.
-            intermediate_ca_cert_secret_name: Secret name for the intermediate CA cert.
-            crl_bucket_path: Object storage path for the CRL file.
-            hsm_backend: Either ``"hsm"`` or ``"software"``.
-            publisher_ca_key_secret_name: Secret name for the publisher CA key.
-        """
         self.hsm_key_id: pulumi.Output[str] = hsm_key_id
         self.intermediate_ca_cert_secret_name: pulumi.Output[str] = intermediate_ca_cert_secret_name
         self.crl_bucket_path: pulumi.Output[str] = crl_bucket_path
         self.hsm_backend: str = hsm_backend
         self.publisher_ca_key_secret_name: pulumi.Output[str] = publisher_ca_key_secret_name
+        # ARNs are AWS-specific; None on providers that use K8s Secrets instead.
+        self.publisher_ca_key_secret_arn: pulumi.Output[str] | None = publisher_ca_key_secret_arn
+        self.registry_ca_key_secret_arn: pulumi.Output[str] | None = registry_ca_key_secret_arn
 
 
 class SkillpkgPki(Protocol):

@@ -176,8 +176,7 @@ async fn send_rotation_email(
     }
 
     crate::email::send_email(
-        &state.smtp_host,
-        state.smtp_port,
+        &state.smtp,
         &state.from_email,
         &email,
         "Confirm your skreg key rotation",

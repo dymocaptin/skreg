@@ -221,6 +221,8 @@ class AwsPki(pulumi.ComponentResource):
             ),
             hsm_backend="software",
             publisher_ca_key_secret_name=publisher_ca_key_secret.name,
+            publisher_ca_key_secret_arn=publisher_ca_key_secret.arn,
+            registry_ca_key_secret_arn=ca_key_secret.arn,
         )
         self.root_ca_cert_pem: pulumi.Output[str] = ca_cert_version.secret_string.apply(
             lambda s: s or ""
