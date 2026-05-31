@@ -170,57 +170,27 @@ async fn send_rotation_email(
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
 
-    state
-        .ses
-        .send_email()
-        .from_email_address(&state.from_email)
-        .destination(
-            aws_sdk_sesv2::types::Destination::builder()
-                .to_addresses(&email)
-                .build(),
-        )
-        .content(
-            aws_sdk_sesv2::types::EmailContent::builder()
-                .simple(
-                    aws_sdk_sesv2::types::Message::builder()
-                        .subject(
-                            aws_sdk_sesv2::types::Content::builder()
-                                .data("Confirm your skreg key rotation")
-                                .build()
-                                .map_err(|e| {
-                                    error!("ses build error: {e}");
-                                    StatusCode::INTERNAL_SERVER_ERROR
-                                })?,
-                        )
-                        .body(
-                            aws_sdk_sesv2::types::Body::builder()
-                                .text(
-                                    aws_sdk_sesv2::types::Content::builder()
-                                        .data(format!(
-                                            "A key rotation was requested for namespace \
-                                             \"{namespace}\".\n\n\
-                                             Confirm here (link valid for 24 h):\n{confirm_url}\n\n\
-                                             If you did not request this, ignore this email."
-                                        ))
-                                        .build()
-                                        .map_err(|e| {
-                                            error!("ses build error: {e}");
-                                            StatusCode::INTERNAL_SERVER_ERROR
-                                        })?,
-                                )
-                                .build(),
-                        )
-                        .build(),
-                )
-                .build(),
-        )
-        .send()
-        .await
-        .map_err(|e| {
-            error!("SES send error: {e}");
-            StatusCode::SERVICE_UNAVAILABLE
-        })?;
+    if state.smtp_disabled {
+        log::info!("[DEV] rotation email for namespace '{namespace}': {confirm_url}");
+        return Ok(());
+    }
 
+    crate::email::send_email(
+        &state.smtp,
+        &state.from_email,
+        &email,
+        "Confirm your skreg key rotation",
+        &format!(
+            "A key rotation was requested for namespace \"{namespace}\".\n\n\
+             Confirm here (link valid for 24 h):\n{confirm_url}\n\n\
+             If you did not request this, ignore this email."
+        ),
+    )
+    .await
+    .map_err(|e| {
+        error!("smtp error: {e}");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
     Ok(())
 }
 
@@ -417,7 +387,7 @@ async fn persist_rotation(
 /// - `409` — nonce already used
 /// - `422` — malformed token or cert
 /// - `429` — rate limit exceeded
-/// - `500` — database or SES error
+/// - `500` — database or SMTP error
 pub async fn rotate_submit_handler(
     State(state): State<SharedState>,
     Path(ns): Path<String>,

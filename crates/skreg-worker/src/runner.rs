@@ -1,9 +1,7 @@
-//! Job runner: listens on pg_notify("vetting_jobs") and dispatches stage pipeline.
+//! Job runner: listens on `pg_notify("vetting_jobs")` and dispatches stage pipeline.
 
 use anyhow::Result;
 use aws_sdk_s3::Client as S3Client;
-use aws_sdk_sesv2::types::{Body, Content, Destination, EmailContent, Message};
-use aws_sdk_sesv2::Client as SesClient;
 use log::{error, info};
 use sqlx::postgres::PgListener;
 use sqlx::PgPool;
@@ -11,7 +9,17 @@ use uuid::Uuid;
 
 use crate::stages::run_pipeline;
 
-/// Start the `pg_notify` listener loop. Blocks indefinitely.
+/// Shared configuration threaded through the job pipeline.
+struct JobCtx<'a> {
+    pool: &'a PgPool,
+    s3: &'a S3Client,
+    smtp: &'a crate::email::SmtpConfig,
+    from_email: &'a str,
+    bucket: &'a str,
+    registry_ca_key_pem: &'a str,
+}
+
+/// Start the `pg_notify` listener loop. Blocks until a fatal error occurs.
 ///
 /// # Errors
 ///
@@ -19,10 +27,23 @@ use crate::stages::run_pipeline;
 pub async fn run(
     pool: PgPool,
     s3: S3Client,
-    ses: SesClient,
+    smtp: crate::email::SmtpConfig,
+    from_email: String,
     bucket: String,
     registry_ca_key_pem: String,
 ) -> Result<()> {
+    // Process any jobs already pending in the DB before entering the listen loop.
+    // This handles the timing gap where pg_notify fires before this process starts.
+    drain_pending(&JobCtx {
+        pool: &pool,
+        s3: &s3,
+        smtp: &smtp,
+        from_email: &from_email,
+        bucket: &bucket,
+        registry_ca_key_pem: &registry_ca_key_pem,
+    })
+    .await;
+
     let mut listener = PgListener::connect_with(&pool).await?;
     listener.listen("vetting_jobs").await?;
     info!("worker listening on vetting_jobs channel");
@@ -34,12 +55,20 @@ pub async fn run(
             Ok(job_id) => {
                 let pool2 = pool.clone();
                 let s3_2 = s3.clone();
-                let ses2 = ses.clone();
+                let smtp2 = smtp.clone();
+                let from2 = from_email.clone();
                 let bucket2 = bucket.clone();
                 let pem2 = registry_ca_key_pem.clone();
                 tokio::spawn(async move {
-                    if let Err(e) = process_job(job_id, &pool2, &s3_2, &ses2, &bucket2, &pem2).await
-                    {
+                    let ctx = JobCtx {
+                        pool: &pool2,
+                        s3: &s3_2,
+                        smtp: &smtp2,
+                        from_email: &from2,
+                        bucket: &bucket2,
+                        registry_ca_key_pem: &pem2,
+                    };
+                    if let Err(e) = process_job(job_id, &ctx).await {
                         error!("job {job_id} failed: {e}");
                     }
                 });
@@ -49,18 +78,32 @@ pub async fn run(
     }
 }
 
-async fn process_job(
-    job_id: Uuid,
-    pool: &PgPool,
-    s3: &S3Client,
-    ses: &SesClient,
-    bucket: &str,
-    registry_ca_key_pem: &str,
-) -> Result<()> {
-    // Acquire advisory lock so only one worker processes this job
+/// Process jobs already sitting in `pending` state — handles startup timing gaps.
+async fn drain_pending(ctx: &JobCtx<'_>) {
+    let ids: Vec<Uuid> = match sqlx::query_scalar(
+        "SELECT id FROM vetting_jobs WHERE status = 'pending' ORDER BY created_at",
+    )
+    .fetch_all(ctx.pool)
+    .await
+    {
+        Ok(ids) => ids,
+        Err(e) => {
+            error!("drain query failed: {e}");
+            return;
+        }
+    };
+
+    for job_id in ids {
+        if let Err(e) = process_job(job_id, ctx).await {
+            error!("drain job {job_id} failed: {e}");
+        }
+    }
+}
+
+async fn process_job(job_id: Uuid, ctx: &JobCtx<'_>) -> Result<()> {
     let locked: bool = sqlx::query_scalar("SELECT pg_try_advisory_lock($1)")
         .bind(i64::from_ne_bytes(job_id.as_bytes()[..8].try_into()?))
-        .fetch_one(pool)
+        .fetch_one(ctx.pool)
         .await?;
 
     if !locked {
@@ -70,7 +113,15 @@ async fn process_job(
 
     info!("processing job {job_id}");
 
-    match run_pipeline(job_id, pool, s3, bucket, registry_ca_key_pem).await {
+    match run_pipeline(
+        job_id,
+        ctx.pool,
+        ctx.s3,
+        ctx.bucket,
+        ctx.registry_ca_key_pem,
+    )
+    .await
+    {
         Ok(()) => {
             info!("job {job_id} completed successfully");
         }
@@ -82,10 +133,10 @@ async fn process_job(
             )
             .bind(serde_json::json!({"message": msg}))
             .bind(job_id)
-            .execute(pool)
+            .execute(ctx.pool)
             .await?;
 
-            if let Err(email_err) = send_failure_email(job_id, &msg, pool, ses).await {
+            if let Err(email_err) = send_failure_email(job_id, &msg, ctx).await {
                 error!("failed to send failure email for job {job_id}: {email_err}");
             }
         }
@@ -93,20 +144,13 @@ async fn process_job(
 
     sqlx::query("SELECT pg_advisory_unlock($1)")
         .bind(i64::from_ne_bytes(job_id.as_bytes()[..8].try_into()?))
-        .execute(pool)
+        .execute(ctx.pool)
         .await?;
 
     Ok(())
 }
 
-/// Look up the publisher's email and package ref, then send a failure notification via SES.
-async fn send_failure_email(
-    job_id: Uuid,
-    message: &str,
-    pool: &PgPool,
-    ses: &SesClient,
-) -> Result<()> {
-    // Look up email address and package ref for this job
+async fn send_failure_email(job_id: Uuid, message: &str, ctx: &JobCtx<'_>) -> Result<()> {
     let row: Option<(String, String)> = sqlx::query_as(
         "SELECT ak.email,
                 n.slug || '/' || p.name || '@' || v.version
@@ -119,7 +163,7 @@ async fn send_failure_email(
          LIMIT 1",
     )
     .bind(job_id)
-    .fetch_optional(pool)
+    .fetch_optional(ctx.pool)
     .await?;
 
     let Some((to_email, pkg_ref)) = row else {
@@ -127,28 +171,15 @@ async fn send_failure_email(
         return Ok(());
     };
 
-    let subject = format!("Publishing {pkg_ref} failed");
-    let body_text = format!("Publishing {pkg_ref} failed: {message}");
-
-    let dest = Destination::builder().to_addresses(&to_email).build();
-    let subject_content = Content::builder().data(&subject).charset("UTF-8").build()?;
-    let body_content = Content::builder()
-        .data(&body_text)
-        .charset("UTF-8")
-        .build()?;
-    let body = Body::builder().text(body_content).build();
-    let msg = Message::builder()
-        .subject(subject_content)
-        .body(body)
-        .build();
-    let email_content = EmailContent::builder().simple(msg).build();
-
-    ses.send_email()
-        .from_email_address("noreply@skreg.ai")
-        .destination(dest)
-        .content(email_content)
-        .send()
-        .await?;
+    crate::email::send_email(
+        ctx.smtp,
+        ctx.from_email,
+        &to_email,
+        &format!("Publishing {pkg_ref} failed"),
+        &format!("Publishing {pkg_ref} failed: {message}"),
+    )
+    .await
+    .map_err(|e| anyhow::anyhow!(e))?;
 
     Ok(())
 }

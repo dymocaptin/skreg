@@ -15,6 +15,7 @@ class CloudProvider(StrEnum):
     AWS = "aws"
     GCP = "gcp"
     AZURE = "azure"
+    K8S = "k8s"
 
 
 class HsmBackend(StrEnum):
@@ -39,10 +40,17 @@ class StackConfig(BaseSettings):
     web_domain_name: str = ""
     web_cert_arn: str = ""
     from_email: str = ""
-    ses_region: str = ""
+    # AWS path: SES SMTP relay host (e.g. email-smtp.us-west-2.amazonaws.com)
+    smtp_host: str = ""
+    smtp_port: int = 587
+    # ARN of a Secrets Manager secret with keys "username" and "password" for SMTP auth.
+    # Required for the AWS path; absent on K8s (uses anonymous in-cluster Postfix).
+    smtp_credentials_secret_arn: str = ""
     hsm_backend: HsmBackend = HsmBackend.HSM
     multi_az: bool = False
     environment: Literal["prod", "staging", "dev"] = "prod"
+    github_repo: str = ""
+    hosted_zone_id: str = ""
 
     @classmethod
     def load(cls) -> StackConfig:

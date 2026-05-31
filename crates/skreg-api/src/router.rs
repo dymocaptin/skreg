@@ -3,7 +3,6 @@
 use std::sync::Arc;
 
 use aws_sdk_s3::Client as S3Client;
-use aws_sdk_sesv2::Client as SesClient;
 use axum::{
     http::HeaderValue,
     routing::{get, post},
@@ -12,6 +11,7 @@ use axum::{
 use serde::Serialize;
 use sqlx::PgPool;
 use tower_http::cors::{AllowHeaders, AllowMethods, CorsLayer};
+use tower_http::services::ServeDir;
 
 use crate::handlers::auth::{login_handler, token_handler};
 use crate::handlers::cert::cert_handler;
@@ -32,18 +32,18 @@ pub struct AppState {
     pub pool: PgPool,
     /// AWS S3 client.
     pub s3: S3Client,
-    /// AWS SES v2 client.
-    pub ses: SesClient,
     /// S3 bucket name for package artifacts.
     pub s3_bucket: String,
     /// Sender address for transactional email.
     pub from_email: String,
+    /// SMTP relay configuration.
+    pub smtp: crate::email::SmtpConfig,
     /// PEM-encoded Publisher CA private key, resolved once at startup.
     pub publisher_ca_key_pem: String,
     /// PEM-encoded Publisher CA certificate.
     pub publisher_ca_cert_pem: String,
-    /// When `true`, OTPs are logged at INFO level instead of sent via SES.
-    pub ses_disabled: bool,
+    /// When `true`, OTPs are logged at INFO level instead of sent via SMTP.
+    pub smtp_disabled: bool,
 }
 
 /// Arc-wrapped [`AppState`] used as the Axum router state.
@@ -70,6 +70,7 @@ pub fn build_router(state: AppState) -> Router {
         .allow_origin(origin)
         .allow_methods(AllowMethods::mirror_request())
         .allow_headers(AllowHeaders::mirror_request());
+    let web_dist = std::env::var("WEB_DIST_DIR").unwrap_or_else(|_| "/web/dist".to_owned());
     Router::new()
         .route("/healthz", get(health_handler))
         .route("/v1/search", get(search_handler))
@@ -97,6 +98,7 @@ pub fn build_router(state: AppState) -> Router {
             "/v1/download/:ns/:name/:version/sig",
             get(package_sig_handler),
         )
+        .nest_service("/", ServeDir::new(&web_dist))
         .layer(cors)
         .with_state(shared)
 }

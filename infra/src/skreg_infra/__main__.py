@@ -34,10 +34,17 @@ class SkregStack:
         )
         if self._config.cloud_provider == CloudProvider.AWS:
             self._run_aws()
+        elif self._config.cloud_provider == CloudProvider.K8S:
+            self._run_k8s()
         else:
             raise NotImplementedError(
                 f"Provider '{self._config.cloud_provider}' not yet implemented."
             )
+
+    def _run_k8s(self) -> None:
+        from skreg_infra.providers.k8s.stack import K8sStack
+
+        K8sStack(self._config).run()
 
     def _run_aws(self) -> None:
         config = self._config
@@ -71,11 +78,13 @@ class SkregStack:
                 existing_cert_arn=config.existing_cert_arn,
                 s3_bucket=storage.outputs.bucket_name,
                 from_email=config.from_email,
-                ses_region=config.ses_region,
-                ca_secret_arn=pki.outputs.hsm_key_id,
-                db_sg_id=database.outputs.security_group_id,
-                publisher_ca_key_secret_name=pki.outputs.publisher_ca_key_secret_name,
+                smtp_host=config.smtp_host,
+                smtp_port=config.smtp_port,
+                smtp_credentials_secret_arn=config.smtp_credentials_secret_arn,
+                publisher_ca_key_secret_arn=pki.outputs.publisher_ca_key_secret_arn or "",
                 publisher_ca_cert_pem=pki.publisher_ca_cert_pem,
+                registry_ca_key_secret_arn=pki.outputs.registry_ca_key_secret_arn or "",
+                db_sg_id=database.outputs.security_group_id,
             ),
         )
         AwsWorkerTrigger(
