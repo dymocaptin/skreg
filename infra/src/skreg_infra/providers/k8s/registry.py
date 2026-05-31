@@ -88,9 +88,7 @@ class K8sRegistry(pulumi.ComponentResource):
             spec=k8s.core.v1.ServiceSpecArgs(
                 selector=labels,
                 type="NodePort",
-                ports=[
-                    k8s.core.v1.ServicePortArgs(port=5000, target_port=5000, node_port=30500)
-                ],
+                ports=[k8s.core.v1.ServicePortArgs(port=5000, target_port=5000, node_port=30500)],
             ),
             opts=pulumi.ResourceOptions(parent=self, depends_on=[deploy]),
         )

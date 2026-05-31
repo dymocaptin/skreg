@@ -481,9 +481,14 @@ class AwsCompute(pulumi.ComponentResource):
                         "secrets": [
                             {"name": "DATABASE_URL", "valueFrom": vals[0]},
                             {"name": "PUBLISHER_CA_KEY_PEM", "valueFrom": vals[2]},
-                            *([{"name": "SMTP_USERNAME", "valueFrom": f"{vals[4]}:username::"},
-                               {"name": "SMTP_PASSWORD", "valueFrom": f"{vals[4]}:password::"}]
-                              if vals[4] else []),
+                            *(
+                                [
+                                    {"name": "SMTP_USERNAME", "valueFrom": f"{vals[4]}:username::"},
+                                    {"name": "SMTP_PASSWORD", "valueFrom": f"{vals[4]}:password::"},
+                                ]
+                                if vals[4]
+                                else []
+                            ),
                         ],
                         "logConfiguration": {
                             "logDriver": "awslogs",
@@ -535,9 +540,14 @@ class AwsCompute(pulumi.ComponentResource):
                         "secrets": [
                             {"name": "DATABASE_URL", "valueFrom": vals[0]},
                             {"name": "REGISTRY_CA_KEY_PEM", "valueFrom": vals[2]},
-                            *([{"name": "SMTP_USERNAME", "valueFrom": f"{vals[3]}:username::"},
-                               {"name": "SMTP_PASSWORD", "valueFrom": f"{vals[3]}:password::"}]
-                              if vals[3] else []),
+                            *(
+                                [
+                                    {"name": "SMTP_USERNAME", "valueFrom": f"{vals[3]}:username::"},
+                                    {"name": "SMTP_PASSWORD", "valueFrom": f"{vals[3]}:password::"},
+                                ]
+                                if vals[3]
+                                else []
+                            ),
                         ],
                         "logConfiguration": {
                             "logDriver": "awslogs",
