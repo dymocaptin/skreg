@@ -99,9 +99,12 @@ def _generate_publisher_ca(root_key_pem: str, root_cert_pem: str) -> tuple[str, 
             ),
         )
     )
+    # PKCS8 is required: the server loads this key via rcgen, which uses ring under
+    # the hood. ring's RsaKeyPair::from_pkcs8 only accepts PKCS#8 (BEGIN PRIVATE KEY),
+    # not PKCS#1/TraditionalOpenSSL (BEGIN RSA PRIVATE KEY).
     pem_key = private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
-        format=serialization.PrivateFormat.TraditionalOpenSSL,
+        format=serialization.PrivateFormat.PKCS8,
         encryption_algorithm=serialization.NoEncryption(),
     ).decode("ascii")
     pem_cert = cert.public_bytes(serialization.Encoding.PEM).decode("ascii")

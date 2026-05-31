@@ -87,6 +87,21 @@ def test_generate_publisher_ca_returns_pem_strings() -> None:
     assert "CERTIFICATE" in pub_cert_pem
 
 
+def test_generate_publisher_ca_key_is_pkcs8() -> None:
+    """Publisher CA key must be PKCS#8 (BEGIN PRIVATE KEY), not PKCS#1.
+
+    ring (used by rcgen in the server) only accepts PKCS#8 format via
+    RsaKeyPair::from_pkcs8. PKCS#1 / TraditionalOpenSSL format causes a parse
+    error at cert-issuance time.
+    """
+    root_key_pem, root_cert_pem = _generate_root_ca()
+    pub_key_pem, _ = _generate_publisher_ca(root_key_pem, root_cert_pem)
+    assert "-----BEGIN PRIVATE KEY-----" in pub_key_pem, (
+        "Publisher CA key must be PKCS#8 format (BEGIN PRIVATE KEY). "
+        "ring/rcgen rejects PKCS#1 (BEGIN RSA PRIVATE KEY)."
+    )
+
+
 def test_generate_publisher_ca_cert_is_signed_by_root() -> None:
     """Publisher CA cert must be cryptographically signed by the root CA using PSS."""
     root_key_pem, root_cert_pem = _generate_root_ca()
