@@ -127,7 +127,7 @@ class K8sCompute(pulumi.ComponentResource):
                     {
                         "match": f"Host(`{domain_name}`) || Host(`api.{domain_name}`)",
                         "kind": "Rule",
-                        "middlewares": [{"name": "redirect-https", "namespace": "skreg-infra"}],
+                        "middlewares": [{"name": "redirect-https", "namespace": "skreg"}],
                         "services": [{"name": "skreg-api", "port": 8080}],
                     }
                 ],
@@ -139,7 +139,7 @@ class K8sCompute(pulumi.ComponentResource):
             f"{name}-redirect-mw",
             api_version="traefik.io/v1alpha1",
             kind="Middleware",
-            metadata=k8s.meta.v1.ObjectMetaArgs(name="redirect-https", namespace="skreg-infra"),
+            metadata=k8s.meta.v1.ObjectMetaArgs(name="redirect-https", namespace="skreg"),
             spec={"redirectScheme": {"scheme": "https", "permanent": True}},
             opts=pulumi.ResourceOptions(parent=self),
         )
