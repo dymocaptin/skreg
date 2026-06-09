@@ -28,6 +28,9 @@ class K8sStorage(pulumi.ComponentResource):
         Release(
             f"{name}-minio",
             ReleaseArgs(
+                # Pin release name so the K8s service is always "skreg-storage-minio"
+                # and matches the ENDPOINT constant above.
+                name="skreg-storage-minio",
                 chart="minio",
                 repository_opts=RepositoryOptsArgs(repo="https://charts.min.io/"),
                 version="5.4.0",

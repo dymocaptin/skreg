@@ -87,6 +87,13 @@ class K8sDispatcher(pulumi.ComponentResource):
                                         name="PKI_SECRET_NAME", value="skreg-pki"
                                     ),
                                     k8s.core.v1.EnvVarArgs(name="DB_SECRET_NAME", value="skreg-db"),
+                                    k8s.core.v1.EnvVarArgs(
+                                        name="AWS_ENDPOINT_URL",
+                                        value="http://skreg-storage-minio.skreg-infra.svc:9000",
+                                    ),
+                                    k8s.core.v1.EnvVarArgs(
+                                        name="AWS_EC2_METADATA_DISABLED", value="true"
+                                    ),
                                 ],
                                 liveness_probe=k8s.core.v1.ProbeArgs(
                                     http_get=k8s.core.v1.HTTPGetActionArgs(
