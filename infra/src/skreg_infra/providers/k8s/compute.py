@@ -55,6 +55,9 @@ class K8sCompute(pulumi.ComponentResource):
                                         value="http://skreg-storage-minio.skreg-infra.svc:9000",
                                     ),
                                     k8s.core.v1.EnvVarArgs(name="AWS_REGION", value="us-east-1"),
+                                    k8s.core.v1.EnvVarArgs(
+                                        name="AWS_EC2_METADATA_DISABLED", value="true"
+                                    ),
                                 ],
                                 env_from=[
                                     k8s.core.v1.EnvFromSourceArgs(
