@@ -15,6 +15,7 @@ class K8sStack:
         from skreg_infra.providers.k8s.ci import K8sCi
         from skreg_infra.providers.k8s.compute import K8sCompute
         from skreg_infra.providers.k8s.database import K8sDatabase
+        from skreg_infra.providers.k8s.database_cnpg import K8sCnpgDatabase
         from skreg_infra.providers.k8s.dispatcher import K8sDispatcher
         from skreg_infra.providers.k8s.dns import K8sDns
         from skreg_infra.providers.k8s.email import K8sEmail
@@ -27,6 +28,10 @@ class K8sStack:
 
         K8sNetwork("skreg-network")
         database = K8sDatabase("skreg-db")
+        # CNPG cluster runs alongside the StatefulSet during the data
+        # migration; the StatefulSet is removed in a follow-up once data is
+        # restored and verified.
+        cnpg_database = K8sCnpgDatabase("skreg-db-cnpg")
         storage = K8sStorage("skreg-storage")
         pki = K8sPki("skreg-pki")
         email = K8sEmail("skreg-email")
@@ -56,7 +61,7 @@ class K8sStack:
         )
 
         # suppress unused-variable warnings — these resources register themselves
-        _ = database, pki, email
+        _ = database, cnpg_database, pki, email
 
         pulumi.export("api_url", f"https://api.{config.domain_name}")
         pulumi.export("registry_url", registry.outputs.registry_url)
