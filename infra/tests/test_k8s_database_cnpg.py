@@ -20,3 +20,12 @@ from skreg_infra.providers.k8s.database_cnpg import K8sCnpgDatabase  # noqa: E40
 def test_cnpg_database_instantiates() -> None:
     db = K8sCnpgDatabase("test-db")
     assert db.outputs.secret_name == "skreg-db"
+
+
+def test_cnpg_database_exposes_contract() -> None:
+    from skreg_infra.contracts import DatabaseContract
+
+    db = K8sCnpgDatabase("test-db-2")
+    assert isinstance(db.contract, DatabaseContract)
+    assert db.contract.dsn_secret_name == "skreg-db"
+    assert db.contract.dsn_secret_key == "DATABASE_URL"

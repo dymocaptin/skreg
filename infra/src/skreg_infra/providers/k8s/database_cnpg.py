@@ -12,6 +12,8 @@ import pulumi
 import pulumi_kubernetes as k8s
 from pulumi_kubernetes.helm.v3 import Release, ReleaseArgs, RepositoryOptsArgs
 
+from skreg_infra.contracts import DatabaseContract
+
 _NAMESPACE = "skreg-infra"
 _SECRET_NAME = "skreg-db"  # noqa: S105
 _CLUSTER_NAME = "skreg-db-pg"
@@ -78,8 +80,15 @@ class K8sCnpgDatabase(pulumi.ComponentResource):
         )
 
         self._outputs = K8sCnpgDatabaseOutputs(secret_name=_SECRET_NAME)
+        self._contract = DatabaseContract(
+            dsn_secret_name=_SECRET_NAME, dsn_secret_key="DATABASE_URL"  # noqa: S106
+        )
         self.register_outputs({"secret_name": _SECRET_NAME})
 
     @property
     def outputs(self) -> K8sCnpgDatabaseOutputs:
         return self._outputs
+
+    @property
+    def contract(self) -> DatabaseContract:
+        return self._contract
