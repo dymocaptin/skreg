@@ -193,5 +193,5 @@ jobs:
                 format('localhost:30500/skreg-worker:{0}', github.sha) ||
                 'localhost:30500/skreg-worker:latest' }}
         run: |
-          pulumi stack select main
+          pulumi stack select k8s
           pulumi up --yes
