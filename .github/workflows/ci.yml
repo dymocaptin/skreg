@@ -101,7 +101,7 @@ jobs:
   build-push:
     name: Build and push Docker images to local registry
     needs: [rust, python-infra, web, changes]
-    runs-on: self-hosted
+    runs-on: skreg-runner
     if: github.ref == 'refs/heads/main' && github.event_name == 'push' && needs.changes.outputs.rust == 'true'
     steps:
       - uses: actions/checkout@v4
@@ -145,7 +145,7 @@ jobs:
   deploy:
     name: Deploy with Pulumi
     needs: [rust, python-infra, web, changes, build-push]
-    runs-on: self-hosted
+    runs-on: skreg-runner
     if: >
       always() &&
       github.ref == 'refs/heads/main' &&
