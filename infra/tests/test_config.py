@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from skreg_infra.config import CloudProvider, HsmBackend, StackConfig
+from skreg_infra.config import CloudProvider, DatabaseBackend, DnsBackend, HsmBackend, StackConfig, StorageBackend
 
 
 def test_cloud_provider_values() -> None:
@@ -63,3 +63,18 @@ def test_stack_config_domain_name_read_from_env(monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setenv("SKREG_DOMAIN_NAME", "api.skreg.ai")
     config = StackConfig.load()
     assert config.domain_name == "api.skreg.ai"
+
+
+def test_backends_default_to_incluster(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SKREG_CLOUD_PROVIDER", "k8s")
+    cfg = StackConfig.load()
+    assert cfg.database_backend == DatabaseBackend.INCLUSTER
+    assert cfg.storage_backend == StorageBackend.INCLUSTER
+    assert cfg.dns_backend == DnsBackend.MANUAL
+
+
+def test_backends_overridable(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("SKREG_CLOUD_PROVIDER", "aws")
+    monkeypatch.setenv("SKREG_DATABASE_BACKEND", "managed")
+    cfg = StackConfig.load()
+    assert cfg.database_backend == DatabaseBackend.MANAGED

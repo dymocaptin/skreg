@@ -23,6 +23,21 @@ class HsmBackend(StrEnum):
     SOFTWARE = "software"
 
 
+class DatabaseBackend(StrEnum):
+    INCLUSTER = "incluster"
+    MANAGED = "managed"
+
+
+class StorageBackend(StrEnum):
+    INCLUSTER = "incluster"
+    MANAGED = "managed"
+
+
+class DnsBackend(StrEnum):
+    MANUAL = "manual"
+    MANAGED = "managed"
+
+
 class StackConfig(BaseSettings):
     """Fully validated infrastructure stack configuration."""
 
@@ -51,6 +66,10 @@ class StackConfig(BaseSettings):
     environment: Literal["prod", "staging", "dev"] = "prod"
     github_repo: str = ""
     hosted_zone_id: str = ""
+    database_backend: DatabaseBackend = DatabaseBackend.INCLUSTER
+    storage_backend: StorageBackend = StorageBackend.INCLUSTER
+    dns_backend: DnsBackend = DnsBackend.MANUAL
+    ingress_endpoint: str = ""
 
     @classmethod
     def load(cls) -> StackConfig:

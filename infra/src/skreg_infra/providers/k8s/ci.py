@@ -47,6 +47,10 @@ class K8sCi(pulumi.ComponentResource):
                 create_namespace=False,
                 values={
                     "githubConfigUrl": f"https://github.com/{github_repo}",
+                    # Runners must advertise the label the workflow requests in
+                    # runs-on; ARC scale sets otherwise register under the Helm
+                    # release name, which never matches "self-hosted".
+                    "runnerScaleSetName": "self-hosted",
                     "githubConfigSecret": "github-pat",
                     "minRunners": 1,
                     "maxRunners": 3,

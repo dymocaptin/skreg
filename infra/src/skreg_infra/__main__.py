@@ -4,118 +4,31 @@ from __future__ import annotations
 
 import logging
 
-import pulumi
 import structlog
 
-from skreg_infra.config import CloudProvider, StackConfig
-from skreg_infra.providers.aws.compute import AwsCompute, AwsComputeArgs
-from skreg_infra.providers.aws.database import AwsDatabase, AwsDatabaseArgs
-from skreg_infra.providers.aws.network import AwsNetwork
-from skreg_infra.providers.aws.pki import AwsPki, AwsPkiArgs
-from skreg_infra.providers.aws.storage import AwsStorage
-from skreg_infra.providers.aws.web_hosting import AwsWebHosting
-from skreg_infra.providers.aws.worker_trigger import AwsWorkerTrigger, AwsWorkerTriggerArgs
+from skreg_infra.config import StackConfig
+from skreg_infra.providers.k8s.stack import K8sStack
 
 logger: logging.Logger = logging.getLogger(__name__)
 
 
 class SkregStack:
-    """Orchestrates all provider-agnostic infrastructure components."""
+    """Resolves the substrate and pluggable components, then runs the app stack."""
 
     def __init__(self, config: StackConfig) -> None:
-        """Initialise the stack with resolved configuration."""
         self._config: StackConfig = config
 
     def run(self) -> None:
-        """Provision the full infrastructure stack."""
         logger.info(
             "stack_run_started",
-            extra={"cloud_provider": self._config.cloud_provider.value},
+            extra={
+                "cloud_provider": self._config.cloud_provider.value,
+                "database_backend": self._config.database_backend.value,
+                "storage_backend": self._config.storage_backend.value,
+                "dns_backend": self._config.dns_backend.value,
+            },
         )
-        if self._config.cloud_provider == CloudProvider.AWS:
-            self._run_aws()
-        elif self._config.cloud_provider == CloudProvider.K8S:
-            self._run_k8s()
-        else:
-            raise NotImplementedError(
-                f"Provider '{self._config.cloud_provider}' not yet implemented."
-            )
-
-    def _run_k8s(self) -> None:
-        from skreg_infra.providers.k8s.stack import K8sStack
-
         K8sStack(self._config).run()
-
-    def _run_aws(self) -> None:
-        config = self._config
-
-        network = AwsNetwork("skreg-network")
-        storage = AwsStorage("skreg-storage")
-        pki = AwsPki("skreg-pki", AwsPkiArgs(bucket_name=storage.outputs.bucket_name))
-        database = AwsDatabase(
-            "skreg-db",
-            AwsDatabaseArgs(
-                vpc_id=network.outputs.vpc_id,
-                subnet_ids=list(network.outputs.private_subnet_ids),
-                multi_az=config.multi_az,
-            ),
-        )
-        web_hosting = AwsWebHosting(
-            "skreg-web",
-            domain_name=config.web_domain_name,
-            cert_arn=config.web_cert_arn,
-        )
-        compute = AwsCompute(
-            "skreg-compute",
-            AwsComputeArgs(
-                vpc_id=network.outputs.vpc_id,
-                public_subnet_ids=list(network.outputs.public_subnet_ids),
-                private_subnet_ids=list(network.outputs.private_subnet_ids),
-                db_secret_arn=database.outputs.connection_secret_arn,
-                api_image_uri=config.api_image_uri,
-                worker_image_uri=config.worker_image_uri,
-                domain_name=config.domain_name,
-                existing_cert_arn=config.existing_cert_arn,
-                s3_bucket=storage.outputs.bucket_name,
-                from_email=config.from_email,
-                smtp_host=config.smtp_host,
-                smtp_port=config.smtp_port,
-                smtp_credentials_secret_arn=config.smtp_credentials_secret_arn,
-                publisher_ca_key_secret_arn=pki.outputs.publisher_ca_key_secret_arn or "",
-                publisher_ca_cert_pem=pki.publisher_ca_cert_pem,
-                registry_ca_key_secret_arn=pki.outputs.registry_ca_key_secret_arn or "",
-                db_sg_id=database.outputs.security_group_id,
-            ),
-        )
-        AwsWorkerTrigger(
-            "skreg-worker-trigger",
-            AwsWorkerTriggerArgs(
-                cluster_arn=compute.cluster_arn,
-                worker_task_def_arn=compute.worker_task_def_arn,
-                worker_task_role_arn=compute.worker_task_role_arn,
-                exec_role_arn=compute.exec_role_arn,
-                public_subnet_ids=list(network.outputs.public_subnet_ids),
-                worker_sg_id=compute.worker_sg_id,
-                bucket_name=storage.outputs.bucket_name,
-                bucket_arn=storage.bucket_arn,
-            ),
-        )
-        pulumi.export(
-            "api_url",
-            (
-                pulumi.Output.from_input(f"https://{config.domain_name}")
-                if config.domain_name
-                else compute.outputs.service_url
-            ),
-        )
-        pulumi.export("alb_dns_name", compute.outputs.alb_dns_name)
-        pulumi.export("cert_validation_cname", compute.outputs.cert_validation_cname)
-        pulumi.export("cdn_base_url", storage.outputs.cdn_base_url)
-        pulumi.export("root_ca_cert", pki.root_ca_cert_pem)
-        pulumi.export("ecr_api_repo", compute.ecr_api_repo)
-        pulumi.export("ecr_worker_repo", compute.ecr_worker_repo)
-        pulumi.export("web_cdn_url", web_hosting.outputs.cdn_url)
-        pulumi.export("web_cdn_domain", web_hosting.outputs.cdn_domain)
 
 
 if __name__ == "__main__":
