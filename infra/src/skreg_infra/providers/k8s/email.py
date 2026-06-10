@@ -13,7 +13,17 @@ class K8sEmailOutputs:
 
 
 class K8sEmail(pulumi.ComponentResource):
-    """Runs `boky/postfix` as a Deployment, providing SMTP relay on port 25."""
+    """Runs `boky/postfix` as a Deployment, providing SMTP relay on port 25.
+
+    The cluster's network blocks outbound port 25, so postfix cannot deliver
+    directly to recipient MX servers. It must forward all mail through an
+    upstream smarthost on a submission port (587). The smarthost address and
+    SASL credentials are supplied via the ``skreg-smtp-relay`` Secret
+    (keys ``relayhost``, ``username``, ``password``); see
+    ``scripts/create-smtp-relay-secret.sh``.
+    """
+
+    RELAY_SECRET_NAME = "skreg-smtp-relay"  # noqa: S105
 
     def __init__(self, name: str, opts: pulumi.ResourceOptions | None = None) -> None:
         super().__init__("skreg:k8s:Email", name, {}, opts)
@@ -22,6 +32,13 @@ class K8sEmail(pulumi.ComponentResource):
         self._smtp_port = 25
 
         labels = {"app": "postfix"}
+
+        def _relay_secret(key: str) -> k8s.core.v1.EnvVarSourceArgs:
+            return k8s.core.v1.EnvVarSourceArgs(
+                secret_key_ref=k8s.core.v1.SecretKeySelectorArgs(
+                    name=self.RELAY_SECRET_NAME, key=key
+                )
+            )
 
         deploy = k8s.apps.v1.Deployment(
             f"{name}-deploy",
@@ -42,6 +59,24 @@ class K8sEmail(pulumi.ComponentResource):
                                         name="ALLOWED_SENDER_DOMAINS", value="skreg.ai"
                                     ),
                                     k8s.core.v1.EnvVarArgs(name="HOSTNAME", value="skreg.ai"),
+                                    # Forward all outbound mail through an upstream
+                                    # smarthost on the submission port (587) — the
+                                    # cluster cannot reach recipient MX servers on 25.
+                                    k8s.core.v1.EnvVarArgs(
+                                        name="RELAYHOST",
+                                        value_from=_relay_secret("relayhost"),
+                                    ),
+                                    k8s.core.v1.EnvVarArgs(
+                                        name="RELAYHOST_USERNAME",
+                                        value_from=_relay_secret("username"),
+                                    ),
+                                    k8s.core.v1.EnvVarArgs(
+                                        name="RELAYHOST_PASSWORD",
+                                        value_from=_relay_secret("password"),
+                                    ),
+                                    k8s.core.v1.EnvVarArgs(
+                                        name="RELAYHOST_TLS_LEVEL", value="encrypt"
+                                    ),
                                 ],
                             )
                         ]
