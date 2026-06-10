@@ -52,10 +52,13 @@ class K8sCnpgDatabase(pulumi.ComponentResource):
                 "instances": 2,
                 "storage": {"size": "10Gi"},
                 "bootstrap": {
+                    # No secret ref: CNPG generates the app credentials itself
+                    # and publishes them (incl. connection URI) in the
+                    # `skreg-db-pg-app` Secret. The skreg-db secret consumed by
+                    # compute is cut over to that URI during migration.
                     "initdb": {
                         "database": "skreg",
                         "owner": "skreg",
-                        "secret": {"name": _SECRET_NAME},
                     }
                 },
                 "backup": {
