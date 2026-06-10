@@ -33,6 +33,13 @@ def test_ci_instantiates() -> None:
     assert ci._github_repo == "dymocaptin/skreg"
 
 
+def test_ci_deployer_service_account_name() -> None:
+    from skreg_infra.providers.k8s import ci as ci_module
+
+    assert ci_module._DEPLOYER_SA == "skreg-ci-deployer"
+    assert ci_module._NAMESPACE == "skreg-ci"
+
+
 def test_dns_stores_zone() -> None:
     obj = K8sDns.__new__(K8sDns)
     obj._hosted_zone_id = "Z123ABC"
