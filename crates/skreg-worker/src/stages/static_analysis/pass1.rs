@@ -117,7 +117,7 @@ pub fn run_pass1(
             file: rel.display().to_string(),
             tool: "yara".into(),
             rule_id: rule.identifier().to_owned(),
-            severity: Severity::Error,
+            severity: super::severity_for_rule(rule.identifier()),
             message: format!("YARA rule matched: {}", rule.identifier()),
         });
     }
