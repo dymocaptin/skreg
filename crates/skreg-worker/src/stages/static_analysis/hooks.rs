@@ -3,7 +3,7 @@
 
 use std::path::Path;
 
-use super::{Finding, Severity, StaticAnalysisError};
+use super::{Finding, StaticAnalysisError};
 use crate::stages::static_analysis::pass1::CompiledRules;
 
 /// Extract YAML frontmatter from `content`.
@@ -101,18 +101,16 @@ fn scan_command_bytes(
             reason: e.to_string(),
         })?;
 
-    // NOTE: severity is hardcoded to Error here, consistent with pass1.rs.
-    // Rules like `network_transfer` and `privilege_escalation_sudo` declare
-    // `severity = "Warning"` in YARA metadata but yara-x does not expose
-    // metadata on match results, so both are emitted as Error. Both severities
-    // are blocking in the current pipeline so this has no functional impact.
+    // yara-x does not expose rule metadata on match results, so severity is
+    // derived from the rule identifier via `severity_for_rule` (mirroring the
+    // `severity = "Warning"` metadata in the corresponding `.yar` files).
     Ok(results
         .matching_rules()
         .map(|rule| Finding {
             file: "SKILL.md#hooks".to_owned(),
             tool: "yara".into(),
             rule_id: rule.identifier().to_owned(),
-            severity: Severity::Error,
+            severity: super::severity_for_rule(rule.identifier()),
             message: format!("YARA rule matched in hook command: {}", rule.identifier()),
         })
         .collect())
