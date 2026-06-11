@@ -29,6 +29,9 @@ dev = [
     "ruff>=0.4",
     "black>=24",
     "pulumi[testing]>=3,<4",
+    # Type stubs for the dns_updater CronJob script; boto3 itself is
+    # pip-installed inside the job container at runtime.
+    "boto3-stubs[route53]>=1.34",
 ]
 
 [tool.ruff]
