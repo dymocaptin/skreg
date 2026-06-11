@@ -52,5 +52,12 @@ def test_dns_instantiates() -> None:
 
 
 def test_dns_updater_script_exists() -> None:
-    script = pathlib.Path(__file__).parents[2] / "scripts" / "dns-updater.py"
+    script = (
+        pathlib.Path(__file__).parents[1]
+        / "src"
+        / "skreg_infra"
+        / "providers"
+        / "k8s"
+        / "dns_updater.py"
+    )
     assert script.exists()
