@@ -88,6 +88,9 @@ class K8sDispatcher(pulumi.ComponentResource):
                                     ),
                                     k8s.core.v1.EnvVarArgs(name="DB_SECRET_NAME", value="skreg-db"),
                                     k8s.core.v1.EnvVarArgs(
+                                        name="MINIO_SECRET_NAME", value="skreg-minio"
+                                    ),
+                                    k8s.core.v1.EnvVarArgs(
                                         name="AWS_ENDPOINT_URL",
                                         value="http://skreg-storage-minio.skreg-infra.svc:9000",
                                     ),

@@ -15,7 +15,10 @@ pub struct WorkerConfig<'a> {
     pub worker_image: &'a str,
     pub pki_secret: &'a str,
     pub db_secret: &'a str,
+    pub minio_secret: &'a str,
     pub s3_bucket: &'a str,
+    pub s3_endpoint: &'a str,
+    pub aws_region: &'a str,
     pub smtp_host: &'a str,
     pub smtp_port: u16,
     pub from_email: &'a str,
@@ -60,6 +63,21 @@ pub async fn ensure_worker_job(client: &Client, cfg: &WorkerConfig<'_>) -> Resul
                                 ..Default::default()
                             },
                             EnvVar {
+                                name: "AWS_ENDPOINT_URL".to_owned(),
+                                value: Some(cfg.s3_endpoint.to_owned()),
+                                ..Default::default()
+                            },
+                            EnvVar {
+                                name: "AWS_REGION".to_owned(),
+                                value: Some(cfg.aws_region.to_owned()),
+                                ..Default::default()
+                            },
+                            EnvVar {
+                                name: "AWS_EC2_METADATA_DISABLED".to_owned(),
+                                value: Some("true".to_owned()),
+                                ..Default::default()
+                            },
+                            EnvVar {
                                 name: "SMTP_HOST".to_owned(),
                                 value: Some(cfg.smtp_host.to_owned()),
                                 ..Default::default()
@@ -86,6 +104,13 @@ pub async fn ensure_worker_job(client: &Client, cfg: &WorkerConfig<'_>) -> Resul
                             EnvFromSource {
                                 secret_ref: Some(SecretEnvSource {
                                     name: cfg.pki_secret.to_owned(),
+                                    ..Default::default()
+                                }),
+                                ..Default::default()
+                            },
+                            EnvFromSource {
+                                secret_ref: Some(SecretEnvSource {
+                                    name: cfg.minio_secret.to_owned(),
                                     ..Default::default()
                                 }),
                                 ..Default::default()
