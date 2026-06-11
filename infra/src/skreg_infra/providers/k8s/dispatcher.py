@@ -7,7 +7,21 @@ import pulumi_kubernetes as k8s
 
 
 class K8sDispatcher(pulumi.ComponentResource):
-    """Runs skreg-dispatcher; receives MinIO webhooks and spawns worker Jobs."""
+    """Runs skreg-dispatcher; receives MinIO webhooks and spawns worker Jobs.
+
+    MinIO delivers bucket notifications to a ClusterIP Service that fronts this
+    Deployment at ``skreg-dispatcher.skreg.svc.cluster.local:9090`` (see the
+    webhook endpoint in ``K8sStorage``). That Service is managed externally —
+    create it once alongside the namespace:
+
+        kubectl -n skreg expose deploy skreg-dispatcher \\
+            --name skreg-dispatcher --port 9090 --target-port 9090
+
+    It is intentionally not provisioned here so that ``pulumi up`` never has to
+    adopt a pre-existing kubectl-created Service (which would otherwise fail the
+    deploy). Without it, MinIO webhooks cannot reach the dispatcher and the
+    vetting pipeline stalls.
+    """
 
     def __init__(
         self,
