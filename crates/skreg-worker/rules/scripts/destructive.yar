@@ -1,7 +1,7 @@
 rule destructive_ops {
     meta:
         description = "Detects commands that irreversibly destroy data or storage"
-        severity = "Error"
+        severity = "Warning"
     strings:
         $rm_rf1  = "rm -rf"  nocase
         $rm_rf2  = "rm -fr"  nocase
