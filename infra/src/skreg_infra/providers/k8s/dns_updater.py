@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Dynamic DNS updater: syncs the server's public IP to Route53 A records."""
+
 import json
 import os
 import sys
@@ -17,9 +18,7 @@ def get_public_ip() -> str:
         return str(json.loads(r.read())["ip"])
 
 
-def get_current_record(
-    client: "Route53Client", zone_id: str, name: str
-) -> str | None:
+def get_current_record(client: "Route53Client", zone_id: str, name: str) -> str | None:
     resp = client.list_resource_record_sets(
         HostedZoneId=zone_id,
         StartRecordName=name,
@@ -32,9 +31,7 @@ def get_current_record(
     return None
 
 
-def upsert_record(
-    client: "Route53Client", zone_id: str, name: str, ip: str, ttl: int = 60
-) -> None:
+def upsert_record(client: "Route53Client", zone_id: str, name: str, ip: str, ttl: int = 60) -> None:
     client.change_resource_record_sets(
         HostedZoneId=zone_id,
         ChangeBatch={
