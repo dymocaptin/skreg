@@ -7,7 +7,7 @@ import logging
 import structlog
 
 from skreg_infra.config import StackConfig
-from skreg_infra.providers.k8s.stack import K8sStack
+from skreg_infra.dispatch import CloudStack
 
 logger: logging.Logger = logging.getLogger(__name__)
 
@@ -28,7 +28,7 @@ class SkregStack:
                 "dns_backend": self._config.dns_backend.value,
             },
         )
-        K8sStack(self._config).run()
+        CloudStack(self._config).run()
 
 
 if __name__ == "__main__":

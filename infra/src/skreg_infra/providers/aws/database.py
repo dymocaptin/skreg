@@ -12,6 +12,8 @@ Yields DatabaseContract(dsn_secret_name="skreg-db", dsn_secret_key="DATABASE_URL
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import pulumi
 import pulumi_aws as aws
 import pulumi_kubernetes as k8s
@@ -46,8 +48,8 @@ class RdsDatabase(pulumi.ComponentResource):
     def __init__(
         self,
         name: str,
-        vpc_id: str,
-        subnet_ids: list[str],
+        vpc_id: pulumi.Input[str],
+        subnet_ids: Sequence[pulumi.Input[str]],
         source_sg_id: str | None = None,
         source_cidr: str | None = None,
         opts: pulumi.ResourceOptions | None = None,

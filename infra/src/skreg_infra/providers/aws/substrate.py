@@ -43,6 +43,8 @@ class EksSubstrate(pulumi.ComponentResource):
     to ``pulumi_kubernetes.Provider`` in __main__ to target the EKS cluster.
     """
 
+    VPC_CIDR = "10.0.0.0/16"
+
     def __init__(
         self,
         name: str,
@@ -51,11 +53,13 @@ class EksSubstrate(pulumi.ComponentResource):
     ) -> None:
         super().__init__("skreg:aws:EksSubstrate", name, {}, opts)
         child_opts = pulumi.ResourceOptions(parent=self)
+        self._vpc_id: pulumi.Output[str]
+        self._subnet_ids: list[pulumi.Output[str]]
 
         # ── VPC ──────────────────────────────────────────────────────────────
         vpc = aws.ec2.Vpc(
             f"{name}-vpc",
-            cidr_block="10.0.0.0/16",
+            cidr_block=self.VPC_CIDR,
             enable_dns_support=True,
             enable_dns_hostnames=True,
             tags={"Name": f"{name}-vpc"},
@@ -94,6 +98,9 @@ class EksSubstrate(pulumi.ComponentResource):
             },
             opts=child_opts,
         )
+
+        self._vpc_id = vpc.id
+        self._subnet_ids = [subnet_a.id, subnet_b.id]
 
         route_table = aws.ec2.RouteTable(
             f"{name}-rt",
@@ -282,6 +289,16 @@ class EksSubstrate(pulumi.ComponentResource):
                 "oidc_provider_arn": oidc_provider.arn,
             }
         )
+
+    @property
+    def vpc_id(self) -> pulumi.Output[str]:
+        """ID of the VPC the cluster runs in (for co-located services like RDS)."""
+        return self._vpc_id
+
+    @property
+    def subnet_ids(self) -> list[pulumi.Output[str]]:
+        """IDs of the two public subnets (one per AZ)."""
+        return self._subnet_ids
 
     @property
     def contract(self) -> SubstrateContract:

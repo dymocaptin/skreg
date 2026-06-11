@@ -146,6 +146,11 @@ jobs:
     name: Deploy with Pulumi
     needs: [rust, python-infra, web, changes, build-push]
     runs-on: skreg-runner
+    # Serialize deploys: concurrent pushes to main otherwise race on the
+    # Pulumi state lock and fail.
+    concurrency:
+      group: pulumi-deploy
+      cancel-in-progress: false
     if: >
       always() &&
       github.ref == 'refs/heads/main' &&

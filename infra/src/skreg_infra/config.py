@@ -66,6 +66,16 @@ class StackConfig(BaseSettings):
     environment: Literal["prod", "staging", "dev"] = "prod"
     github_repo: str = ""
     hosted_zone_id: str = ""
+    # Per-provider settings. Cloud credentials themselves come from each
+    # provider's standard environment (AWS_*, GOOGLE_APPLICATION_CREDENTIALS,
+    # ARM_*) and are consumed by the Pulumi providers directly.
+    aws_region: str = "us-west-2"
+    gcp_project: str = ""
+    gcp_region: str = "us-central1"
+    gcp_managed_zone: str = ""
+    azure_location: str = "eastus"
+    azure_resource_group: str = "skreg-data-rg"
+    azure_dns_zone: str = ""
     database_backend: DatabaseBackend = DatabaseBackend.INCLUSTER
     storage_backend: StorageBackend = StorageBackend.INCLUSTER
     dns_backend: DnsBackend = DnsBackend.MANUAL
