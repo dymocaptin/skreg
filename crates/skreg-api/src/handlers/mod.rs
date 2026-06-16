@@ -9,3 +9,4 @@ pub mod preview;
 pub mod publish;
 pub mod rotate;
 pub mod search;
+pub mod yank;

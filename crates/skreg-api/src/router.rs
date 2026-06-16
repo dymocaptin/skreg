@@ -24,6 +24,7 @@ use crate::handlers::preview::package_preview_handler;
 use crate::handlers::publish::publish_handler;
 use crate::handlers::rotate::{rotate_confirm_handler, rotate_submit_handler};
 use crate::handlers::search::search_handler;
+use crate::handlers::yank::{yank_all_handler, yank_version_handler};
 
 /// Shared application state injected into every handler.
 #[derive(Clone)]
@@ -97,6 +98,11 @@ pub fn build_router(state: AppState) -> Router {
         .route(
             "/v1/download/:ns/:name/:version/sig",
             get(package_sig_handler),
+        )
+        .route("/v1/packages/:ns/:name/yank", post(yank_all_handler))
+        .route(
+            "/v1/packages/:ns/:name/:version/yank",
+            post(yank_version_handler),
         )
         .nest_service("/", ServeDir::new(&web_dist))
         .layer(cors)

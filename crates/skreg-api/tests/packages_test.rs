@@ -102,3 +102,53 @@ async fn preview_rejects_invalid_version() {
         .await;
     assert_eq!(response.status_code(), StatusCode::BAD_REQUEST);
 }
+
+#[tokio::test]
+async fn yank_all_route_exists() {
+    let app = build_router(make_state().await);
+    let server = TestServer::new(app).unwrap();
+    let response = server.post("/v1/packages/acme/my-skill/yank").await;
+    assert_ne!(response.status_code(), StatusCode::NOT_FOUND);
+    assert_ne!(response.status_code(), StatusCode::METHOD_NOT_ALLOWED);
+}
+
+#[tokio::test]
+async fn yank_version_route_exists() {
+    let app = build_router(make_state().await);
+    let server = TestServer::new(app).unwrap();
+    let response = server.post("/v1/packages/acme/my-skill/1.0.0/yank").await;
+    assert_ne!(response.status_code(), StatusCode::NOT_FOUND);
+    assert_ne!(response.status_code(), StatusCode::METHOD_NOT_ALLOWED);
+}
+
+#[tokio::test]
+async fn yank_all_requires_auth() {
+    let app = build_router(make_state().await);
+    let server = TestServer::new(app).unwrap();
+    let response = server.post("/v1/packages/acme/my-skill/yank").await;
+    assert_eq!(response.status_code(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn yank_version_requires_auth() {
+    let app = build_router(make_state().await);
+    let server = TestServer::new(app).unwrap();
+    let response = server.post("/v1/packages/acme/my-skill/1.0.0/yank").await;
+    assert_eq!(response.status_code(), StatusCode::UNAUTHORIZED);
+}
+
+#[tokio::test]
+async fn yank_rejects_invalid_namespace() {
+    let app = build_router(make_state().await);
+    let server = TestServer::new(app).unwrap();
+    let response = server.post("/v1/packages/ACME/my-skill/yank").await;
+    assert_eq!(response.status_code(), StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn yank_version_rejects_invalid_version() {
+    let app = build_router(make_state().await);
+    let server = TestServer::new(app).unwrap();
+    let response = server.post("/v1/packages/acme/my-skill/1.0@bad/yank").await;
+    assert_eq!(response.status_code(), StatusCode::BAD_REQUEST);
+}
