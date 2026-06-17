@@ -2,6 +2,7 @@
 
 pub mod auth;
 pub mod cert;
+pub mod diff;
 pub mod jobs;
 pub mod namespaces;
 pub mod packages;

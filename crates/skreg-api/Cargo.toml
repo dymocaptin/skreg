@@ -52,6 +52,7 @@ sha2            = { workspace = true }
 x509-cert       = { workspace = true }
 der             = { workspace = true }
 hex             = "0.4"
+similar         = { workspace = true }
 
 [dev-dependencies]
 axum-test = "14"
