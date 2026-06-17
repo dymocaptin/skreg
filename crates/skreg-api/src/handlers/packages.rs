@@ -160,12 +160,11 @@ pub(crate) async fn list_published_versions(
          FROM versions v
          JOIN packages p ON p.id = v.package_id
          JOIN namespaces n ON n.id = p.namespace_id
-         JOIN vetting_jobs j ON j.version_id = v.id
          WHERE n.slug = $1
            AND p.name = $2
-           AND j.status = 'pass'
            AND v.yanked_at IS NULL
            AND n.banned_at IS NULL
+           AND EXISTS (SELECT 1 FROM vetting_jobs j WHERE j.version_id = v.id AND j.status = 'pass')
          ORDER BY v.published_at DESC, v.id DESC",
     )
     .bind(ns)
