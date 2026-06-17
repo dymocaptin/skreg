@@ -55,6 +55,24 @@ pub struct PackagePreview {
     pub truncated: bool,
 }
 
+/// A single published version entry returned by the versions endpoint.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct VersionEntry {
+    /// Version string.
+    pub version: String,
+    /// RFC 3339 publish timestamp.
+    pub published_at: String,
+    /// SHA-256 hex digest of the tarball.
+    pub sha256: String,
+}
+
+/// List of published versions, most recent first.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct VersionList {
+    /// Published versions, most recent first.
+    pub versions: Vec<VersionEntry>,
+}
+
 /// Communicates with a skreg-compatible registry.
 pub trait RegistryClient: Send + Sync {
     /// Resolve a package reference to its latest (or pinned) version metadata.
@@ -93,6 +111,19 @@ pub trait RegistryClient: Send + Sync {
         name: &'a str,
         version: &'a str,
     ) -> BoxFuture<'a, Result<PackagePreview, ClientError>>;
+
+    /// List published versions of a package, most recent first.
+    ///
+    /// Calls `GET /v1/packages/{ns}/{name}/versions`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ClientError`] on network or parse failure.
+    fn list_versions<'a>(
+        &'a self,
+        ns: &'a str,
+        name: &'a str,
+    ) -> BoxFuture<'a, Result<VersionList, ClientError>>;
 }
 
 /// `reqwest`-backed implementation of [`RegistryClient`].
@@ -231,6 +262,26 @@ impl RegistryClient for HttpRegistryClient {
                 .map_err(|e| ClientError::Parse(e.to_string()))
         })
     }
+
+    fn list_versions<'a>(
+        &'a self,
+        ns: &'a str,
+        name: &'a str,
+    ) -> BoxFuture<'a, Result<VersionList, ClientError>> {
+        Box::pin(async move {
+            let url = format!("{}/v1/packages/{ns}/{name}/versions", self.base_url);
+            debug!("listing versions from {url}");
+            self.http
+                .get(&url)
+                .send()
+                .await?
+                .error_for_status()
+                .map_err(ClientError::Http)?
+                .json::<VersionList>()
+                .await
+                .map_err(|e| ClientError::Parse(e.to_string()))
+        })
+    }
 }
 
 #[cfg(test)]
@@ -255,5 +306,17 @@ mod tests {
         let json = r#"{"files": [], "skill_md": "...", "truncated": true}"#;
         let preview: PackagePreview = serde_json::from_str(json).unwrap();
         assert!(preview.truncated);
+    }
+
+    #[test]
+    fn version_list_deserializes_from_json() {
+        let json = r#"{"versions":[
+            {"version":"1.0.1","published_at":"2026-06-10T12:00:00Z","sha256":"aa"},
+            {"version":"1.0.0","published_at":"2026-06-01T09:30:00Z","sha256":"bb"}
+        ]}"#;
+        let list: VersionList = serde_json::from_str(json).unwrap();
+        assert_eq!(list.versions.len(), 2);
+        assert_eq!(list.versions[0].version, "1.0.1");
+        assert_eq!(list.versions[1].sha256, "bb");
     }
 }
