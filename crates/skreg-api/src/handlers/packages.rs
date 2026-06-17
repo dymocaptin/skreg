@@ -12,6 +12,9 @@ use skreg_core::types::{Namespace, PackageName};
 
 use crate::router::{AppState, SharedState};
 
+/// Re-export of the shared version-segment validator.
+pub(crate) use skreg_core::version::is_valid_segment as validate_version;
+
 /// A row from the `versions` + `packages` join used to resolve a version.
 #[derive(sqlx::FromRow)]
 pub(crate) struct VersionRow {
@@ -41,18 +44,6 @@ pub struct ManifestResponse {
     pub sha256: String,
     /// PEM-encoded certificate chain. Empty for registry-signed packages.
     pub cert_chain_pem: Vec<String>,
-}
-
-/// Validate a version segment: "latest" or alphanumeric + `.`, `-`, `+`, max 32 chars.
-pub(crate) fn validate_version(v: &str) -> bool {
-    if v == "latest" {
-        return true;
-    }
-    if v.is_empty() || v.len() > 32 {
-        return false;
-    }
-    v.chars()
-        .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-' || c == '+')
 }
 
 /// Resolve a version row from the DB given validated namespace, name, and version.
@@ -216,43 +207,4 @@ pub async fn package_sig_handler(
     })?;
 
     Ok(data.into_bytes())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::validate_version;
-
-    #[test]
-    fn validate_version_accepts_latest() {
-        assert!(validate_version("latest"));
-    }
-
-    #[test]
-    fn validate_version_accepts_semver() {
-        assert!(validate_version("1.2.3"));
-        assert!(validate_version("1.0.0-alpha.1"));
-        assert!(validate_version("2.0.0+build.1"));
-    }
-
-    #[test]
-    fn validate_version_rejects_empty() {
-        assert!(!validate_version(""));
-    }
-
-    #[test]
-    fn validate_version_rejects_too_long() {
-        assert!(!validate_version(&"1".repeat(33)));
-    }
-
-    #[test]
-    fn validate_version_rejects_path_traversal() {
-        assert!(!validate_version("../etc/passwd"));
-        assert!(!validate_version("1.0/bad"));
-    }
-
-    #[test]
-    fn validate_version_rejects_special_chars() {
-        assert!(!validate_version("1.0.0 beta"));
-        assert!(!validate_version("1.0.0@tag"));
-    }
 }

@@ -9,4 +9,5 @@ pub mod manifest;
 pub mod package_ref;
 pub mod types;
 pub mod verification;
+pub mod version;
 pub use verification::VerificationKind;
