@@ -53,6 +53,12 @@ enum Commands {
         #[arg(value_name = "PACKAGE")]
         package_ref: String,
     },
+    /// Remove a published skill from the registry (soft yank)
+    Yank {
+        /// Package reference (namespace/name or namespace/name@version)
+        #[arg(value_name = "PACKAGE")]
+        package_ref: String,
+    },
     /// Obtain a CA-issued publisher certificate
     Certify {
         /// Path to existing PEM private key (uses ~/.skreg/keys/publisher.key if omitted)
@@ -118,6 +124,9 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::Uninstall { package_ref } => {
             skreg_cli::commands::uninstall::run_uninstall(&package_ref)?;
+        }
+        Commands::Yank { package_ref } => {
+            skreg_cli::commands::yank::run_yank(&package_ref, cli.context.as_deref()).await?;
         }
         Commands::Certify { key } => {
             skreg_cli::commands::certify::run_certify(key.as_deref(), cli.context.as_deref())

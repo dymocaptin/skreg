@@ -11,3 +11,4 @@ pub mod rotate;
 pub mod search;
 pub mod tui;
 pub mod uninstall;
+pub mod yank;
