@@ -2,6 +2,7 @@
 
 pub mod certify;
 pub mod context;
+pub mod diff;
 pub mod install;
 pub mod links;
 pub mod login;
