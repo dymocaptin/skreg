@@ -203,4 +203,8 @@ jobs:
                 'localhost:30500/skreg-worker:latest' }}
         run: |
           pulumi stack select k8s
+          # Clear any stale lock left by a previous run that died mid-update
+          # (e.g. an expired OIDC token before the lock could be released).
+          # Deploys are serial, so there is never a concurrent legitimate update.
+          pulumi cancel --yes || true
           pulumi up --yes
