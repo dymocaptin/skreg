@@ -18,6 +18,12 @@ use similar::{ChangeTag, TextDiff};
 /// Number of unchanged context lines kept around each change.
 const CONTEXT_RADIUS: usize = 3;
 
+/// Paths that are always excluded from diffs. `manifest.json` contains
+/// registry-managed fields (version string, sha256, signature) that change on
+/// every publish, so including it in the diff produces noise and prevents
+/// identical-content version bumps from reading as "No changes".
+const EXCLUDED_PATHS: &[&str] = &["manifest.json"];
+
 /// Kind of a single diff line.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -86,7 +92,8 @@ pub struct DiffResponse {
     pub from: String,
     /// The newer version being compared.
     pub to: String,
-    /// Per-file diffs. Identical files are omitted. `SKILL.md` is first.
+    /// Per-file diffs. Identical files are omitted. `manifest.json` is always
+    /// excluded (registry-managed fields). `SKILL.md` is first.
     pub files: Vec<FileDiff>,
 }
 
@@ -144,13 +151,25 @@ fn text_hunks(old: &str, new: &str) -> Vec<Hunk> {
 /// `old`/`new` map relative file paths to raw bytes. Files identical in both
 /// trees are omitted. Files where either side is non-UTF-8 are reported with
 /// `binary: true` and no hunks. `SKILL.md` is always first.
+///
+/// `manifest.json` is never emitted as a [`FileDiff`] because its
+/// registry-managed fields (version string, sha256, signature) change on every
+/// publish and produce noise in every diff. See [`EXCLUDED_PATHS`].
 pub(crate) fn compute_file_diffs(
     old: &BTreeMap<String, Vec<u8>>,
     new: &BTreeMap<String, Vec<u8>>,
 ) -> Vec<FileDiff> {
     let mut paths: BTreeSet<&str> = BTreeSet::new();
-    paths.extend(old.keys().map(String::as_str));
-    paths.extend(new.keys().map(String::as_str));
+    for key in old.keys().map(String::as_str) {
+        if !EXCLUDED_PATHS.contains(&key) {
+            paths.insert(key);
+        }
+    }
+    for key in new.keys().map(String::as_str) {
+        if !EXCLUDED_PATHS.contains(&key) {
+            paths.insert(key);
+        }
+    }
 
     let mut sorted: Vec<&str> = paths.into_iter().collect();
     sorted.sort_by(|a, b| order_key(a).cmp(&order_key(b)));
@@ -415,5 +434,59 @@ mod tests {
         let files = compute_file_diffs(&a, &b);
         assert_eq!(files[0].path, "SKILL.md");
         assert_eq!(files[1].path, "references/a.md");
+    }
+
+    #[test]
+    fn manifest_json_is_excluded() {
+        // Both SKILL.md and manifest.json differ between versions.
+        let a = map(&[
+            ("SKILL.md", b"version one content\n"),
+            (
+                "manifest.json",
+                b"{\"version\":\"1.0.0\",\"sha256\":\"aaa\"}\n",
+            ),
+        ]);
+        let b = map(&[
+            ("SKILL.md", b"version two content\n"),
+            (
+                "manifest.json",
+                b"{\"version\":\"2.0.0\",\"sha256\":\"bbb\"}\n",
+            ),
+        ]);
+        let files = compute_file_diffs(&a, &b);
+        // SKILL.md must appear; manifest.json must not.
+        assert!(
+            files.iter().any(|f| f.path == "SKILL.md"),
+            "SKILL.md should be in the diff"
+        );
+        assert!(
+            !files.iter().any(|f| f.path == "manifest.json"),
+            "manifest.json must never appear in the diff"
+        );
+    }
+
+    #[test]
+    fn only_manifest_json_differs_returns_empty() {
+        // SKILL.md is identical; only manifest.json changes (simulating a
+        // content-identical version bump). The caller should see "No changes".
+        let a = map(&[
+            ("SKILL.md", b"same content\n"),
+            (
+                "manifest.json",
+                b"{\"version\":\"1.0.0\",\"sha256\":\"aaa\"}\n",
+            ),
+        ]);
+        let b = map(&[
+            ("SKILL.md", b"same content\n"),
+            (
+                "manifest.json",
+                b"{\"version\":\"1.0.1\",\"sha256\":\"bbb\"}\n",
+            ),
+        ]);
+        let files = compute_file_diffs(&a, &b);
+        assert!(
+            files.is_empty(),
+            "expected empty diff when only manifest.json differs, got: {files:?}"
+        );
     }
 }
