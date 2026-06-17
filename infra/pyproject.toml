@@ -47,6 +47,26 @@ strict = true
 python_version = "3.12"
 mypy_path = "src"
 
+# Pulumi provider packages contain tens-of-thousands of generated Python files.
+# Asking mypy to follow imports into them causes multi-minute hangs (pulumi-azure-native
+# alone unpacks to ~764 MB / 32 000 files). Skip them — our code is still fully
+# type-checked; we only stop mypy from crawling the provider internals.
+[[tool.mypy.overrides]]
+module = [
+    "pulumi_aws",
+    "pulumi_aws.*",
+    "pulumi_azure_native",
+    "pulumi_azure_native.*",
+    "pulumi_gcp",
+    "pulumi_gcp.*",
+    "pulumi_kubernetes",
+    "pulumi_kubernetes.*",
+    "pulumi_random",
+    "pulumi_random.*",
+]
+ignore_missing_imports = true
+follow_imports = "skip"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "--cov=skreg_infra --cov-report=term-missing --cov-fail-under=90"
