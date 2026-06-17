@@ -20,7 +20,7 @@ use crate::router::{AppState, SharedState};
 #[derive(Debug, Serialize)]
 pub struct YankResponse {
     /// Number of versions newly yanked by this call (0 if already yanked).
-    pub yanked: i64,
+    pub yanked: u64,
 }
 
 /// Handle `POST /v1/packages/:ns/:name/yank` — yank all non-yanked versions.
@@ -93,7 +93,7 @@ async fn yank_versions(
     ns_id: uuid::Uuid,
     name: &str,
     version: Option<&str>,
-) -> Result<i64, StatusCode> {
+) -> Result<u64, StatusCode> {
     // Resolve the package id within the (already ownership-checked) namespace.
     let pkg_id: Option<uuid::Uuid> =
         sqlx::query_scalar("SELECT id FROM packages WHERE namespace_id = $1 AND name = $2")
@@ -108,6 +108,10 @@ async fn yank_versions(
     let pkg_id = pkg_id.ok_or(StatusCode::NOT_FOUND)?;
 
     if let Some(v) = version {
+        // Two queries (existence check, then UPDATE) let us return 404 for a
+        // missing version while still reporting 0 for an already-yanked one.
+        // A concurrent yank between the two is harmless: it only means this
+        // call reports 0 instead of 1. Acceptable for an owner-only endpoint.
         // 404 if the version row does not exist at all.
         let exists: bool = sqlx::query_scalar(
             "SELECT EXISTS(SELECT 1 FROM versions WHERE package_id = $1 AND version = $2)",
@@ -137,11 +141,11 @@ async fn yank_versions(
             StatusCode::INTERNAL_SERVER_ERROR
         })?
         .rows_affected();
-        return Ok(i64::try_from(affected).unwrap_or(i64::MAX));
+        return Ok(affected);
     }
 
     // 404 if the package has no versions at all.
-    let total: i64 = sqlx::query_scalar("SELECT count(*) FROM versions WHERE package_id = $1")
+    let total: i64 = sqlx::query_scalar("SELECT COUNT(*) FROM versions WHERE package_id = $1")
         .bind(pkg_id)
         .fetch_one(&state.pool)
         .await
@@ -165,5 +169,5 @@ async fn yank_versions(
         StatusCode::INTERNAL_SERVER_ERROR
     })?
     .rows_affected();
-    Ok(i64::try_from(affected).unwrap_or(i64::MAX))
+    Ok(affected)
 }
