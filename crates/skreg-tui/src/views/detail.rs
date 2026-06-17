@@ -55,7 +55,9 @@ pub struct DetailState {
     pub scroll: u16,
     /// Total number of content lines in the SKILL.md pane.
     pub content_lines: u16,
-    /// Index of the selected version (always 0 — single version shown).
+    /// Published version strings, most recent first.
+    pub versions: Vec<String>,
+    /// Index into `versions` of the selected version.
     pub selected_version: usize,
     /// Preview data for the file tree and SKILL.md pane.
     pub preview: PreviewState,
@@ -75,6 +77,7 @@ impl DetailState {
             focus: Pane::Versions,
             scroll: 0,
             content_lines: 0,
+            versions: Vec::new(),
             selected_version: 0,
             preview: PreviewState::NotLoaded,
         }
@@ -99,6 +102,18 @@ impl DetailState {
     /// Scroll the SKILL.md pane up one line, clamped at zero.
     pub fn scroll_up(&mut self) {
         self.scroll = self.scroll.saturating_sub(1);
+    }
+
+    /// Move selection to the next (older) version, clamped at the last.
+    pub fn select_next_version(&mut self) {
+        if self.selected_version + 1 < self.versions.len() {
+            self.selected_version += 1;
+        }
+    }
+
+    /// Move selection to the previous (newer) version, clamped at the first.
+    pub fn select_prev_version(&mut self) {
+        self.selected_version = self.selected_version.saturating_sub(1);
     }
 }
 
@@ -157,6 +172,8 @@ pub struct PackageDetailView {
     state: DetailState,
     /// In-flight preview fetch (None when reading from disk).
     preview_rx: Option<oneshot::Receiver<Result<PackagePreview, String>>>,
+    /// In-flight versions list fetch.
+    versions_rx: Option<oneshot::Receiver<Result<Vec<String>, String>>>,
     install_rx: Option<oneshot::Receiver<Result<String, String>>>,
     /// Whether the currently displayed version is locally installed.
     is_installed: bool,
@@ -186,6 +203,7 @@ impl PackageDetailView {
             trusted,
             state: DetailState::new(),
             preview_rx: None,
+            versions_rx: None,
             install_rx: None,
             is_installed,
             confirming: false,
@@ -197,6 +215,7 @@ impl PackageDetailView {
             v.state.preview = PreviewState::Loading;
             v.fetch_preview();
         }
+        v.fetch_versions();
         v
     }
 
@@ -220,6 +239,23 @@ impl PackageDetailView {
             let result = client
                 .preview_package(&ns, &name, &version)
                 .await
+                .map_err(|e| e.to_string());
+            let _ = tx.send(result);
+        });
+    }
+
+    fn fetch_versions(&mut self) {
+        let registry = self.config.registry().to_string();
+        let ns = self.namespace.clone();
+        let name = self.name.clone();
+        let (tx, rx) = oneshot::channel();
+        self.versions_rx = Some(rx);
+        tokio::spawn(async move {
+            let client = HttpRegistryClient::new(registry);
+            let result = client
+                .list_versions(&ns, &name)
+                .await
+                .map(|list| list.versions.into_iter().map(|v| v.version).collect())
                 .map_err(|e| e.to_string());
             let _ = tx.send(result);
         });
@@ -324,6 +360,23 @@ impl View for PackageDetailView {
             }
         }
 
+        if let Some(rx) = &mut self.versions_rx {
+            if let Ok(result) = rx.try_recv() {
+                self.versions_rx = None;
+                if let Ok(versions) = result {
+                    if !versions.is_empty() {
+                        self.state.versions = versions;
+                        // Keep the currently displayed version selected if present.
+                        if let Some(idx) =
+                            self.state.versions.iter().position(|v| *v == self.version)
+                        {
+                            self.state.selected_version = idx;
+                        }
+                    }
+                }
+            }
+        }
+
         if let Some(rx) = &mut self.install_rx {
             if let Ok(result) = rx.try_recv() {
                 self.install_rx = None;
@@ -390,16 +443,30 @@ impl View for PackageDetailView {
         let versions_inner = versions_block.inner(versions_area);
         frame.render_widget(versions_block, versions_area);
 
-        let installed_span = if self.is_installed {
-            Span::styled(" \u{25cf}", theme.success())
+        let version_strings: Vec<String> = if self.state.versions.is_empty() {
+            vec![self.version.clone()]
         } else {
-            Span::raw("")
+            self.state.versions.clone()
         };
-        let version_item = ListItem::new(Line::from(vec![
-            Span::raw(format!("\u{25b6} {}", self.version)),
-            installed_span,
-        ]));
-        frame.render_widget(List::new(vec![version_item]), versions_inner);
+        let version_items: Vec<ListItem> = version_strings
+            .iter()
+            .enumerate()
+            .map(|(i, v)| {
+                let selected = i == self.state.selected_version;
+                let cursor = if selected { "\u{25b6} " } else { "  " };
+                let mut spans = vec![Span::raw(format!("{cursor}{v}"))];
+                if *v == self.version && self.is_installed {
+                    spans.push(Span::styled(" \u{25cf}", theme.success()));
+                }
+                let item = ListItem::new(Line::from(spans));
+                if selected {
+                    item.style(theme.selected())
+                } else {
+                    item
+                }
+            })
+            .collect();
+        frame.render_widget(List::new(version_items), versions_inner);
 
         // ── Files pane ─────────────────────────────────────────────────────────
         let files_title = if self.is_installed {
@@ -523,6 +590,14 @@ impl View for PackageDetailView {
                     self.state.toggle_pane();
                     Action::None
                 }
+                KeyCode::Down | KeyCode::Char('j') if self.state.focus == Pane::Versions => {
+                    self.state.select_next_version();
+                    Action::None
+                }
+                KeyCode::Up | KeyCode::Char('k') if self.state.focus == Pane::Versions => {
+                    self.state.select_prev_version();
+                    Action::None
+                }
                 KeyCode::Down | KeyCode::Char('j') if self.state.focus == Pane::SkillMd => {
                     self.state.scroll_down();
                     Action::None
@@ -590,6 +665,21 @@ mod tests {
         let mut s = DetailState::new();
         s.preview = PreviewState::Loading;
         assert!(matches!(s.preview, PreviewState::Loading));
+    }
+
+    #[test]
+    fn version_selection_moves_and_clamps() {
+        let mut s = DetailState::new();
+        s.versions = vec!["2.0.0".into(), "1.0.0".into()];
+        assert_eq!(s.selected_version, 0);
+        s.select_next_version();
+        assert_eq!(s.selected_version, 1);
+        s.select_next_version(); // clamp at last
+        assert_eq!(s.selected_version, 1);
+        s.select_prev_version();
+        assert_eq!(s.selected_version, 0);
+        s.select_prev_version(); // clamp at first
+        assert_eq!(s.selected_version, 0);
     }
 
     #[test]
