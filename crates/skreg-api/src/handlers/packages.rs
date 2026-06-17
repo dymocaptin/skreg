@@ -133,6 +133,99 @@ pub async fn package_meta_handler(
     }))
 }
 
+/// A published version row, most-recent-first, used by the versions and diff endpoints.
+#[derive(sqlx::FromRow)]
+pub(crate) struct PublishedVersion {
+    pub(crate) version: String,
+    pub(crate) published_at: chrono::DateTime<chrono::Utc>,
+    pub(crate) sha256: String,
+    /// Storage path consumed by the diff endpoint (Task 3).
+    #[allow(dead_code)]
+    pub(crate) storage_path: String,
+}
+
+/// List all published (passing, non-yanked, non-banned) versions of a package,
+/// most recent first.
+///
+/// # Errors
+///
+/// Returns `404` when the package has no published versions, `500` on DB error.
+pub(crate) async fn list_published_versions(
+    state: &AppState,
+    ns: &str,
+    name: &str,
+) -> Result<Vec<PublishedVersion>, StatusCode> {
+    let rows = sqlx::query_as::<_, PublishedVersion>(
+        "SELECT v.version, v.published_at, v.sha256, v.storage_path
+         FROM versions v
+         JOIN packages p ON p.id = v.package_id
+         JOIN namespaces n ON n.id = p.namespace_id
+         JOIN vetting_jobs j ON j.version_id = v.id
+         WHERE n.slug = $1
+           AND p.name = $2
+           AND j.status = 'pass'
+           AND v.yanked_at IS NULL
+           AND n.banned_at IS NULL
+         ORDER BY v.published_at DESC, v.id DESC",
+    )
+    .bind(ns)
+    .bind(name)
+    .fetch_all(&state.pool)
+    .await
+    .map_err(|e| {
+        error!("db query error (versions): {e}");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    if rows.is_empty() {
+        return Err(StatusCode::NOT_FOUND);
+    }
+    Ok(rows)
+}
+
+/// A single entry in the public versions listing.
+#[derive(Debug, Serialize)]
+pub struct VersionEntry {
+    /// Version string.
+    pub version: String,
+    /// RFC 3339 publish timestamp.
+    pub published_at: chrono::DateTime<chrono::Utc>,
+    /// SHA-256 hex digest of the tarball.
+    pub sha256: String,
+}
+
+/// Response body for the versions listing endpoint.
+#[derive(Debug, Serialize)]
+pub struct VersionsResponse {
+    /// Published versions, most recent first.
+    pub versions: Vec<VersionEntry>,
+}
+
+/// Handle `GET /v1/packages/:ns/:name/versions`.
+///
+/// # Errors
+///
+/// Returns `400` for invalid namespace/name, `404` if the package has no
+/// published versions, `500` on DB error.
+pub async fn package_versions_handler(
+    State(state): State<SharedState>,
+    Path((ns_raw, name_raw)): Path<(String, String)>,
+) -> Result<Json<VersionsResponse>, StatusCode> {
+    let ns = Namespace::new(&ns_raw).map_err(|_| StatusCode::BAD_REQUEST)?;
+    let pkg_name = PackageName::new(&name_raw).map_err(|_| StatusCode::BAD_REQUEST)?;
+
+    let rows = list_published_versions(&state, ns.as_str(), pkg_name.as_str()).await?;
+    let versions = rows
+        .into_iter()
+        .map(|r| VersionEntry {
+            version: r.version,
+            published_at: r.published_at,
+            sha256: r.sha256,
+        })
+        .collect();
+    Ok(Json(VersionsResponse { versions }))
+}
+
 /// Handle `GET /v1/download/:ns/:name/:version` — return tarball bytes.
 ///
 /// # Errors
