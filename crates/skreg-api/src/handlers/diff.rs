@@ -1,12 +1,18 @@
 //! Structured per-file diff model and computation (pure; no I/O).
 
-// HTTP wiring is added in a later task; these items are not yet called from
-// outside the module but will be when the endpoint is wired up.
-#![allow(dead_code)]
-
 use std::collections::{BTreeMap, BTreeSet};
 
-use serde::Serialize;
+use axum::extract::{Path, Query, State};
+use axum::http::StatusCode;
+use axum::Json;
+use log::error;
+use serde::{Deserialize, Serialize};
+use skreg_core::types::{Namespace, PackageName};
+use skreg_core::version::is_valid_segment;
+
+use crate::handlers::packages::{list_published_versions, PublishedVersion};
+use crate::handlers::preview::collect_files;
+use crate::router::{AppState, SharedState};
 use similar::{ChangeTag, TextDiff};
 
 /// Number of unchanged context lines kept around each change.
@@ -114,7 +120,11 @@ fn text_hunks(old: &str, new: &str) -> Vec<Hunk> {
                     ChangeTag::Insert => LineKind::Insert,
                 };
                 let raw = change.value();
-                let text = raw.strip_suffix('\n').unwrap_or(raw).to_owned();
+                let without_lf = raw.strip_suffix('\n').unwrap_or(raw);
+                let text = without_lf
+                    .strip_suffix('\r')
+                    .unwrap_or(without_lf)
+                    .to_owned();
                 lines.push(DiffLine { kind, text });
             }
         }
@@ -183,9 +193,161 @@ pub(crate) fn compute_file_diffs(
     files
 }
 
+/// Query parameters for the diff endpoint.
+#[derive(Debug, Deserialize)]
+pub struct DiffQuery {
+    /// Older version; defaults to the second-most-recent published version.
+    pub from: Option<String>,
+    /// Newer version; defaults to the most-recent published version.
+    pub to: Option<String>,
+}
+
+/// Fetch a tarball from S3 by storage path, unpack it, and read every file into
+/// a path → bytes map.
+async fn read_package_files(
+    state: &AppState,
+    storage_path: &str,
+) -> Result<BTreeMap<String, Vec<u8>>, StatusCode> {
+    let obj = state
+        .s3
+        .get_object()
+        .bucket(&state.s3_bucket)
+        .key(storage_path)
+        .send()
+        .await
+        .map_err(|e| {
+            error!("s3 get_object error (diff): {e}");
+            StatusCode::SERVICE_UNAVAILABLE
+        })?;
+    let data = obj.body.collect().await.map_err(|e| {
+        error!("s3 body collect error (diff): {e}");
+        StatusCode::SERVICE_UNAVAILABLE
+    })?;
+    let bytes = data.into_bytes();
+    let tmp = skreg_pack::unpack::unpack_to_tempdir(&bytes).map_err(|e| {
+        error!("unpack error (diff): {e}");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    let mut rel_paths = Vec::new();
+    collect_files(tmp.path(), tmp.path(), &mut rel_paths).map_err(|e| {
+        error!("file walk error (diff): {e}");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    let mut files = BTreeMap::new();
+    for rel in rel_paths {
+        let abs = tmp.path().join(&rel);
+        let contents = std::fs::read(&abs).map_err(|e| {
+            error!("file read error (diff): {e}");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+        files.insert(rel, contents);
+    }
+    Ok(files)
+}
+
+/// Resolve a requested (possibly `None`/`"latest"`) version against the
+/// published list, returning its row. `default_index` is used when the request
+/// omits the version (0 = latest, 1 = previous).
+fn resolve_requested<'a>(
+    requested: Option<&str>,
+    published: &'a [PublishedVersion],
+    default_index: usize,
+) -> Result<&'a PublishedVersion, StatusCode> {
+    match requested {
+        None => published.get(default_index).ok_or(StatusCode::NOT_FOUND),
+        Some("latest") => published.first().ok_or(StatusCode::NOT_FOUND),
+        Some(v) => {
+            if !is_valid_segment(v) {
+                return Err(StatusCode::BAD_REQUEST);
+            }
+            published
+                .iter()
+                .find(|p| p.version == v)
+                .ok_or(StatusCode::NOT_FOUND)
+        }
+    }
+}
+
+/// Handle `GET /v1/packages/:ns/:name/diff?from=&to=`.
+///
+/// # Errors
+///
+/// - `400` invalid namespace/name, invalid version segment, or `from == to`
+/// - `404` unknown package/version, or fewer than two published versions
+/// - `503` S3 failure
+/// - `500` unpack / read failure
+pub async fn package_diff_handler(
+    State(state): State<SharedState>,
+    Path((ns_raw, name_raw)): Path<(String, String)>,
+    Query(q): Query<DiffQuery>,
+) -> Result<Json<DiffResponse>, StatusCode> {
+    let ns = Namespace::new(&ns_raw).map_err(|_| StatusCode::BAD_REQUEST)?;
+    let pkg_name = PackageName::new(&name_raw).map_err(|_| StatusCode::BAD_REQUEST)?;
+
+    let published = list_published_versions(&state, ns.as_str(), pkg_name.as_str()).await?;
+
+    let to_row = resolve_requested(q.to.as_deref(), &published, 0)?;
+    let from_row = resolve_requested(q.from.as_deref(), &published, 1)?;
+
+    if from_row.version == to_row.version {
+        return Err(StatusCode::BAD_REQUEST);
+    }
+
+    let old_files = read_package_files(&state, &from_row.storage_path).await?;
+    let new_files = read_package_files(&state, &to_row.storage_path).await?;
+
+    let files = compute_file_diffs(&old_files, &new_files);
+    Ok(Json(DiffResponse {
+        from: from_row.version.clone(),
+        to: to_row.version.clone(),
+        files,
+    }))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn pv(version: &str) -> crate::handlers::packages::PublishedVersion {
+        crate::handlers::packages::PublishedVersion {
+            version: version.to_owned(),
+            published_at: chrono::Utc::now(),
+            sha256: String::new(),
+            storage_path: String::new(),
+        }
+    }
+
+    #[test]
+    fn resolve_defaults_to_latest_and_previous() {
+        let list = vec![pv("2.0.0"), pv("1.0.0")];
+        let to = super::resolve_requested(None, &list, 0).unwrap();
+        let from = super::resolve_requested(None, &list, 1).unwrap();
+        assert_eq!(to.version, "2.0.0");
+        assert_eq!(from.version, "1.0.0");
+    }
+
+    #[test]
+    fn resolve_rejects_invalid_segment() {
+        let list = vec![pv("1.0.0")];
+        let err = super::resolve_requested(Some("../bad"), &list, 0).unwrap_err();
+        assert_eq!(err, axum::http::StatusCode::BAD_REQUEST);
+    }
+
+    #[test]
+    fn resolve_unknown_version_is_404() {
+        let list = vec![pv("1.0.0")];
+        let err = super::resolve_requested(Some("9.9.9"), &list, 0).unwrap_err();
+        assert_eq!(err, axum::http::StatusCode::NOT_FOUND);
+    }
+
+    #[test]
+    fn resolve_missing_previous_is_404() {
+        let list = vec![pv("1.0.0")];
+        let err = super::resolve_requested(None, &list, 1).unwrap_err();
+        assert_eq!(err, axum::http::StatusCode::NOT_FOUND);
+    }
 
     fn map(pairs: &[(&str, &[u8])]) -> BTreeMap<String, Vec<u8>> {
         pairs

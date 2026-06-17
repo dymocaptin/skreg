@@ -134,13 +134,11 @@ pub async fn package_meta_handler(
 }
 
 /// A published version row, most-recent-first, used by the versions and diff endpoints.
-#[derive(sqlx::FromRow)]
+#[derive(Debug, sqlx::FromRow)]
 pub(crate) struct PublishedVersion {
     pub(crate) version: String,
     pub(crate) published_at: chrono::DateTime<chrono::Utc>,
     pub(crate) sha256: String,
-    /// Storage path consumed by the diff endpoint (Task 3).
-    #[allow(dead_code)]
     pub(crate) storage_path: String,
 }
 

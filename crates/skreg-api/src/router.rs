@@ -15,6 +15,7 @@ use tower_http::services::ServeDir;
 
 use crate::handlers::auth::{login_handler, token_handler};
 use crate::handlers::cert::cert_handler;
+use crate::handlers::diff::package_diff_handler;
 use crate::handlers::jobs::job_status_handler;
 use crate::handlers::namespaces::create_namespace_handler;
 use crate::handlers::packages::{
@@ -90,6 +91,7 @@ pub fn build_router(state: AppState) -> Router {
             "/v1/packages/:ns/:name/versions",
             get(package_versions_handler),
         )
+        .route("/v1/packages/:ns/:name/diff", get(package_diff_handler))
         .route(
             "/v1/packages/:ns/:name/:version/preview",
             get(package_preview_handler),
