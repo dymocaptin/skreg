@@ -1,5 +1,3 @@
-import pathlib
-
 import pulumi
 from pulumi.runtime import Mocks
 
@@ -51,6 +49,10 @@ def test_dns_instantiates() -> None:
     assert dns._hosted_zone_id == "Z123ABC"
 
 
-def test_dns_updater_script_exists() -> None:
-    script = pathlib.Path(__file__).parents[2] / "scripts" / "dns-updater.py"
-    assert script.exists()
+def test_dns_updater_script_inlined() -> None:
+    from skreg_infra.providers.k8s import dns as dns_module
+
+    # The updater script is embedded in the provider (no external file dependency)
+    # and is delivered to the CronJob via the ConfigMap.
+    assert "def main()" in dns_module._DNS_UPDATER_SCRIPT
+    assert "route53" in dns_module._DNS_UPDATER_SCRIPT
