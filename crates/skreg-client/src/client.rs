@@ -93,6 +93,23 @@ pub trait RegistryClient: Send + Sync {
         name: &'a str,
         version: &'a str,
     ) -> BoxFuture<'a, Result<PackagePreview, ClientError>>;
+
+    /// Yank a published package from the registry (soft removal).
+    ///
+    /// `version = None` yanks all versions; `Some(v)` yanks one version.
+    /// Authenticates with `api_key` as a bearer token. Returns the number of
+    /// versions newly yanked.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ClientError`] on network failure or a non-success status.
+    fn yank<'a>(
+        &'a self,
+        api_key: &'a str,
+        ns: &'a str,
+        name: &'a str,
+        version: Option<&'a str>,
+    ) -> BoxFuture<'a, Result<u64, ClientError>>;
 }
 
 /// `reqwest`-backed implementation of [`RegistryClient`].
@@ -229,6 +246,41 @@ impl RegistryClient for HttpRegistryClient {
                 .json::<PackagePreview>()
                 .await
                 .map_err(|e| ClientError::Parse(e.to_string()))
+        })
+    }
+
+    fn yank<'a>(
+        &'a self,
+        api_key: &'a str,
+        ns: &'a str,
+        name: &'a str,
+        version: Option<&'a str>,
+    ) -> BoxFuture<'a, Result<u64, ClientError>> {
+        #[derive(serde::Deserialize)]
+        struct YankResponse {
+            yanked: u64,
+        }
+
+        Box::pin(async move {
+            let url = match version {
+                Some(v) => format!("{}/v1/packages/{ns}/{name}/{v}/yank", self.base_url),
+                None => format!("{}/v1/packages/{ns}/{name}/yank", self.base_url),
+            };
+            debug!("yanking via {url}");
+
+            let resp: YankResponse = self
+                .http
+                .post(&url)
+                .header("Authorization", format!("Bearer {api_key}"))
+                .send()
+                .await?
+                .error_for_status()
+                .map_err(ClientError::Http)?
+                .json()
+                .await
+                .map_err(|e| ClientError::Parse(e.to_string()))?;
+
+            Ok(resp.yanked)
         })
     }
 }
