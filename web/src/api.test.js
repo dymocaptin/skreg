@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { searchPackages, previewPackage } from './api.js'
+import { searchPackages, previewPackage, versionsPath, diffPath } from './api.js'
 
 describe('searchPackages', () => {
   beforeEach(() => {
@@ -121,5 +121,27 @@ describe('previewPackage', () => {
 
     await expect(previewPackage('acme', 'my-skill', '1.2.3', undefined))
       .rejects.toThrow('Failed to fetch')
+  })
+})
+
+describe('versionsPath', () => {
+  it('builds the versions path', () => {
+    expect(versionsPath('ns', 'pkg')).toBe('/v1/packages/ns/pkg/versions')
+  })
+})
+
+describe('diffPath', () => {
+  it('includes from and to query params when both given', () => {
+    expect(diffPath('ns', 'pkg', '1.0.0', '1.0.1'))
+      .toBe('/v1/packages/ns/pkg/diff?from=1.0.0&to=1.0.1')
+  })
+
+  it('omits the query string when neither is given', () => {
+    expect(diffPath('ns', 'pkg')).toBe('/v1/packages/ns/pkg/diff')
+  })
+
+  it('includes only the provided side', () => {
+    expect(diffPath('ns', 'pkg', undefined, '2.0.0'))
+      .toBe('/v1/packages/ns/pkg/diff?to=2.0.0')
   })
 })

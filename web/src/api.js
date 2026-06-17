@@ -17,3 +17,27 @@ export async function previewPackage(ns, name, version, signal) {
   if (!res.ok) throw new Error(`Preview failed: ${res.status}`)
   return res.json()
 }
+
+export function versionsPath(ns, name) {
+  return `/v1/packages/${ns}/${name}/versions`
+}
+
+export function diffPath(ns, name, from, to) {
+  const params = new URLSearchParams()
+  if (from) params.set('from', from)
+  if (to) params.set('to', to)
+  const qs = params.toString()
+  return `/v1/packages/${ns}/${name}/diff${qs ? `?${qs}` : ''}`
+}
+
+export async function listVersions(ns, name, signal) {
+  const res = await fetch(`${BASE_URL}${versionsPath(ns, name)}`, { signal })
+  if (!res.ok) throw new Error(`Versions failed: ${res.status}`)
+  return res.json()
+}
+
+export async function diffPackage(ns, name, from, to, signal) {
+  const res = await fetch(`${BASE_URL}${diffPath(ns, name, from, to)}`, { signal })
+  if (!res.ok) throw new Error(`Diff failed: ${res.status}`)
+  return res.json()
+}
