@@ -1,10 +1,15 @@
 import { useState, useEffect, useRef } from 'react'
-import { previewPackage } from '../../api.js'
+import { previewPackage, listVersions, diffPackage } from '../../api.js'
+import DiffView from '../DiffView/DiffView.jsx'
 import styles from './PackageDetail.module.css'
 
 export default function PackageDetail({ pkg }) {
   const [preview, setPreview] = useState({ status: 'loading' })
   const [copied, setCopied] = useState(false)
+  const [versions, setVersions] = useState([])
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
+  const [diff, setDiff] = useState({ status: 'idle' })
   const timerRef = useRef(null)
   const installCmd = `skreg install ${pkg.namespace}/${pkg.name}`
 
@@ -36,6 +41,34 @@ export default function PackageDetail({ pkg }) {
       if (timerRef.current) clearTimeout(timerRef.current)
     }
   }, [])
+
+  // Load the version list and default from/to to the latest two.
+  useEffect(() => {
+    const controller = new AbortController()
+    setDiff({ status: 'idle' })
+    listVersions(pkg.namespace, pkg.name, controller.signal)
+      .then(data => {
+        const vs = data.versions.map(v => v.version)
+        setVersions(vs)
+        setTo(vs[0] ?? '')
+        setFrom(vs[1] ?? '')
+      })
+      .catch(err => {
+        if (err.name !== 'AbortError') setVersions([])
+      })
+    return () => controller.abort()
+  }, [pkg.namespace, pkg.name])
+
+  const canCompare =
+    versions.includes(from) && versions.includes(to) && from !== to
+
+  function handleCompare() {
+    if (!canCompare) return
+    setDiff({ status: 'loading' })
+    diffPackage(pkg.namespace, pkg.name, from, to)
+      .then(data => setDiff({ status: 'loaded', data }))
+      .catch(err => setDiff({ status: 'failed', message: err.message }))
+  }
 
   async function handleCopy() {
     try {
@@ -104,6 +137,27 @@ export default function PackageDetail({ pkg }) {
             </>
           )}
         </div>
+      </div>
+      <div className={styles.compare}>
+        <div className={styles.compareControls}>
+          <label>
+            from
+            <select value={from} onChange={e => setFrom(e.target.value)}>
+              {versions.map(v => <option key={v} value={v}>{v}</option>)}
+            </select>
+          </label>
+          <span className={styles.arrow}>→</span>
+          <label>
+            to
+            <select value={to} onChange={e => setTo(e.target.value)}>
+              {versions.map(v => <option key={v} value={v}>{v}</option>)}
+            </select>
+          </label>
+          <button onClick={handleCompare} disabled={!canCompare}>Compare</button>
+        </div>
+        {diff.status === 'loading' && <p className={styles.loading}>⠙ Loading diff…</p>}
+        {diff.status === 'failed' && <p className={styles.error}>{diff.message}</p>}
+        {diff.status === 'loaded' && <DiffView diff={diff.data} />}
       </div>
     </div>
   )

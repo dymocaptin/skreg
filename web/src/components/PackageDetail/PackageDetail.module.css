@@ -152,3 +152,8 @@
   color: var(--text-muted);
   padding: 1rem;
 }
+
+.compare { margin-top: 1rem; border-top: 1px solid var(--border, #333); padding-top: 1rem; }
+.compareControls { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.75rem; }
+.compareControls select { margin-left: 0.3rem; }
+.arrow { color: var(--muted, #888); }

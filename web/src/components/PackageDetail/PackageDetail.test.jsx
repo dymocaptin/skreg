@@ -5,6 +5,8 @@ import PackageDetail from './PackageDetail.jsx'
 
 vi.mock('../../api.js', () => ({
   previewPackage: vi.fn(),
+  listVersions: vi.fn().mockResolvedValue({ versions: [] }),
+  diffPackage: vi.fn(),
 }))
 
 import { previewPackage } from '../../api.js'
