@@ -76,7 +76,7 @@ pub async fn run_pipeline(
 
         if sa_findings.iter().any(|f| f.severity.is_blocking()) {
             let results = serde_json::json!({
-                "status": "rejected",
+                "status": "quarantined",
                 "stage": "static_analysis",
                 "findings": sa_findings.iter().map(|f| serde_json::json!({
                     "file": f.file,
@@ -87,7 +87,7 @@ pub async fn run_pipeline(
                 })).collect::<Vec<_>>()
             });
             sqlx::query(
-                "UPDATE vetting_jobs SET status = 'rejected', completed_at = now(), results = $1 WHERE id = $2"
+                "UPDATE vetting_jobs SET status = 'quarantined', completed_at = now(), results = $1 WHERE id = $2"
             )
             .bind(sqlx::types::Json(results))
             .bind(job_id)

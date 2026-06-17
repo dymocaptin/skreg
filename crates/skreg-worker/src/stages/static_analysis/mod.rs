@@ -29,7 +29,7 @@ pub struct Finding {
 pub enum Severity {
     /// Finding blocks publishing.
     Error,
-    /// Finding blocks publishing.
+    /// Advisory — recorded but does not block publishing.
     Warning,
     /// Informational — recorded but does not block.
     Info,
@@ -39,7 +39,28 @@ impl Severity {
     /// Returns `true` if this severity causes rejection.
     #[must_use]
     pub fn is_blocking(&self) -> bool {
-        matches!(self, Severity::Error | Severity::Warning)
+        matches!(self, Severity::Error)
+    }
+}
+
+/// YARA rule identifiers that are advisory rather than rejecting. These detect
+/// operations that are legitimate in many skills — secure file shredding,
+/// scp/ssh transfer, sudo — so they warn rather than block. This mirrors the
+/// `severity = "Warning"` metadata in the corresponding `.yar` files, which
+/// yara-x does not expose on match results.
+pub const WARNING_RULES: &[&str] = &[
+    "destructive_ops",
+    "network_transfer",
+    "privilege_escalation_sudo",
+];
+
+/// Map a matched YARA rule identifier to its pipeline severity.
+#[must_use]
+pub fn severity_for_rule(rule_id: &str) -> Severity {
+    if WARNING_RULES.contains(&rule_id) {
+        Severity::Warning
+    } else {
+        Severity::Error
     }
 }
 
@@ -189,8 +210,20 @@ mod tests {
     }
 
     #[test]
-    fn warning_severity_is_blocking() {
-        assert!(Severity::Warning.is_blocking());
+    fn warning_severity_is_not_blocking() {
+        assert!(!Severity::Warning.is_blocking());
+    }
+
+    #[test]
+    fn advisory_rules_map_to_warning() {
+        assert_eq!(severity_for_rule("destructive_ops"), Severity::Warning);
+        assert_eq!(severity_for_rule("network_transfer"), Severity::Warning);
+        assert_eq!(
+            severity_for_rule("privilege_escalation_sudo"),
+            Severity::Warning
+        );
+        assert_eq!(severity_for_rule("aws_credential_harvest"), Severity::Error);
+        assert!(!severity_for_rule("destructive_ops").is_blocking());
     }
 
     #[test]
@@ -211,7 +244,7 @@ mod tests {
     }
 
     #[test]
-    fn findings_with_warning_block() {
+    fn findings_with_only_warning_do_not_block() {
         let findings = [Finding {
             file: "scripts/setup.py".into(),
             tool: "bandit".into(),
@@ -219,7 +252,7 @@ mod tests {
             severity: Severity::Warning,
             message: "shell injection risk".into(),
         }];
-        assert!(findings.iter().any(|f| f.severity.is_blocking()));
+        assert!(!findings.iter().any(|f| f.severity.is_blocking()));
     }
 
     /// Mock analyzer that returns a canned list of findings.
