@@ -8,6 +8,7 @@
 use axum::extract::{Path, State};
 use axum::http::{HeaderMap, StatusCode};
 use axum::Json;
+use log::error;
 use serde::Serialize;
 use skreg_core::types::{Namespace, PackageName};
 
@@ -80,19 +81,89 @@ async fn do_yank(
         return Err(StatusCode::FORBIDDEN);
     }
 
-    // 4. DB step — implemented in a later task.
+    // 4. DB step.
     let yanked = yank_versions(state, ns_id, pkg_name.as_str(), version).await?;
     Ok(Json(YankResponse { yanked }))
 }
 
-/// Set `yanked_at` on the target version(s); returns count newly yanked.
-/// Stubbed in this task, implemented in the next task.
-#[allow(clippy::unused_async)]
+/// Set `yanked_at` on the target version(s); returns the number of versions
+/// newly yanked (already-yanked versions are not recounted). Idempotent.
 async fn yank_versions(
-    _state: &AppState,
-    _ns_id: uuid::Uuid,
-    _name: &str,
-    _version: Option<&str>,
+    state: &AppState,
+    ns_id: uuid::Uuid,
+    name: &str,
+    version: Option<&str>,
 ) -> Result<i64, StatusCode> {
-    Ok(0)
+    // Resolve the package id within the (already ownership-checked) namespace.
+    let pkg_id: Option<uuid::Uuid> =
+        sqlx::query_scalar("SELECT id FROM packages WHERE namespace_id = $1 AND name = $2")
+            .bind(ns_id)
+            .bind(name)
+            .fetch_optional(&state.pool)
+            .await
+            .map_err(|e| {
+                error!("db: {e}");
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
+    let pkg_id = pkg_id.ok_or(StatusCode::NOT_FOUND)?;
+
+    if let Some(v) = version {
+        // 404 if the version row does not exist at all.
+        let exists: bool = sqlx::query_scalar(
+            "SELECT EXISTS(SELECT 1 FROM versions WHERE package_id = $1 AND version = $2)",
+        )
+        .bind(pkg_id)
+        .bind(v)
+        .fetch_one(&state.pool)
+        .await
+        .map_err(|e| {
+            error!("db: {e}");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+        if !exists {
+            return Err(StatusCode::NOT_FOUND);
+        }
+
+        let affected = sqlx::query(
+            "UPDATE versions SET yanked_at = now()
+             WHERE package_id = $1 AND version = $2 AND yanked_at IS NULL",
+        )
+        .bind(pkg_id)
+        .bind(v)
+        .execute(&state.pool)
+        .await
+        .map_err(|e| {
+            error!("db: {e}");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?
+        .rows_affected();
+        return Ok(i64::try_from(affected).unwrap_or(i64::MAX));
+    }
+
+    // 404 if the package has no versions at all.
+    let total: i64 = sqlx::query_scalar("SELECT count(*) FROM versions WHERE package_id = $1")
+        .bind(pkg_id)
+        .fetch_one(&state.pool)
+        .await
+        .map_err(|e| {
+            error!("db: {e}");
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+    if total == 0 {
+        return Err(StatusCode::NOT_FOUND);
+    }
+
+    let affected = sqlx::query(
+        "UPDATE versions SET yanked_at = now()
+         WHERE package_id = $1 AND yanked_at IS NULL",
+    )
+    .bind(pkg_id)
+    .execute(&state.pool)
+    .await
+    .map_err(|e| {
+        error!("db: {e}");
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?
+    .rows_affected();
+    Ok(i64::try_from(affected).unwrap_or(i64::MAX))
 }
