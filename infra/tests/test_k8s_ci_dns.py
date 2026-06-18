@@ -40,6 +40,22 @@ def test_ci_deployer_service_account_name() -> None:
     assert ci_module._NAMESPACE == "skreg-ci"
 
 
+def test_ci_registry_proxy_sidecar() -> None:
+    from skreg_infra.providers.k8s import ci as ci_module
+
+    sidecar = ci_module._REGISTRY_PROXY_SIDECAR
+    # Native sidecar: starts before the runner and never blocks pod completion.
+    assert sidecar["restartPolicy"] == "Always"
+    assert sidecar["name"] == "registry-proxy"
+    # Bridges the pod loopback :30500 to the in-cluster registry Service, on
+    # both IPv4 and IPv6 (the runner resolves localhost to ::1 first).
+    script = sidecar["args"][0]
+    assert ci_module._REGISTRY_SERVICE in script
+    assert "bind=[::1]" in script
+    assert "bind=127.0.0.1" in script
+    assert "30500" in script
+
+
 def test_dns_stores_zone() -> None:
     obj = K8sDns.__new__(K8sDns)
     obj._hosted_zone_id = "Z123ABC"
