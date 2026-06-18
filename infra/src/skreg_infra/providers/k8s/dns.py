@@ -7,7 +7,7 @@ import pathlib
 import pulumi
 import pulumi_kubernetes as k8s
 
-_SCRIPT_PATH = pathlib.Path(__file__).parents[5] / "scripts" / "dns-updater.py"
+_SCRIPT_PATH = pathlib.Path(__file__).parent / "dns_updater.py"
 
 
 class K8sDns(pulumi.ComponentResource):

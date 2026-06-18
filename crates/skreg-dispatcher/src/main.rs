@@ -19,7 +19,10 @@ struct AppState {
     worker_image: String,
     pki_secret: String,
     db_secret: String,
+    minio_secret: String,
     s3_bucket: String,
+    s3_endpoint: String,
+    aws_region: String,
     smtp_host: String,
     smtp_port: u16,
     from_email: String,
@@ -70,7 +73,10 @@ async fn notify_handler(
         worker_image: &state.worker_image,
         pki_secret: &state.pki_secret,
         db_secret: &state.db_secret,
+        minio_secret: &state.minio_secret,
         s3_bucket: &state.s3_bucket,
+        s3_endpoint: &state.s3_endpoint,
+        aws_region: &state.aws_region,
         smtp_host: &state.smtp_host,
         smtp_port: state.smtp_port,
         from_email: &state.from_email,
@@ -95,7 +101,11 @@ async fn main() -> Result<()> {
     let worker_image = std::env::var("WORKER_IMAGE")?;
     let pki_secret = std::env::var("PKI_SECRET_NAME").unwrap_or_else(|_| "skreg-pki".to_owned());
     let db_secret = std::env::var("DB_SECRET_NAME").unwrap_or_else(|_| "skreg-db".to_owned());
+    let minio_secret =
+        std::env::var("MINIO_SECRET_NAME").unwrap_or_else(|_| "skreg-minio".to_owned());
     let s3_bucket = std::env::var("S3_BUCKET")?;
+    let s3_endpoint = std::env::var("AWS_ENDPOINT_URL")?;
+    let aws_region = std::env::var("AWS_REGION").unwrap_or_else(|_| "us-east-1".to_owned());
     let smtp_host =
         std::env::var("SMTP_HOST").unwrap_or_else(|_| "postfix.skreg.svc.cluster.local".to_owned());
     let smtp_port: u16 = std::env::var("SMTP_PORT")
@@ -111,7 +121,10 @@ async fn main() -> Result<()> {
         worker_image,
         pki_secret,
         db_secret,
+        minio_secret,
         s3_bucket,
+        s3_endpoint,
+        aws_region,
         smtp_host,
         smtp_port,
         from_email,
