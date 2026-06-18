@@ -72,14 +72,23 @@ class K8sStorage(pulumi.ComponentResource):
         # Bind the bucket to the webhook ARN for `.skill` uploads. Idempotent:
         # tolerates an existing binding, retries until MinIO (with the webhook
         # target env above) is reachable.
+        # `mc event add` is not idempotent: re-running against an already-bound
+        # bucket exits non-zero with an "overlapping prefixes/suffixes" message
+        # (MinIO does not say "already exists"). The minio/mc image ships no
+        # `grep`, so the binding is tolerated with a POSIX `case` on the output;
+        # any other failure still fails the Job.
         event_script = (
             "set -e; "
             "for i in $(seq 1 60); do "
             f'mc alias set m {self.ENDPOINT} "$MC_USER" "$MC_PASS" >/dev/null 2>&1 '
             "&& break || sleep 4; done; "
-            f"mc event add m/{self.BUCKET} {self.WEBHOOK_ARN} "
-            "--event put --suffix .skill >/tmp/o 2>&1 "
-            '|| grep -qi "already exists" /tmp/o; cat /tmp/o'
+            f"if ! mc event add m/{self.BUCKET} {self.WEBHOOK_ARN} "
+            "--event put --suffix .skill >/tmp/o 2>&1; then "
+            'case "$(cat /tmp/o)" in '
+            "*overlapping*|*[Aa]lready*) "
+            'echo "event binding already present; continuing" ;; '
+            "*) cat /tmp/o; exit 1 ;; "
+            "esac; fi; cat /tmp/o"
         )
         k8s.batch.v1.Job(
             f"{name}-event",
