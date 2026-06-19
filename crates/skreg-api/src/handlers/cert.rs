@@ -78,6 +78,48 @@ fn parse_and_validate_csr(
     Ok(csr)
 }
 
+/// Build rcgen [`CertificateParams`] for the Publisher CA from its cert + key.
+///
+/// [`CertificateParams::from_ca_cert_pem`] fails on CA certs whose own
+/// signature uses an algorithm rcgen cannot parse (the production Publisher
+/// CA cert is RSASSA-PSS-signed by the Root CA). Only the CA's subject DN and
+/// key pair are needed to sign leaves, so build the params manually: parse
+/// the subject out of the cert with `x509-cert` and sign leaves with
+/// SHA256-with-RSA (PKCS#1 v1.5).
+///
+/// # Errors
+///
+/// Returns an error if the cert or key PEM cannot be parsed.
+fn ca_params_from_cert_and_key(
+    pub_ca_cert_pem: &str,
+    ca_key: KeyPair,
+) -> anyhow::Result<CertificateParams> {
+    use anyhow::Context;
+    use x509_cert::der::DecodePem;
+
+    let ca_x509 = x509_cert::Certificate::from_pem(pub_ca_cert_pem.as_bytes())
+        .context("parsing CA cert PEM")?;
+
+    let mut dn = rcgen::DistinguishedName::new();
+    for rdn in &ca_x509.tbs_certificate.subject.0 {
+        for attr in rdn.0.iter() {
+            let oid: Vec<u64> = attr.oid.arcs().map(u64::from).collect();
+            let value = attr
+                .value
+                .decode_as::<String>()
+                .context("decoding subject attribute value")?;
+            dn.push(rcgen::DnType::from_oid(&oid), value);
+        }
+    }
+
+    let mut params = CertificateParams::default();
+    params.distinguished_name = dn;
+    params.is_ca = rcgen::IsCa::Ca(rcgen::BasicConstraints::Constrained(0));
+    params.alg = &rcgen::PKCS_RSA_SHA256;
+    params.key_pair = Some(ca_key);
+    Ok(params)
+}
+
 /// Sign a CSR with the Publisher CA and return `(leaf_cert_pem, serial_i64)`.
 ///
 /// Builds the CA [`Certificate`] from the CA key + cert PEM, then calls
@@ -96,8 +138,7 @@ fn sign_csr_with_ca(
     use anyhow::Context;
 
     let ca_key = KeyPair::from_pem(pub_ca_key_pem).context("parsing CA key PEM")?;
-    let ca_params = CertificateParams::from_ca_cert_pem(pub_ca_cert_pem, ca_key)
-        .context("parsing CA cert PEM")?;
+    let ca_params = ca_params_from_cert_and_key(pub_ca_cert_pem, ca_key)?;
     let ca_cert = Certificate::from_params(ca_params).context("building CA Certificate")?;
 
     let leaf_pem = csr
@@ -261,6 +302,46 @@ mod tests {
     #[test]
     fn accepts_normal_csr() {
         assert!(validate_csr_size(&"A".repeat(1_000)).is_ok());
+    }
+
+    #[test]
+    fn sign_csr_with_pss_signed_ca_cert() {
+        // The production Publisher CA cert is signed by the Root CA using
+        // RSASSA-PSS, which rcgen cannot parse. Signing a leaf must still
+        // work because the leaf signature algorithm is independent of how
+        // the CA cert itself was signed.
+        use rand::rngs::OsRng;
+        use rsa::pkcs8::EncodePrivateKey;
+        use x509_cert::der::DecodePem;
+
+        let ca_key_pem = include_str!("../../tests/fixtures/pss-ca.key");
+        let ca_cert_pem = include_str!("../../tests/fixtures/pss-ca.pem");
+
+        let rsa_key = rsa::RsaPrivateKey::new(&mut OsRng, 2048).unwrap();
+        let pkcs8_pem = rsa_key
+            .to_pkcs8_pem(rsa::pkcs8::LineEnding::LF)
+            .unwrap()
+            .to_string();
+        let key_pair = KeyPair::from_pem(&pkcs8_pem).unwrap();
+        let mut params = rcgen::CertificateParams::new(vec!["acme".to_owned()]);
+        params.alg = &PKCS_RSA_SHA256;
+        params.key_pair = Some(key_pair);
+        let cert = rcgen::Certificate::from_params(params).unwrap();
+        let csr_pem = cert.serialize_request_pem().unwrap();
+        let csr = CertificateSigningRequest::from_pem(&csr_pem).unwrap();
+
+        let (leaf_pem, serial) = sign_csr_with_ca(&csr, ca_key_pem, ca_cert_pem).unwrap();
+        assert!(leaf_pem.contains("BEGIN CERTIFICATE"));
+        assert!(serial > 0);
+
+        // The leaf's issuer must equal the CA cert's subject so chain
+        // verification can link the two.
+        let leaf = x509_cert::Certificate::from_pem(leaf_pem.as_bytes()).unwrap();
+        let ca = x509_cert::Certificate::from_pem(ca_cert_pem.as_bytes()).unwrap();
+        assert_eq!(
+            leaf.tbs_certificate.issuer.to_string(),
+            ca.tbs_certificate.subject.to_string()
+        );
     }
 
     #[test]
