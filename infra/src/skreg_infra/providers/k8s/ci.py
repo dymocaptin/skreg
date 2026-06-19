@@ -9,6 +9,29 @@ from pulumi_kubernetes.helm.v3 import Release, ReleaseArgs
 _DEPLOYER_SA = "skreg-ci-deployer"
 _NAMESPACE = "skreg-ci"
 
+# The CI build job pushes images to ``localhost:30500`` (see K8sRegistry, which
+# exposes the in-cluster registry on that address from the kind host). The ARC
+# runner, however, is an in-cluster pod: its ``localhost`` is the pod's own
+# loopback, so the dind daemon's ``docker push localhost:30500`` has nowhere to
+# go and the deploy's image push fails. This native sidecar (an initContainer
+# with ``restartPolicy: Always``, so it starts before the runner and never
+# blocks the ephemeral pod from completing) proxies the pod's loopback :30500 to
+# the registry Service. Both IPv4 and IPv6 are bound because the runner image
+# resolves ``localhost`` to ``::1`` first.
+_REGISTRY_SERVICE = "docker-registry.skreg-infra.svc.cluster.local:5000"
+_REGISTRY_PROXY_SIDECAR = {
+    "name": "registry-proxy",
+    "image": "alpine/socat:1.8.0.1",
+    "restartPolicy": "Always",
+    "command": ["/bin/sh", "-c"],
+    "args": [
+        f"socat TCP6-LISTEN:30500,fork,reuseaddr,bind=[::1] TCP:{_REGISTRY_SERVICE} & "
+        f"socat TCP4-LISTEN:30500,fork,reuseaddr,bind=127.0.0.1 TCP:{_REGISTRY_SERVICE} & "
+        "wait"
+    ],
+    "resources": {"requests": {"cpu": "10m", "memory": "16Mi"}},
+}
+
 
 class K8sCi(pulumi.ComponentResource):
     """Installs ARC controller + a RunnerSet for the skreg repo.
@@ -92,6 +115,11 @@ class K8sCi(pulumi.ComponentResource):
                     "template": {
                         "spec": {
                             "serviceAccountName": _DEPLOYER_SA,
+                            # Native sidecar bridging the pod's localhost:30500
+                            # to the in-cluster registry so the deploy job can
+                            # push built images. The chart appends its own dind
+                            # init/sidecar containers alongside this one.
+                            "initContainers": [_REGISTRY_PROXY_SIDECAR],
                         },
                     },
                 },
