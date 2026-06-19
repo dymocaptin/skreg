@@ -91,6 +91,8 @@ POST /v1/namespaces
 POST /v1/auth/login
 POST /v1/auth/token
 POST /v1/publish
+POST /v1/packages/:ns/:name/yank
+POST /v1/packages/:ns/:name/:version/yank
 GET  /v1/jobs/:id
 GET  /v1/packages/:ns/:name/:version
 GET  /v1/download/:ns/:name/:version
