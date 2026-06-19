@@ -55,6 +55,96 @@ pub struct PackagePreview {
     pub truncated: bool,
 }
 
+/// A single published version entry returned by the versions endpoint.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct VersionEntry {
+    /// Version string.
+    pub version: String,
+    /// RFC 3339 publish timestamp.
+    pub published_at: String,
+    /// SHA-256 hex digest of the tarball.
+    pub sha256: String,
+}
+
+/// List of published versions, most recent first.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct VersionList {
+    /// Published versions, most recent first.
+    pub versions: Vec<VersionEntry>,
+}
+
+/// Kind of a single diff line.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LineKind {
+    /// Unchanged context line.
+    Context,
+    /// Line present only in the `to` version.
+    Insert,
+    /// Line present only in the `from` version.
+    Delete,
+}
+
+/// A single diff line; `text` has no trailing newline.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct DiffLine {
+    /// Whether the line is context, an insertion, or a deletion.
+    pub kind: LineKind,
+    /// Line content without the trailing newline.
+    pub text: String,
+}
+
+/// A contiguous unified-diff hunk.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct Hunk {
+    /// 1-based start line in the `from` file.
+    pub old_start: usize,
+    /// Number of `from` lines covered.
+    pub old_lines: usize,
+    /// 1-based start line in the `to` file.
+    pub new_start: usize,
+    /// Number of `to` lines covered.
+    pub new_lines: usize,
+    /// Ordered lines in the hunk.
+    pub lines: Vec<DiffLine>,
+}
+
+/// Per-file change classification.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum FileStatus {
+    /// Present only in the `to` version.
+    Added,
+    /// Present only in the `from` version.
+    Removed,
+    /// Present in both, with differing content.
+    Modified,
+}
+
+/// Diff for a single file.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct FileDiff {
+    /// Path relative to the package root.
+    pub path: String,
+    /// Added, removed, or modified.
+    pub status: FileStatus,
+    /// True for non-UTF-8 files; `hunks` is then empty.
+    pub binary: bool,
+    /// Unified hunks (empty for binary files).
+    pub hunks: Vec<Hunk>,
+}
+
+/// A full skill diff between two versions.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct SkillDiff {
+    /// The older version.
+    pub from: String,
+    /// The newer version.
+    pub to: String,
+    /// Per-file diffs; `SKILL.md` first.
+    pub files: Vec<FileDiff>,
+}
+
 /// Communicates with a skreg-compatible registry.
 pub trait RegistryClient: Send + Sync {
     /// Resolve a package reference to its latest (or pinned) version metadata.
@@ -93,6 +183,35 @@ pub trait RegistryClient: Send + Sync {
         name: &'a str,
         version: &'a str,
     ) -> BoxFuture<'a, Result<PackagePreview, ClientError>>;
+
+    /// List published versions of a package, most recent first.
+    ///
+    /// Calls `GET /v1/packages/{ns}/{name}/versions`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ClientError`] on network or parse failure.
+    fn list_versions<'a>(
+        &'a self,
+        ns: &'a str,
+        name: &'a str,
+    ) -> BoxFuture<'a, Result<VersionList, ClientError>>;
+
+    /// Diff two versions of a package. `from`/`to` default server-side to the
+    /// second-most-recent and most-recent published versions respectively.
+    ///
+    /// Calls `GET /v1/packages/{ns}/{name}/diff?from=&to=`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ClientError`] on network or parse failure.
+    fn diff<'a>(
+        &'a self,
+        ns: &'a str,
+        name: &'a str,
+        from: Option<&'a str>,
+        to: Option<&'a str>,
+    ) -> BoxFuture<'a, Result<SkillDiff, ClientError>>;
 }
 
 /// `reqwest`-backed implementation of [`RegistryClient`].
@@ -231,6 +350,53 @@ impl RegistryClient for HttpRegistryClient {
                 .map_err(|e| ClientError::Parse(e.to_string()))
         })
     }
+
+    fn list_versions<'a>(
+        &'a self,
+        ns: &'a str,
+        name: &'a str,
+    ) -> BoxFuture<'a, Result<VersionList, ClientError>> {
+        Box::pin(async move {
+            let url = format!("{}/v1/packages/{ns}/{name}/versions", self.base_url);
+            debug!("listing versions from {url}");
+            self.http
+                .get(&url)
+                .send()
+                .await?
+                .error_for_status()
+                .map_err(ClientError::Http)?
+                .json::<VersionList>()
+                .await
+                .map_err(|e| ClientError::Parse(e.to_string()))
+        })
+    }
+
+    fn diff<'a>(
+        &'a self,
+        ns: &'a str,
+        name: &'a str,
+        from: Option<&'a str>,
+        to: Option<&'a str>,
+    ) -> BoxFuture<'a, Result<SkillDiff, ClientError>> {
+        Box::pin(async move {
+            let url = format!("{}/v1/packages/{ns}/{name}/diff", self.base_url);
+            let mut req = self.http.get(&url);
+            if let Some(f) = from {
+                req = req.query(&[("from", f)]);
+            }
+            if let Some(t) = to {
+                req = req.query(&[("to", t)]);
+            }
+            debug!("fetching diff from {url} (from={from:?} to={to:?})");
+            req.send()
+                .await?
+                .error_for_status()
+                .map_err(ClientError::Http)?
+                .json::<SkillDiff>()
+                .await
+                .map_err(|e| ClientError::Parse(e.to_string()))
+        })
+    }
 }
 
 #[cfg(test)]
@@ -255,5 +421,43 @@ mod tests {
         let json = r#"{"files": [], "skill_md": "...", "truncated": true}"#;
         let preview: PackagePreview = serde_json::from_str(json).unwrap();
         assert!(preview.truncated);
+    }
+
+    #[test]
+    fn version_list_deserializes_from_json() {
+        let json = r#"{"versions":[
+            {"version":"1.0.1","published_at":"2026-06-10T12:00:00Z","sha256":"aa"},
+            {"version":"1.0.0","published_at":"2026-06-01T09:30:00Z","sha256":"bb"}
+        ]}"#;
+        let list: VersionList = serde_json::from_str(json).unwrap();
+        assert_eq!(list.versions.len(), 2);
+        assert_eq!(list.versions[0].version, "1.0.1");
+        assert_eq!(list.versions[1].sha256, "bb");
+    }
+
+    #[test]
+    fn skill_diff_deserializes_from_json() {
+        let json = r#"{
+            "from":"1.0.0","to":"1.0.1",
+            "files":[
+                {"path":"SKILL.md","status":"modified","binary":false,"hunks":[
+                    {"old_start":1,"old_lines":1,"new_start":1,"new_lines":1,"lines":[
+                        {"kind":"delete","text":"old"},
+                        {"kind":"insert","text":"new"}
+                    ]}
+                ]},
+                {"path":"logo.png","status":"added","binary":true,"hunks":[]}
+            ]
+        }"#;
+        let d: SkillDiff = serde_json::from_str(json).unwrap();
+        assert_eq!(d.from, "1.0.0");
+        assert_eq!(d.to, "1.0.1");
+        assert_eq!(d.files.len(), 2);
+        assert!(matches!(d.files[0].status, FileStatus::Modified));
+        assert!(matches!(
+            d.files[0].hunks[0].lines[0].kind,
+            LineKind::Delete
+        ));
+        assert!(d.files[1].binary);
     }
 }

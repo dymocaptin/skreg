@@ -70,6 +70,21 @@ enum Commands {
         #[command(subcommand)]
         command: skreg_cli::commands::context::ContextCommands,
     },
+    /// Show a git-style diff between two published versions of a skill
+    Diff {
+        /// Package reference (namespace/name)
+        #[arg(value_name = "PACKAGE")]
+        package_ref: String,
+        /// Older version to compare from (defaults to the second-most-recent)
+        #[arg(long, value_name = "VERSION")]
+        from: Option<String>,
+        /// Newer version to compare to (defaults to the most recent)
+        #[arg(long, value_name = "VERSION")]
+        to: Option<String>,
+        /// Disable colored output
+        #[arg(long)]
+        no_color: bool,
+    },
 }
 
 #[tokio::main]
@@ -129,6 +144,25 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::Context { command } => {
             skreg_cli::commands::context::handle(command)?;
+        }
+        Commands::Diff {
+            package_ref,
+            from,
+            to,
+            no_color,
+        } => {
+            // Color when stdout is a TTY, NO_COLOR is unset, and --no-color absent.
+            let use_color = !no_color
+                && std::env::var_os("NO_COLOR").is_none()
+                && std::io::IsTerminal::is_terminal(&std::io::stdout());
+            skreg_cli::commands::diff::run_diff(
+                &package_ref,
+                from.as_deref(),
+                to.as_deref(),
+                use_color,
+                cli.context.as_deref(),
+            )
+            .await?;
         }
     }
     Ok(())
